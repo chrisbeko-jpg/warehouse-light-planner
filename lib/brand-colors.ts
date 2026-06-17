@@ -1,0 +1,57 @@
+/** Shared Lightsale brand palette for canvas, PDF and UI. */
+export const BRAND = {
+  yellow: "#F5C400",
+  yellowHover: "#E0B000",
+  yellowDark: "#C49A00",
+  black: "#111111",
+  dark: "#2B2B2B",
+  gray: "#6B7280",
+  grayLight: "#E5E5E5",
+  bg: "#F4F4F4",
+  white: "#FFFFFF",
+  success: "#16A34A",
+  successDark: "#15803D",
+  warn: "#EA580C",
+  danger: "#DC2626",
+} as const;
+
+export const CANVAS_COLORS = {
+  floor: BRAND.bg,
+  floorStroke: BRAND.dark,
+  gridMajor: "#D1D5DB",
+  gridMinor: BRAND.grayLight,
+  shelfFill: "rgba(43, 43, 43, 0.35)",
+  shelfStroke: BRAND.dark,
+  obstructionFill: "rgba(107, 114, 128, 0.45)",
+  obstructionStroke: BRAND.gray,
+  selectedStroke: BRAND.yellow,
+  railStroke: BRAND.dark,
+  moduleFill: BRAND.yellow,
+  moduleStroke: BRAND.black,
+  moduleText: BRAND.black,
+  blankFill: BRAND.grayLight,
+  blankStroke: "#9CA3AF",
+  blankText: BRAND.gray,
+  dividerStroke: BRAND.gray,
+  powerFeedFill: BRAND.dark,
+  powerFeedStroke: BRAND.black,
+  endCapFill: BRAND.black,
+  hangerFill: BRAND.gray,
+  hangerStroke: BRAND.dark,
+  labelText: BRAND.dark,
+  voltageLabel: BRAND.black,
+  drawnLine: "rgba(43, 43, 43, 0.45)",
+  drawnLineSelected: BRAND.dark,
+  previewLine: BRAND.yellow,
+  rectLabel: BRAND.dark,
+} as const;
+
+/** PDF RGB tuples */
+export const PDF_BRAND = {
+  black: [17, 17, 17] as [number, number, number],
+  dark: [43, 43, 43] as [number, number, number],
+  gray: [107, 114, 128] as [number, number, number],
+  grayLight: [229, 229, 229] as [number, number, number],
+  yellow: [245, 196, 0] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+};

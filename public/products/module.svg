@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="48" viewBox="0 0 80 48">
+  <rect width="80" height="48" rx="4" fill="#fefce8"/>
+  <rect x="10" y="18" width="60" height="12" rx="2" fill="#facc15" stroke="#ca8a04"/>
+  <text x="40" y="14" text-anchor="middle" font-size="7" fill="#854d0e" font-family="sans-serif">LED module</text>
+</svg>
