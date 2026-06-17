@@ -13,6 +13,7 @@ interface LightLineEditorLayerProps {
   warehouseLength: number;
   warehouseWidth: number;
   drawModeActive?: boolean;
+  touchTarget?: boolean;
 }
 
 function EditableDrawnLine({
@@ -21,6 +22,7 @@ function EditableDrawnLine({
   isSelected,
   warehouseLength,
   warehouseWidth,
+  touchTarget,
   onSelect,
   onUpdate,
 }: {
@@ -29,9 +31,12 @@ function EditableDrawnLine({
   isSelected: boolean;
   warehouseLength: number;
   warehouseWidth: number;
+  touchTarget: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<DrawnLightLine>) => void;
 }) {
+  const handleRadius = touchTarget ? 14 : 6;
+  const lineHitWidth = touchTarget ? 28 : 20;
   const points =
     line.direction === "horizontal"
       ? [
@@ -106,10 +111,13 @@ function EditableDrawnLine({
         stroke={isSelected ? CANVAS_COLORS.drawnLineSelected : CANVAS_COLORS.drawnLine}
         strokeWidth={isSelected ? 4 : 8}
         lineCap="round"
-        hitStrokeWidth={20}
+        hitStrokeWidth={lineHitWidth}
         onClick={onSelect}
         onTap={onSelect}
         draggable={isSelected}
+        onTouchStart={(event) => {
+          event.target.getStage()?.setPointersPositions(event.evt);
+        }}
         onDragEnd={handleBodyDragEnd}
       />
       {isSelected && (
@@ -117,22 +125,28 @@ function EditableDrawnLine({
           <Circle
             x={startHandle.x}
             y={startHandle.y}
-            radius={6}
+            radius={handleRadius}
             fill={BRAND.white}
             stroke={isSelected ? BRAND.yellow : BRAND.dark}
             strokeWidth={2}
             draggable
+            onTouchStart={(event) => {
+              event.target.getStage()?.setPointersPositions(event.evt);
+            }}
             onDragMove={handleEndpointDrag("start")}
             onDragEnd={handleEndpointDrag("start")}
           />
           <Circle
             x={endHandle.x}
             y={endHandle.y}
-            radius={6}
+            radius={handleRadius}
             fill={BRAND.white}
             stroke={isSelected ? BRAND.yellow : BRAND.dark}
             strokeWidth={2}
             draggable
+            onTouchStart={(event) => {
+              event.target.getStage()?.setPointersPositions(event.evt);
+            }}
             onDragMove={handleEndpointDrag("end")}
             onDragEnd={handleEndpointDrag("end")}
           />
@@ -147,6 +161,7 @@ export function LightLineEditorLayer({
   warehouseLength,
   warehouseWidth,
   drawModeActive = false,
+  touchTarget = false,
 }: LightLineEditorLayerProps) {
   const drawnLightLines = useWarehouseStore((state) => state.drawnLightLines);
   const selectedLightLineId = useWarehouseStore((state) => state.selectedLightLineId);
@@ -167,6 +182,7 @@ export function LightLineEditorLayer({
           isSelected={selectedLightLineId === line.id}
           warehouseLength={warehouseLength}
           warehouseWidth={warehouseWidth}
+          touchTarget={touchTarget}
           onSelect={() => setSelectedLightLineId(line.id)}
           onUpdate={(updates) => updateDrawnLightLine(line.id, updates)}
         />

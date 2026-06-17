@@ -35,6 +35,10 @@ import {
   pixelsToMeters,
 } from "@/lib/canvas-scale";
 import { CANVAS_COLORS } from "@/lib/brand-colors";
+import {
+  getStagePointerMeters,
+  preventTouchDefaults,
+} from "@/lib/stage-pointer";
 import type { LightLine, LightLinePlan, PlacedRectangle } from "@/types";
 
 const RECT_COLORS = {
@@ -56,6 +60,7 @@ interface DraggableRectangleProps {
   warehouseLength: number;
   warehouseWidth: number;
   isSelected: boolean;
+  touchTarget: boolean;
   onSelect: () => void;
   onUpdate: (id: string, updates: Partial<PlacedRectangle>) => void;
 }
@@ -66,6 +71,7 @@ function DraggableRectangle({
   warehouseLength,
   warehouseWidth,
   isSelected,
+  touchTarget,
   onSelect,
   onUpdate,
 }: DraggableRectangleProps) {
@@ -126,9 +132,13 @@ function DraggableRectangle({
         fill={colors.fill}
         stroke={isSelected ? CANVAS_COLORS.selectedStroke : colors.stroke}
         strokeWidth={isSelected ? 3 : 2}
+        hitStrokeWidth={touchTarget ? 24 : 0}
         draggable
         onClick={onSelect}
         onTap={onSelect}
+        onTouchStart={(event) => {
+          event.target.getStage()?.setPointersPositions(event.evt);
+        }}
         onDragEnd={handleDragEnd}
         onTransformEnd={handleTransformEnd}
       />
@@ -403,6 +413,7 @@ export function WarehouseCanvas() {
 
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [drawPreview, setDrawPreview] = useState<{ x: number; y: number } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const stageRef = useRef<Konva.Stage>(null);
   const layerRef = useRef<Konva.Layer>(null);
@@ -444,6 +455,23 @@ export function WarehouseCanvas() {
     observer.observe(container);
     return () => observer.disconnect();
   }, [calculateFitZoom, length, width]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    if (!lightLineDrawMode || !isMobile) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [lightLineDrawMode, isMobile]);
 
   const activeLines = lightLinePlan?.lines ?? [];
   const activeHeatmap = lightLinePlan?.heatmap ?? null;
@@ -608,55 +636,112 @@ export function WarehouseCanvas() {
           metersToPixels(previewLine.drawnEnd, scale),
         ]);
 
-  const getPointerMeters = (stage: Konva.Stage) => {
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return null;
-    return {
-      x: pixelsToMeters(pointer.x, scale),
-      y: pixelsToMeters(pointer.y, scale),
-    };
-  };
+  const placeDrawnLine = useCallback(
+    (endPoint: { x: number; y: number }) => {
+      if (!drawStart) return;
+      const line = createDrawnLineFromPoints(
+        createDrawnLightLineId(),
+        drawStart.x,
+        drawStart.y,
+        endPoint.x,
+        endPoint.y,
+        length,
+        width,
+      );
+      setDrawStart(null);
+      setDrawPreview(null);
+      if (line) addDrawnLightLine(line);
+    },
+    [addDrawnLightLine, drawStart, length, width],
+  );
 
-  const handleFloorClick = (event: KonvaEventObject<MouseEvent | TouchEvent>) => {
-    if (!lightLineDrawMode) return;
-    if (!isDrawSurface(event.target)) return;
+  const handleFloorPointPlacement = useCallback(
+    (event: KonvaEventObject<MouseEvent | TouchEvent>) => {
+      if (!lightLineDrawMode) return;
+      if (!isDrawSurface(event.target)) return;
 
-    const stage = event.target.getStage();
-    if (!stage) return;
-    const point = getPointerMeters(stage);
-    if (!point) return;
+      const stage = event.target.getStage();
+      if (!stage) return;
+      const point = getStagePointerMeters(stage, event, scale);
+      if (!point) return;
 
-    event.cancelBubble = true;
+      event.cancelBubble = true;
+      preventTouchDefaults(event);
 
-    if (!drawStart) {
-      setDrawStart(point);
-      setDrawPreview(point);
-      setSelectedRectangleId(null);
-      setSelectedLightLineId(null);
-      return;
-    }
+      if (!drawStart) {
+        setDrawStart(point);
+        setDrawPreview(point);
+        setSelectedRectangleId(null);
+        setSelectedLightLineId(null);
+        return;
+      }
 
-    const line = createDrawnLineFromPoints(
-      createDrawnLightLineId(),
-      drawStart.x,
-      drawStart.y,
-      point.x,
-      point.y,
-      length,
-      width,
-    );
+      placeDrawnLine(point);
+    },
+    [
+      lightLineDrawMode,
+      scale,
+      drawStart,
+      placeDrawnLine,
+      setSelectedRectangleId,
+      setSelectedLightLineId,
+    ],
+  );
+
+  const handleStagePointerMove = useCallback(
+    (event: KonvaEventObject<MouseEvent | TouchEvent>) => {
+      if (!lightLineDrawMode || !drawStart) return;
+      preventTouchDefaults(event);
+      const stage = event.target.getStage();
+      if (!stage) return;
+      const point = getStagePointerMeters(stage, event, scale);
+      if (point) setDrawPreview(point);
+    },
+    [lightLineDrawMode, drawStart, scale],
+  );
+
+  const handleStagePointerDown = useCallback(
+    (event: KonvaEventObject<MouseEvent | TouchEvent>) => {
+      if (lightLineDrawMode) {
+        if (isDrawSurface(event.target)) {
+          preventTouchDefaults(event);
+        }
+        return;
+      }
+      if (isDrawSurface(event.target)) {
+        setSelectedRectangleId(null);
+        setSelectedLightLineId(null);
+      }
+    },
+    [lightLineDrawMode, setSelectedRectangleId, setSelectedLightLineId],
+  );
+
+  const handleStagePointerUp = useCallback(
+    (event: KonvaEventObject<MouseEvent | TouchEvent>) => {
+      if (!lightLineDrawMode) return;
+      if (isDrawSurface(event.target)) {
+        preventTouchDefaults(event);
+      }
+    },
+    [lightLineDrawMode],
+  );
+
+  const handleFloorTap = useCallback(
+    (event: KonvaEventObject<MouseEvent | TouchEvent>) => {
+      handleFloorPointPlacement(event);
+    },
+    [handleFloorPointPlacement],
+  );
+
+  const placeEndPoint = useCallback(() => {
+    if (!drawStart || !drawPreview) return;
+    placeDrawnLine(drawPreview);
+  }, [drawStart, drawPreview, placeDrawnLine]);
+
+  const resetDrawStart = useCallback(() => {
     setDrawStart(null);
     setDrawPreview(null);
-    if (line) addDrawnLightLine(line);
-  };
-
-  const handleStageMouseMove = (event: KonvaEventObject<MouseEvent | TouchEvent>) => {
-    if (!lightLineDrawMode || !drawStart) return;
-    const stage = event.target.getStage();
-    if (!stage) return;
-    const point = getPointerMeters(stage);
-    if (point) setDrawPreview(point);
-  };
+  }, []);
 
   const handleCancelDraw = () => {
     setDrawStart(null);
@@ -666,8 +751,12 @@ export function WarehouseCanvas() {
 
   const drawStatusMessage = lightLineDrawMode
     ? drawStart
-      ? "Kies eindpunt. Lijn wordt automatisch horizontaal of verticaal."
-      : "Tekenmodus actief: klik beginpunt en eindpunt van de lichtlijn."
+      ? isMobile
+        ? "Tik het eindpunt of gebruik ‘Plaats eindpunt’. Lijn blijft horizontaal of verticaal."
+        : "Kies eindpunt. Lijn wordt automatisch horizontaal of verticaal."
+      : isMobile
+        ? "Tekenmodus: tik het beginpunt op het canvas."
+        : "Tekenmodus actief: klik beginpunt en eindpunt van de lichtlijn."
     : null;
 
   return (
@@ -687,37 +776,61 @@ export function WarehouseCanvas() {
       {drawStatusMessage && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--ls-gray-light)] bg-[var(--ls-yellow-soft)] px-3 py-2">
           <p className="text-sm font-medium text-[var(--ls-black)]">{drawStatusMessage}</p>
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={handleCancelDraw}
+              className="btn-secondary px-3 py-1.5 text-xs"
+            >
+              Annuleer tekenen
+            </button>
+          )}
+        </div>
+      )}
+      {isMobile && lightLineDrawMode && (
+        <div className="mb-3 flex flex-col gap-2 md:hidden">
+          <button
+            type="button"
+            onClick={resetDrawStart}
+            className="btn-primary btn-mobile-full w-full py-2.5 text-sm"
+          >
+            Start lichtlijn
+          </button>
+          <button
+            type="button"
+            onClick={placeEndPoint}
+            disabled={!drawStart || !drawPreview}
+            className="btn-primary btn-mobile-full w-full py-2.5 text-sm"
+          >
+            Plaats eindpunt
+          </button>
           <button
             type="button"
             onClick={handleCancelDraw}
-            className="btn-secondary px-3 py-1.5 text-xs"
+            className="btn-secondary btn-mobile-full w-full py-2.5 text-sm"
           >
-            Annuleer tekenen
+            Annuleer
           </button>
         </div>
       )}
       <div
         ref={containerRef}
         className={`max-w-full overflow-x-auto overflow-y-auto rounded-lg border border-[var(--ls-gray-light)] bg-[var(--ls-bg)] p-2 sm:p-4 ${
-          lightLineDrawMode ? "cursor-crosshair" : ""
+          lightLineDrawMode ? "cursor-crosshair ls-canvas-interactive" : "ls-canvas-scroll"
         }`}
-        style={{ WebkitOverflowScrolling: "touch" }}
       >
         <div style={{ width: stageWidth, height: stageHeight, minWidth: stageWidth }}>
           <Stage
           ref={stageRef}
           width={stageWidth}
           height={stageHeight}
-          onClick={handleFloorClick}
-          onMouseMove={handleStageMouseMove}
-          onTouchMove={handleStageMouseMove}
-          onMouseDown={(event) => {
-            if (lightLineDrawMode) return;
-            if (isDrawSurface(event.target)) {
-              setSelectedRectangleId(null);
-              setSelectedLightLineId(null);
-            }
-          }}
+          onTap={handleFloorTap}
+          onMouseDown={handleStagePointerDown}
+          onMouseMove={handleStagePointerMove}
+          onMouseUp={handleStagePointerUp}
+          onTouchStart={handleStagePointerDown}
+          onTouchMove={handleStagePointerMove}
+          onTouchEnd={handleStagePointerUp}
         >
           <Layer ref={layerRef}>
             <Rect
@@ -747,6 +860,7 @@ export function WarehouseCanvas() {
                 warehouseLength={length}
                 warehouseWidth={width}
                 isSelected={selectedRectangleId === rectangle.id}
+                touchTarget={isMobile}
                 onSelect={() => {
                   setSelectedRectangleId(rectangle.id);
                   setSelectedLightLineId(null);
@@ -834,6 +948,7 @@ export function WarehouseCanvas() {
               warehouseLength={length}
               warehouseWidth={width}
               drawModeActive={lightLineDrawMode}
+              touchTarget={isMobile}
             />
             <DrawPreviewLine points={previewPoints || null} />
           </Layer>

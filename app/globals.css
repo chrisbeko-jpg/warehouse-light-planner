@@ -51,6 +51,20 @@ html {
   max-width: 100%;
 }
 
+.ls-canvas-interactive {
+  touch-action: none;
+  overscroll-behavior: contain;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.ls-canvas-scroll {
+  touch-action: pan-x pan-y;
+  overscroll-behavior: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 @media (max-width: 639px) {
   .btn-mobile-full {
     width: 100%;
