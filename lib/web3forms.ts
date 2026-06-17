@@ -1,8 +1,9 @@
-import { formatEuroExVat } from "@/lib/format-currency";
 import { formatNumber } from "@/lib/calculations";
+import { formatEuroExVat } from "@/lib/format-currency";
 
-const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
+export const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
 export const WEB3FORMS_SUBJECT = "Nieuwe lichtplan-aanvraag magazijn";
+const RESPONSE_PREVIEW_LENGTH = 300;
 
 export interface Web3FormsContact {
   name: string;
@@ -41,14 +42,20 @@ interface Web3FormsResponse {
   message?: string;
 }
 
-export function getWeb3FormsAccessKey(): string {
-  const key = process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY?.trim();
-  if (!key) {
-    throw new Error(
-      "Web3Forms is niet geconfigureerd. Stel NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY in je .env.local bestand.",
-    );
+function formatSubmitError(status: number, responseText: string): string {
+  const preview = responseText.trim().slice(0, RESPONSE_PREVIEW_LENGTH);
+  return `Formulier kon niet worden verstuurd: ${status} ${preview}`;
+}
+
+function parseWeb3FormsResponseText(
+  responseText: string,
+  status: number,
+): Web3FormsResponse {
+  try {
+    return JSON.parse(responseText) as Web3FormsResponse;
+  } catch {
+    throw new Error(formatSubmitError(status, responseText));
   }
-  return key;
 }
 
 export function buildLightplanMessage(
@@ -98,7 +105,10 @@ export async function submitLightplanToWeb3Forms(
   contact: Web3FormsContact,
   project: LightplanWeb3FormsProjectData,
 ): Promise<Web3FormsResponse> {
-  const accessKey = getWeb3FormsAccessKey();
+  const accessKey = process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY?.trim();
+  if (!accessKey) {
+    throw new Error("Web3Forms access key ontbreekt.");
+  }
 
   const response = await fetch(WEB3FORMS_ENDPOINT, {
     method: "POST",
@@ -117,26 +127,18 @@ export async function submitLightplanToWeb3Forms(
     }),
   });
 
-  const text = await response.text();
+  const responseText = await response.text();
 
   if (process.env.NODE_ENV === "development") {
     console.log("[Web3Forms] status:", response.status);
-    console.log("[Web3Forms] response:", text);
+    console.log("[Web3Forms] response:", responseText);
   }
 
-  let parsed: Web3FormsResponse;
-  try {
-    parsed = JSON.parse(text) as Web3FormsResponse;
-  } catch {
-    throw new Error(
-      `Web3Forms gaf een ongeldige response (HTTP ${response.status}): ${text.slice(0, 500)}`,
-    );
-  }
+  const parsed = parseWeb3FormsResponseText(responseText, response.status);
 
-  if (!response.ok || !parsed.success) {
-    throw new Error(
-      parsed.message ?? `Verzenden mislukt (HTTP ${response.status}).`,
-    );
+  if (response.ok !== true || parsed.success !== true) {
+    const detail = parsed.message?.trim() || responseText.trim();
+    throw new Error(formatSubmitError(response.status, detail));
   }
 
   return parsed;
