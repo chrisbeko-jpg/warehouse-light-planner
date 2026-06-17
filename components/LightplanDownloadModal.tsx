@@ -8,6 +8,10 @@ import {
 } from "@/lib/pdf/generate-lightplan-pdf";
 import { formatEuroExVat } from "@/lib/format-currency";
 import { getFillModeLabel } from "@/lib/line-fill";
+import {
+  mountingSystemLabel,
+  submitLightplanToWeb3Forms,
+} from "@/lib/web3forms";
 import { useWarehouseStore } from "@/lib/warehouse-store";
 
 interface LightplanDownloadModalProps {
@@ -30,9 +34,10 @@ export function LightplanDownloadModal({ open, onClose }: LightplanDownloadModal
   const lightLinePlan = useWarehouseStore((s) => s.lightLinePlan);
   const canvasExporter = useWarehouseStore((s) => s.canvasExporter);
 
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [projectName, setProjectName] = useState("");
-  const [consent, setConsent] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [company, setCompany] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,12 +51,16 @@ export function LightplanDownloadModal({ open, onClose }: LightplanDownloadModal
     setError(null);
     setMessage(null);
 
+    if (!name.trim()) {
+      setError("Vul je naam in.");
+      return;
+    }
     if (!isValidEmail(email)) {
       setError("Vul een geldig e-mailadres in.");
       return;
     }
-    if (!consent) {
-      setError("Geef toestemming om je aanvraag te versturen.");
+    if (!phone.trim()) {
+      setError("Vul je telefoonnummer in.");
       return;
     }
     if (!lightLinePlan) {
@@ -61,15 +70,47 @@ export function LightplanDownloadModal({ open, onClose }: LightplanDownloadModal
 
     setLoading(true);
     try {
+      const { summary, lines, productList } = lightLinePlan;
+
+      await submitLightplanToWeb3Forms(
+        {
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          company: company.trim() || undefined,
+        },
+        {
+          length,
+          width,
+          height,
+          lux,
+          lineFillModeLabel: getFillModeLabel(lineFillMode),
+          mountingSystemLabel: mountingSystemLabel(mountingSystem),
+          netArea,
+          lightLinesCount: lines.length,
+          totalModules: summary.totalModules,
+          blankPlates: summary.blankPlates,
+          installedPowerW: summary.installedPowerW,
+          advisedWattsPerModule: summary.advisedWattsPerModule,
+          advisedTotalPowerW: summary.advisedTotalPowerW,
+          expectedLuxAfterDimming: summary.expectedLuxAfterDimming,
+          targetLux: summary.targetLux,
+          totalExVat: productList.subtotal,
+          materialLines: productList.export,
+        },
+      );
+
       const planImageWithoutHeatmap = canvasExporter
         ? await canvasExporter({ withHeatmap: false })
         : null;
       const planImageWithHeatmap = canvasExporter
         ? await canvasExporter({ withHeatmap: true })
         : null;
+
+      const projectLabel = company.trim() || undefined;
       const pdfBlob = await generateLightplanPdf({
         email: email.trim(),
-        projectName: projectName.trim() || undefined,
+        projectName: projectLabel,
         length,
         width,
         height,
@@ -82,51 +123,14 @@ export function LightplanDownloadModal({ open, onClose }: LightplanDownloadModal
         planImageWithHeatmap,
       });
 
-      const filename = buildPdfFilename(projectName.trim() || undefined);
-      const pdfBase64 = await blobToBase64(pdfBlob);
-
-      const response = await fetch("/api/send-lightplan-request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          projectName: projectName.trim() || undefined,
-          length,
-          width,
-          height,
-          lux,
-          lineFillMode: getFillModeLabel(lineFillMode),
-          mountingSystem,
-          totalExVat: lightLinePlan.productList.subtotal,
-          materialLines: lightLinePlan.productList.export,
-          pdfBase64,
-          pdfFilename: filename,
-        }),
-      });
-
-      const result = (await response.json()) as {
-        ok: boolean;
-        emailSent?: boolean;
-        message?: string;
-        error?: string;
-      };
-
-      if (!result.ok) {
-        throw new Error(result.error ?? "Verzenden mislukt");
-      }
-
+      const filename = buildPdfFilename(projectLabel);
       downloadBlob(pdfBlob, filename);
 
-      if (result.emailSent) {
-        setMessage("PDF gedownload. Aanvraag is verstuurd naar Lightsale en een kopie naar jouw e-mail.");
-      } else {
-        setMessage(
-          result.message ??
-            "PDF is gedownload, maar e-mail kon nog niet worden verstuurd omdat mailconfiguratie ontbreekt.",
-        );
-      }
+      setMessage(
+        "Bedankt voor je aanvraag! Je lichtplan is gedownload. We nemen zo snel mogelijk contact met je op.",
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Er ging iets mis bij het genereren van de PDF.");
+      setError(err instanceof Error ? err.message : "Er ging iets mis bij het versturen van je aanvraag.");
     } finally {
       setLoading(false);
     }
@@ -136,68 +140,91 @@ export function LightplanDownloadModal({ open, onClose }: LightplanDownloadModal
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
         <h2 className="ls-heading text-lg">Ontvang je lichtplan</h2>
-        <p className="mt-1 text-sm text-[var(--ls-navy-muted)]">
-          Vul je gegevens in om het indicatieve lichtplan als PDF te downloaden.
+        <p className="mt-1 text-sm text-[var(--ls-gray)]">
+          Vul je gegevens in. Na verzending download je het indicatieve lichtplan als PDF.
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <label className="block text-sm">
-            <span className="font-medium text-[var(--ls-navy)]">E-mailadres *</span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-              placeholder="naam@bedrijf.nl"
-            />
-          </label>
-
-          <label className="block text-sm">
-            <span className="font-medium text-[var(--ls-navy)]">Projectnaam (optioneel)</span>
-            <input
-              type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-              placeholder="Magazijn Utrecht"
-            />
-          </label>
-
-          <label className="flex items-start gap-2 text-sm text-[var(--ls-navy-muted)]">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-              className="mt-1"
-            />
-            Ik ga akkoord dat Lightsale mijn aanvraag ontvangt om contact op te nemen over dit
-            lichtplan.
-          </label>
-
-          {lightLinePlan && (
-            <p className="rounded-lg bg-slate-50 p-3 text-xs text-[var(--ls-navy-muted)]">
-              Totaal materialen: {formatEuroExVat(lightLinePlan.productList.subtotal)} excl. btw
+        {message ? (
+          <div className="mt-4 space-y-4">
+            <p className="rounded-lg border border-green-200 bg-[var(--ls-success-soft)] p-4 text-sm text-green-800">
+              {message}
             </p>
-          )}
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {message && <p className="text-sm text-green-700">{message}</p>}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-secondary flex-1"
-              disabled={loading}
-            >
-              Annuleren
-            </button>
-            <button type="submit" className="btn-primary flex-1" disabled={loading || !lightLinePlan}>
-              {loading ? "Bezig…" : "Download PDF"}
+            <button type="button" onClick={onClose} className="btn-primary w-full">
+              Sluiten
             </button>
           </div>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+            <label className="block text-sm">
+              <span className="font-medium text-[var(--ls-black)]">Naam *</span>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[var(--ls-gray-light)] px-3 py-2"
+                placeholder="Jan Jansen"
+              />
+            </label>
+
+            <label className="block text-sm">
+              <span className="font-medium text-[var(--ls-black)]">E-mailadres *</span>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[var(--ls-gray-light)] px-3 py-2"
+                placeholder="naam@bedrijf.nl"
+              />
+            </label>
+
+            <label className="block text-sm">
+              <span className="font-medium text-[var(--ls-black)]">Telefoonnummer *</span>
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[var(--ls-gray-light)] px-3 py-2"
+                placeholder="06 12345678"
+              />
+            </label>
+
+            <label className="block text-sm">
+              <span className="font-medium text-[var(--ls-black)]">Bedrijfsnaam (optioneel)</span>
+              <input
+                type="text"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[var(--ls-gray-light)] px-3 py-2"
+                placeholder="Bedrijf B.V."
+              />
+            </label>
+
+            {lightLinePlan && (
+              <p className="rounded-lg bg-[var(--ls-bg)] p-3 text-xs text-[var(--ls-gray)]">
+                Totaal materialen: {formatEuroExVat(lightLinePlan.productList.subtotal)} excl. btw
+              </p>
+            )}
+
+            {error && <p className="text-sm text-[var(--ls-danger)]">{error}</p>}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn-secondary flex-1"
+                disabled={loading}
+              >
+                Annuleren
+              </button>
+              <button type="submit" className="btn-primary flex-1" disabled={loading || !lightLinePlan}>
+                {loading ? "Bezig…" : "Versturen & download PDF"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -210,17 +237,4 @@ function downloadBlob(blob: Blob, filename: string) {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const base64 = result.split(",")[1] ?? "";
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
 }
