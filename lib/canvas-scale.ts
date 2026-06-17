@@ -7,6 +7,17 @@ export function getCanvasScale(length: number, width: number): number {
   return CANVAS_MAX_SIZE / maxDimension;
 }
 
+/** Zoom factor to fit warehouse floor plan within a pixel width (meters scale preserved). */
+export function computeFitZoomFactor(
+  length: number,
+  meterScale: number,
+  availableWidthPx: number,
+): number {
+  const naturalWidthPx = length * meterScale;
+  if (naturalWidthPx <= 0 || availableWidthPx <= 0) return 1;
+  return Math.min(1, availableWidthPx / naturalWidthPx);
+}
+
 export function metersToPixels(meters: number, scale: number): number {
   return meters * scale;
 }

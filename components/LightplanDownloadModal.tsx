@@ -137,8 +137,8 @@ export function LightplanDownloadModal({ open, onClose }: LightplanDownloadModal
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl sm:p-6">
         <h2 className="ls-heading text-lg">Ontvang je lichtplan</h2>
         <p className="mt-1 text-sm text-[var(--ls-gray)]">
           Vul je gegevens in. Na verzending download je het indicatieve lichtplan als PDF.
@@ -210,16 +210,20 @@ export function LightplanDownloadModal({ open, onClose }: LightplanDownloadModal
 
             {error && <p className="text-sm text-[var(--ls-danger)]">{error}</p>}
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
               <button
                 type="button"
                 onClick={onClose}
-                className="btn-secondary flex-1"
+                className="btn-secondary w-full sm:flex-1"
                 disabled={loading}
               >
                 Annuleren
               </button>
-              <button type="submit" className="btn-primary flex-1" disabled={loading || !lightLinePlan}>
+              <button
+                type="submit"
+                className="btn-primary w-full sm:flex-1"
+                disabled={loading || !lightLinePlan}
+              >
                 {loading ? "Bezig…" : "Versturen & download PDF"}
               </button>
             </div>

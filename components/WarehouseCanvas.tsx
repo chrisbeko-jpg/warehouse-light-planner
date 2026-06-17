@@ -1,10 +1,12 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Circle, Layer, Line, Rect, Stage, Text, Transformer } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import type Konva from "konva";
 import { HeatmapStatsPanel } from "@/components/HeatmapStatsPanel";
+import { CanvasZoomControls } from "@/components/CanvasZoomControls";
 import { DrawPreviewLine, LightLineEditorLayer } from "@/components/LightLineEditor";
 import { SelectedLightLinePanel } from "@/components/SelectedLightLinePanel";
 import { SelectedObjectPanel } from "@/components/SelectedObjectPanel";
@@ -26,6 +28,7 @@ import {
   GRID_METER_STEP,
   MIN_RECT_DIMENSION,
   clampRectangle,
+  computeFitZoomFactor,
   getCanvasScale,
   getRectangleLabel,
   metersToPixels,
@@ -405,13 +408,42 @@ export function WarehouseCanvas() {
   const layerRef = useRef<Konva.Layer>(null);
   const heatmapLayerRef = useRef<Konva.Layer>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const showHeatmapRef = useRef(showHeatmap);
   showHeatmapRef.current = showHeatmap;
 
-  const scale = useMemo(() => getCanvasScale(length, width), [length, width]);
+  const meterScale = useMemo(() => getCanvasScale(length, width), [length, width]);
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  zoomRef.current = zoom;
+
+  const scale = meterScale * zoom;
   const stageWidth = metersToPixels(length, scale);
   const stageHeight = metersToPixels(width, scale);
   const minSizePx = metersToPixels(MIN_RECT_DIMENSION, scale);
+  const zoomPercent = Math.round(zoom * 100);
+
+  const calculateFitZoom = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return 1;
+    return computeFitZoomFactor(length, meterScale, container.clientWidth - 16);
+  }, [length, meterScale]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const applyFitOnSmallScreens = () => {
+      if (window.innerWidth < 1280) {
+        setZoom(calculateFitZoom());
+      }
+    };
+
+    applyFitOnSmallScreens();
+    const observer = new ResizeObserver(applyFitOnSmallScreens);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [calculateFitZoom, length, width]);
 
   const activeLines = lightLinePlan?.lines ?? [];
   const activeHeatmap = lightLinePlan?.heatmap ?? null;
@@ -470,6 +502,9 @@ export function WarehouseCanvas() {
       const heatmapLayer = heatmapLayerRef.current;
       if (!stage) return null;
 
+      const previousZoom = zoomRef.current;
+      flushSync(() => setZoom(1));
+
       transformer?.nodes([]);
       transformer?.getLayer()?.batchDraw();
 
@@ -479,7 +514,7 @@ export function WarehouseCanvas() {
       }
       stage.batchDraw();
 
-      await waitForCanvasPaint(2);
+      await waitForCanvasPaint(3);
 
       const dataUrl = stage.toDataURL({ pixelRatio: PDF_EXPORT_PIXEL_RATIO });
 
@@ -489,11 +524,13 @@ export function WarehouseCanvas() {
         stage.batchDraw();
       }
 
+      flushSync(() => setZoom(previousZoom));
+
       return dataUrl;
     };
     setCanvasExporter(exporter);
     return () => setCanvasExporter(null);
-  }, [setCanvasExporter, scale, length, width, lightLinePlan, rectangles]);
+  }, [setCanvasExporter, meterScale, length, width, lightLinePlan, rectangles]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -634,13 +671,19 @@ export function WarehouseCanvas() {
     : null;
 
   return (
-    <section className="ls-card p-4">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="ls-card min-w-0 p-4">
+      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="ls-heading text-lg">Lichtontwerp · plattegrond</h2>
-        <p className="text-sm text-slate-500">
-          {length} × {width} m · schaal 1 m = {scale.toFixed(0)} px
+        <p className="text-xs text-[var(--ls-gray)] sm:text-sm">
+          {length} × {width} m · 1 m = {meterScale.toFixed(0)} px · zoom {zoomPercent}%
         </p>
       </div>
+      <CanvasZoomControls
+        zoomPercent={zoomPercent}
+        onZoomIn={() => setZoom((value) => Math.min(3, Number((value + 0.25).toFixed(2))))}
+        onZoomOut={() => setZoom((value) => Math.max(0.25, Number((value - 0.25).toFixed(2))))}
+        onFitToScreen={() => setZoom(calculateFitZoom())}
+      />
       {drawStatusMessage && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--ls-gray-light)] bg-[var(--ls-yellow-soft)] px-3 py-2">
           <p className="text-sm font-medium text-[var(--ls-black)]">{drawStatusMessage}</p>
@@ -654,11 +697,14 @@ export function WarehouseCanvas() {
         </div>
       )}
       <div
-        className={`overflow-auto rounded-lg border border-[var(--ls-gray-light)] bg-[var(--ls-bg)] p-4 ${
+        ref={containerRef}
+        className={`max-w-full overflow-x-auto overflow-y-auto rounded-lg border border-[var(--ls-gray-light)] bg-[var(--ls-bg)] p-2 sm:p-4 ${
           lightLineDrawMode ? "cursor-crosshair" : ""
         }`}
+        style={{ WebkitOverflowScrolling: "touch" }}
       >
-        <Stage
+        <div style={{ width: stageWidth, height: stageHeight, minWidth: stageWidth }}>
+          <Stage
           ref={stageRef}
           width={stageWidth}
           height={stageHeight}
@@ -792,6 +838,7 @@ export function WarehouseCanvas() {
             <DrawPreviewLine points={previewPoints || null} />
           </Layer>
         </Stage>
+        </div>
       </div>
       <SelectedObjectPanel />
       <SelectedLightLinePanel />

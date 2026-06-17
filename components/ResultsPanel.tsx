@@ -38,10 +38,10 @@ export function ResultsPanel() {
         {rows.map((row) => (
           <div
             key={row.label}
-            className="flex items-center justify-between border-b border-slate-100 pb-2"
+            className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2"
           >
-            <dt className="text-sm text-[var(--ls-navy-muted)]">{row.label}</dt>
-            <dd className="text-sm font-semibold text-[var(--ls-navy)]">{row.value}</dd>
+            <dt className="text-sm text-[var(--ls-gray)]">{row.label}</dt>
+            <dd className="text-right text-sm font-semibold text-[var(--ls-black)]">{row.value}</dd>
           </div>
         ))}
       </dl>

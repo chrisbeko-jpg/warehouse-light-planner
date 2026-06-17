@@ -42,7 +42,7 @@ export function ProjectRequirementsPanel({ productList }: ProjectRequirementsPan
         Overzicht van alle onderdelen · prijzen excl. btw
       </p>
 
-      <div className="overflow-x-auto">
+      <div className="ls-table-scroll">
         <table className="w-full min-w-[520px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-[var(--ls-navy-muted)]">
