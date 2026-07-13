@@ -33,6 +33,11 @@ export default function Home() {
             Indicatieve berekening voor energiezuinige magazijnverlichting. Ontwerp lichtlijnen,
             bepaal veiligheid en werkcomfort, en stel direct een projectlijst samen.
           </p>
+          <p className="mt-3 text-sm">
+            <a href="/plattegrond" className="font-medium text-[var(--ls-yellow)] hover:underline">
+              Plattegrondeditor →
+            </a>
+          </p>
         </header>
 
         {/* Desktop: form | canvas | results. Tablet/mobile: single column */}
