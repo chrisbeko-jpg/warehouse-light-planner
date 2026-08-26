@@ -11,12 +11,6 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host")?.split(":")[0]?.toLowerCase() ?? "";
   const { pathname } = request.nextUrl;
 
-  if (LEDPANEEL_HOSTS.has(host) && host === "www.ledpaneel.nl") {
-    const url = request.nextUrl.clone();
-    url.host = "ledpaneel.nl";
-    return NextResponse.redirect(url, 308);
-  }
-
   if (isLedpaneelSite(host) && pathname === "/") {
     return NextResponse.rewrite(new URL("/home", request.url));
   }
