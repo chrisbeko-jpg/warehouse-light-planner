@@ -12,7 +12,15 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@tiptap/extension-image": "^3.30.5",
+    "@tiptap/extension-link": "^3.30.5",
+    "@tiptap/extension-placeholder": "^3.30.5",
+    "@tiptap/extension-underline": "^3.30.5",
+    "@tiptap/pm": "^3.30.5",
+    "@tiptap/react": "^3.30.5",
+    "@tiptap/starter-kit": "^3.30.5",
     "html2canvas": "^1.4.1",
+    "isomorphic-dompurify": "^3.23.0",
     "jspdf": "^4.2.1",
     "konva": "^9.3.20",
     "next": "^15.3.3",
@@ -25,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.55.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
@@ -32,7 +41,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^15.3.3",
-    "@playwright/test": "^1.55.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

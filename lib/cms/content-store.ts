@@ -1,70 +1,125 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { DEFAULT_CMS_SITE } from "@/lib/cms/defaults";
+import {
+  mergeSitePayload,
+  normalizeStorage,
+  payloadToPublicContent,
+} from "@/lib/cms/merge";
+import { imagePublicUrl } from "@/lib/cms/image-url";
 import { getCmsDir, getUploadsDir } from "@/lib/storage/data-dir";
-import type { CmsImageRecord, CmsPage, CmsSiteContent, CmsWizardContent } from "@/types/cms";
+import type {
+  CmsImageRecord,
+  CmsPage,
+  CmsSiteContent,
+  CmsSitePayload,
+  CmsSiteStorage,
+} from "@/types/cms";
 
 const SITE_FILE = "site.json";
 
-function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardContent {
-  const defaults = DEFAULT_CMS_SITE.wizard;
-  if (!stored) return defaults;
-
-  const mergeChoices = <T extends { id: string }>(defaultItems: T[], storedItems?: T[]): T[] => {
-    if (!storedItems?.length) return defaultItems;
-    const byId = new Map(storedItems.map((item) => [item.id, item]));
-    return defaultItems.map((item) => ({ ...item, ...byId.get(item.id) }));
-  };
-
-  return {
-    roomChoices: mergeChoices(defaults.roomChoices, stored.roomChoices),
-    atmosphereChoices: mergeChoices(defaults.atmosphereChoices, stored.atmosphereChoices),
-  };
-}
-
-export async function loadCmsSite(): Promise<CmsSiteContent> {
+async function readStorage(): Promise<CmsSiteStorage> {
   const filePath = path.join(getCmsDir(), SITE_FILE);
   try {
     const raw = await fs.readFile(filePath, "utf8");
-    const stored = JSON.parse(raw) as Partial<CmsSiteContent>;
-    return {
-      ...DEFAULT_CMS_SITE,
-      ...stored,
-      homepage: stored.homepage ?? DEFAULT_CMS_SITE.homepage,
-      pages: { ...DEFAULT_CMS_SITE.pages, ...stored.pages },
-      images: { ...DEFAULT_CMS_SITE.images, ...stored.images },
-      wizard: mergeWizardContent(stored.wizard),
-    };
+    return normalizeStorage(JSON.parse(raw));
   } catch {
-    return DEFAULT_CMS_SITE;
+    return normalizeStorage(undefined);
   }
 }
 
-export async function saveCmsSite(content: CmsSiteContent): Promise<void> {
+async function writeStorage(storage: CmsSiteStorage): Promise<void> {
   const dir = getCmsDir();
   await fs.mkdir(dir, { recursive: true });
-  const payload: CmsSiteContent = {
-    ...content,
-    updatedAt: new Date().toISOString(),
-  };
-  await fs.writeFile(path.join(dir, SITE_FILE), JSON.stringify(payload, null, 2), "utf8");
+  await fs.writeFile(path.join(dir, SITE_FILE), JSON.stringify(storage, null, 2), "utf8");
 }
 
-export async function getCmsPage(slug: string): Promise<CmsPage | null> {
-  const site = await loadCmsSite();
-  if (slug === "/" || slug === "") return site.homepage;
+/** Public published CMS content. */
+export async function loadCmsSite(): Promise<CmsSiteContent> {
+  const storage = await readStorage();
+  return payloadToPublicContent(storage.published, {
+    publishedAt: storage.publishedAt,
+    draftUpdatedAt: storage.draftUpdatedAt,
+  });
+}
+
+/** Draft content for internal admin. */
+export async function loadCmsDraft(): Promise<CmsSiteContent> {
+  const storage = await readStorage();
+  return payloadToPublicContent(storage.draft, {
+    publishedAt: storage.publishedAt,
+    draftUpdatedAt: storage.draftUpdatedAt,
+  });
+}
+
+export async function getCmsStorageMeta(): Promise<{
+  publishedAt: string | null;
+  draftUpdatedAt: string | null;
+}> {
+  const storage = await readStorage();
+  return {
+    publishedAt: storage.publishedAt,
+    draftUpdatedAt: storage.draftUpdatedAt,
+  };
+}
+
+export async function saveCmsDraft(payload: Partial<CmsSitePayload>): Promise<CmsSiteContent> {
+  const storage = await readStorage();
+  storage.draft = mergeSitePayload({ ...storage.draft, ...payload });
+  storage.draftUpdatedAt = new Date().toISOString();
+  await writeStorage(storage);
+  return loadCmsDraft();
+}
+
+export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<void> {
+  const storage = await readStorage();
   const key = slug.replace(/^\//, "");
+  if (key === "" || slug === "/" || key === "homepage") {
+    storage.draft.homepage = { ...page, updatedAt: new Date().toISOString() };
+  } else {
+    storage.draft.pages[key] = { ...page, updatedAt: new Date().toISOString() };
+  }
+  storage.draftUpdatedAt = new Date().toISOString();
+  await writeStorage(storage);
+}
+
+export async function publishCmsDraft(): Promise<CmsSiteContent> {
+  const storage = await readStorage();
+  const now = new Date().toISOString();
+  storage.published = structuredClone(storage.draft);
+  storage.publishedAt = now;
+  storage.draftUpdatedAt = now;
+  await writeStorage(storage);
+  return loadCmsSite();
+}
+
+export async function revertCmsDraft(): Promise<CmsSiteContent> {
+  const storage = await readStorage();
+  storage.draft = structuredClone(storage.published);
+  storage.draftUpdatedAt = new Date().toISOString();
+  await writeStorage(storage);
+  return loadCmsDraft();
+}
+
+/** @deprecated use saveCmsDraft */
+export async function saveCmsSite(content: CmsSiteContent): Promise<void> {
+  const storage = await readStorage();
+  storage.draft = mergeSitePayload(content);
+  storage.draftUpdatedAt = new Date().toISOString();
+  storage.published = mergeSitePayload(content);
+  storage.publishedAt = new Date().toISOString();
+  await writeStorage(storage);
+}
+
+export async function getCmsPage(slug: string, options?: { draft?: boolean }): Promise<CmsPage | null> {
+  const site = options?.draft ? await loadCmsDraft() : await loadCmsSite();
+  const key = slug.replace(/^\//, "");
+  if (key === "" || key === "homepage") return site.homepage;
   return site.pages[key] ?? null;
 }
 
 export async function saveCmsPage(slug: string, page: CmsPage): Promise<void> {
-  const site = await loadCmsSite();
-  if (slug === "/" || slug === "") {
-    site.homepage = page;
-  } else {
-    site.pages[slug.replace(/^\//, "")] = page;
-  }
-  await saveCmsSite(site);
+  await saveCmsDraftPage(slug, page);
 }
 
 export async function saveUploadedImage(
@@ -72,8 +127,9 @@ export async function saveUploadedImage(
   filename: string,
   mimeType: string,
   alt: string,
+  title?: string,
 ): Promise<CmsImageRecord> {
-  const site = await loadCmsSite();
+  const storage = await readStorage();
   const id = `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const ext = path.extname(filename) || ".jpg";
   const storedName = `${id}${ext}`;
@@ -86,11 +142,60 @@ export async function saveUploadedImage(
     filename: storedName,
     mimeType,
     alt,
+    title: title || alt || filename,
+    fileSizeBytes: buffer.length,
     createdAt: new Date().toISOString(),
   };
-  site.images[id] = record;
-  await saveCmsSite(site);
+  storage.draft.images[id] = record;
+  storage.published.images[id] = record;
+  storage.draftUpdatedAt = new Date().toISOString();
+  await writeStorage(storage);
   return record;
+}
+
+export async function updateImageRecord(
+  id: string,
+  patch: Partial<Pick<CmsImageRecord, "alt" | "title">>,
+): Promise<CmsImageRecord | null> {
+  const storage = await readStorage();
+  const record = storage.draft.images[id] ?? storage.published.images[id];
+  if (!record) return null;
+  const next = { ...record, ...patch };
+  storage.draft.images[id] = next;
+  storage.published.images[id] = next;
+  storage.draftUpdatedAt = new Date().toISOString();
+  await writeStorage(storage);
+  return next;
+}
+
+export async function replaceImageFile(
+  id: string,
+  buffer: Buffer,
+  filename: string,
+  mimeType: string,
+): Promise<CmsImageRecord | null> {
+  const storage = await readStorage();
+  const record = storage.draft.images[id];
+  if (!record) return null;
+  try {
+    await fs.unlink(path.join(getUploadsDir(), record.filename));
+  } catch {
+    /* ignore */
+  }
+  const ext = path.extname(filename) || path.extname(record.filename) || ".jpg";
+  const storedName = `${id}${ext}`;
+  await fs.writeFile(path.join(getUploadsDir(), storedName), buffer);
+  const next: CmsImageRecord = {
+    ...record,
+    filename: storedName,
+    mimeType,
+    fileSizeBytes: buffer.length,
+  };
+  storage.draft.images[id] = next;
+  storage.published.images[id] = next;
+  storage.draftUpdatedAt = new Date().toISOString();
+  await writeStorage(storage);
+  return next;
 }
 
 export async function getImageRecord(id: string): Promise<CmsImageRecord | null> {
@@ -99,16 +204,18 @@ export async function getImageRecord(id: string): Promise<CmsImageRecord | null>
 }
 
 export async function deleteImage(id: string): Promise<boolean> {
-  const site = await loadCmsSite();
-  const record = site.images[id];
+  const storage = await readStorage();
+  const record = storage.draft.images[id];
   if (!record) return false;
   try {
     await fs.unlink(path.join(getUploadsDir(), record.filename));
   } catch {
     /* file may already be gone */
   }
-  delete site.images[id];
-  await saveCmsSite(site);
+  delete storage.draft.images[id];
+  delete storage.published.images[id];
+  storage.draftUpdatedAt = new Date().toISOString();
+  await writeStorage(storage);
   return true;
 }
 
@@ -120,6 +227,4 @@ export async function readImageFile(filename: string): Promise<Buffer | null> {
   }
 }
 
-export function imagePublicUrl(id: string): string {
-  return `/api/cms/images/${id}`;
-}
+export { imagePublicUrl, DEFAULT_CMS_SITE };

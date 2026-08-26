@@ -1,4 +1,5 @@
 import type { CmsPage, CmsSiteContent, CmsWizardContent } from "@/types/cms";
+import { KANTOORVERLICHTING_SEED } from "@/lib/cms/seeds/kantoorverlichting";
 import { ATMOSPHERES } from "@/lib/public-wizard/atmospheres";
 import { ROOM_FUNCTIONS } from "@/lib/public-wizard/room-functions";
 import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
@@ -138,7 +139,29 @@ export const DEFAULT_WIZARD_CONTENT: CmsWizardContent = {
     sortOrder: index,
     active: true,
     flow: item.id === "luxe" ? "kantoorverlichting" : "standard",
+    ctaText:
+      item.id === "luxe" ? "Bekijk professioneel kantoorlichtadvies" : undefined,
   })),
+};
+
+export const DEFAULT_NAVIGATION = {
+  header: [
+    { label: "AI Lichtadvies", href: "/lichtadvies" },
+    { label: "Kantoorverlichting", href: "/kantoorverlichting" },
+    { label: "LED-panelen", href: "/led-panelen" },
+    { label: "Werkwijze", href: "/werkwijze" },
+    { label: "Contact", href: "/contact" },
+  ],
+  footer: [
+    { label: "Home", href: "/home" },
+    { label: "AI Lichtadvies", href: "/lichtadvies" },
+    { label: "Kantoorverlichting", href: "/kantoorverlichting" },
+    { label: "LED-panelen", href: "/led-panelen" },
+    { label: "Werkwijze", href: "/werkwijze" },
+    { label: "Over ons", href: "/over-ons" },
+    { label: "Contact", href: "/contact" },
+    { label: "Privacy", href: "/privacy" },
+  ],
 };
 
 export const DEFAULT_CMS_SITE: CmsSiteContent = {
@@ -180,47 +203,7 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
         },
       ],
     ),
-    kantoorverlichting: page(
-      "/kantoorverlichting",
-      "Kantoorverlichting",
-      "Kantoorverlichting plan maken | ledpaneel.nl",
-      "Maak een indicatief lichtplan voor kantoorverlichting met AI Lichtadvies. Snel, overzichtelijk en gecontroleerd door Lightsale.",
-      [
-        {
-          id: "intro",
-          type: "text-image",
-          heading: "Kantoorverlichting op maat",
-          body: "Of u nu een open kantoor, vergaderruimte of entree wilt verlichten: met AI Lichtadvies krijgt u snel inzicht in het benodigde aantal armaturen, indicatief luxniveau en richtprijs.",
-        },
-        {
-          id: "benefits",
-          type: "benefits",
-          heading: "Voordelen voor kantoorprojecten",
-          items: [
-            { title: "Ruimtefunctie", description: "Voorgesteld luxniveau per ruimtetype." },
-            { title: "Sfeerkeuze", description: "Warm, functioneel of luxe uitstraling." },
-            { title: "Plattegrond", description: "Upload PDF, PNG of JPG." },
-            { title: "Controle", description: "Lightsale checkt uw aanvraag." },
-          ],
-        },
-        {
-          id: "cta",
-          type: "cta",
-          heading: "Start uw kantoorlichtplan",
-          body: "Gratis en indicatief — het definitieve plan volgt na controle.",
-          buttonText: "Start gratis AI Lichtadvies",
-          buttonHref: "/lichtadvies",
-        },
-        {
-          id: "cta-wizard",
-          type: "cta",
-          heading: "Liever snel een indicatief LED-paneel lichtadvies?",
-          body: "Upload uw plattegrond en ontvang binnen enkele minuten een indicatief lichtplan met LED-panelen.",
-          buttonText: "Start gratis AI Lichtadvies",
-          buttonHref: "/lichtadvies",
-        },
-      ],
-    ),
+    kantoorverlichting: KANTOORVERLICHTING_SEED,
     werkwijze: page(
       "/werkwijze",
       "Werkwijze",
@@ -298,6 +281,7 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
   },
   images: {},
   wizard: DEFAULT_WIZARD_CONTENT,
+  navigation: DEFAULT_NAVIGATION,
 };
 
 export function getDefaultPageBySlug(slug: string): CmsPage | null {

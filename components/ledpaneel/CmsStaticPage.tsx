@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ContentBlockRenderer } from "@/components/ledpaneel/ContentBlockRenderer";
+import { faqStructuredData, PageBlocks } from "@/components/ledpaneel/ContentBlockRenderer";
 import { getCmsPage, loadCmsSite, imagePublicUrl } from "@/lib/cms/content-store";
 import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
 
@@ -12,6 +12,7 @@ export async function generateMetadata({ slug }: { slug: string }): Promise<Meta
     title: seo.title,
     description: seo.description,
     alternates: { canonical: seo.canonical ?? `${SITE_LINKS.siteUrl}/${slug}` },
+    robots: seo.noindex ? { index: false, follow: false } : undefined,
     openGraph: {
       title: seo.ogTitle ?? seo.title,
       description: seo.ogDescription ?? seo.description,
@@ -21,22 +22,69 @@ export async function generateMetadata({ slug }: { slug: string }): Promise<Meta
   };
 }
 
+function structuredDataForPage(slug: string, site: Awaited<ReturnType<typeof loadCmsSite>>) {
+  const page = site.pages[slug];
+  if (!page) return [];
+  const scripts: object[] = [
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: SITE_LINKS.siteUrl },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: page.title,
+          item: `${SITE_LINKS.siteUrl}/${slug}`,
+        },
+      ],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "Lightsale / ledpaneel.nl",
+      url: SITE_LINKS.siteUrl,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "ledpaneel.nl",
+      url: SITE_LINKS.siteUrl,
+    },
+  ];
+  const faqBlock = page.blocks.find((b) => b.type === "faq");
+  if (faqBlock?.type === "faq") {
+    scripts.push(faqStructuredData(faqBlock));
+  }
+  return scripts;
+}
+
 export async function CmsStaticPage({ slug }: { slug: string }) {
   const site = await loadCmsSite();
   const page = site.pages[slug];
   if (!page) notFound();
 
+  const showPageHeader = page.blocks[0]?.type !== "hero";
+  const jsonLd = structuredDataForPage(slug, site);
+
   return (
     <>
-      <section className="border-b border-[var(--lp-border)] bg-[var(--lp-bg-secondary)] py-12">
-        <div className="lp-container">
-          <h1 className="lp-heading-1">{page.title}</h1>
-          {page.intro && <p className="lp-body mt-4 max-w-2xl">{page.intro}</p>}
-        </div>
-      </section>
-      {page.blocks.map((block) => (
-        <ContentBlockRenderer key={block.id} block={block} site={site} />
+      {jsonLd.map((data, index) => (
+        <script
+          key={index}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+        />
       ))}
+      {showPageHeader && (
+        <section className="border-b border-[var(--lp-border)] bg-[var(--lp-bg-secondary)] py-12">
+          <div className="lp-container">
+            <h1 className="lp-heading-1">{page.title}</h1>
+            {page.intro && <p className="lp-body mt-4 max-w-2xl">{page.intro}</p>}
+          </div>
+        </section>
+      )}
+      <PageBlocks site={site} pageSlug={slug} />
     </>
   );
 }

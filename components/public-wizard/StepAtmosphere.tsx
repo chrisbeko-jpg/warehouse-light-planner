@@ -15,6 +15,7 @@ interface WizardAtmosphereChoiceView {
   imageUrl: string | null;
   imageAlt: string;
   flow: "standard" | "kantoorverlichting";
+  ctaText?: string;
 }
 
 export function StepAtmosphere() {
@@ -43,6 +44,7 @@ export function StepAtmosphere() {
         imageUrl: null as string | null,
         imageAlt: item.title,
         flow: item.id === "luxe" ? ("kantoorverlichting" as const) : ("standard" as const),
+        ctaText: item.id === "luxe" ? "Bekijk professioneel kantoorlichtadvies →" : undefined,
       }));
     }
     return cmsChoices;
@@ -94,7 +96,7 @@ export function StepAtmosphere() {
                 <p className="text-sm text-[var(--lp-text-secondary)]">{item.description}</p>
                 {isLuxe && (
                   <p className="text-sm font-semibold text-[var(--lp-green-dark)]">
-                    Bekijk professioneel kantoorlichtadvies →
+                    {item.ctaText ?? "Bekijk professioneel kantoorlichtadvies →"}
                   </p>
                 )}
               </div>

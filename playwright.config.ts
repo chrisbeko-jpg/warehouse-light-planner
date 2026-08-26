@@ -8,7 +8,7 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3012",
     trace: "on-first-retry",
     viewport: { width: 1440, height: 900 },
   },
@@ -16,9 +16,9 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: "npm run build && npx next start -p 3000",
-        url: "http://127.0.0.1:3000/home",
-        reuseExistingServer: !process.env.CI,
+        command: "npm run build && npx next start -p 3012",
+        url: "http://127.0.0.1:3012/home",
+        reuseExistingServer: false,
         timeout: 180000,
       },
 });
