@@ -18,7 +18,6 @@ import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import type { Point2D } from "@/types/floor-plan";
 import type {
   AtmosphereId,
-  LeadContactForm,
   PlacedPublicFixture,
   PublicProductId,
   RoomFunctionId,
@@ -580,30 +579,4 @@ export const WIZARD_STEP_LABELS: { id: WizardStepId; label: string; showInProgre
   { id: "request", label: "Aanvragen", showInProgress: false },
 ];
 
-export function validateLeadForm(form: LeadContactForm): string | null {
-  const required: (keyof LeadContactForm)[] = [
-    "companyName",
-    "contactPerson",
-    "address",
-    "postalCode",
-    "city",
-    "telephone",
-    "email",
-    "deliveryAddress",
-    "deliveryPostalCode",
-    "deliveryCity",
-  ];
-  for (const key of required) {
-    const value = form[key];
-    if (typeof value !== "string" || !value.trim()) {
-      return "Vul alle verplichte velden in.";
-    }
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    return "Vul een geldig e-mailadres in.";
-  }
-  if (!form.privacyConsent) {
-    return "Geef toestemming voor het verwerken van uw gegevens.";
-  }
-  return null;
-}
+export { validateLeadForm } from "@/lib/public-wizard/lead-form";

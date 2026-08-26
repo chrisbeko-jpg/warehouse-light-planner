@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { exportPlanSnapshots } from "@/lib/public-wizard/export-plan-snapshot";
-import { usePublicWizardStore, validateLeadForm } from "@/lib/public-wizard/store";
+import {
+  LEAD_SUBMIT_ERROR_MESSAGE,
+  parseLeadApiResponse,
+  resolveLeadContactDelivery,
+  validateLeadForm,
+} from "@/lib/public-wizard/lead-form";
+import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardCard, WizardNav } from "@/components/public-wizard/WizardShell";
 import type { LeadContactForm } from "@/types/public-wizard";
 
@@ -20,7 +26,7 @@ const EMPTY_FORM: LeadContactForm = {
   projectName: "",
   remarks: "",
   desiredDeliveryDate: "",
-  deliverySameAsCompany: false,
+  deliverySameAsCompany: true,
   privacyConsent: false,
 };
 
@@ -48,17 +54,32 @@ export function StepRequest() {
   const update = (patch: Partial<LeadContactForm>) => {
     setForm((prev) => {
       const next = { ...prev, ...patch };
-      if (patch.deliverySameAsCompany === true) {
-        next.deliveryAddress = next.address;
-        next.deliveryPostalCode = next.postalCode;
-        next.deliveryCity = next.city;
+      if (
+        next.deliverySameAsCompany ||
+        patch.deliverySameAsCompany === true ||
+        patch.address !== undefined ||
+        patch.postalCode !== undefined ||
+        patch.city !== undefined
+      ) {
+        if (next.deliverySameAsCompany) {
+          next.deliveryAddress = next.address;
+          next.deliveryPostalCode = next.postalCode;
+          next.deliveryCity = next.city;
+        }
+      }
+      if (patch.deliverySameAsCompany === false) {
+        next.deliveryAddress = "";
+        next.deliveryPostalCode = "";
+        next.deliveryCity = "";
       }
       return next;
     });
+    setError(null);
   };
 
   const handleSubmit = async () => {
-    const validationError = validateLeadForm(form);
+    const contact = resolveLeadContactDelivery(form);
+    const validationError = validateLeadForm(contact);
     if (validationError) {
       setError(validationError);
       return;
@@ -86,7 +107,7 @@ export function StepRequest() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contact: form,
+          contact,
           roomFunction,
           ceilingHeightM,
           targetLux,
@@ -100,17 +121,17 @@ export function StepRequest() {
           heatmapImageBase64: snapshots.heatmapPng,
         }),
       });
-      const data = (await response.json()) as {
-        ok: boolean;
-        reference?: string;
-        error?: string;
-      };
-      if (!response.ok || !data.ok || !data.reference) {
-        throw new Error(data.error ?? "Aanvraag mislukt");
+
+      const bodyText = await response.text();
+      const data = parseLeadApiResponse(response, bodyText);
+      if (!data.success || !data.reference) {
+        setError(data.message || LEAD_SUBMIT_ERROR_MESSAGE);
+        return;
       }
-      setSubmitResult(data.reference, form.email);
+      setSubmitResult(data.reference, contact.email);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Aanvraag mislukt");
+      console.error("Lead submit failed:", err);
+      setError(LEAD_SUBMIT_ERROR_MESSAGE);
     } finally {
       setSubmitting(false);
     }
@@ -148,29 +169,49 @@ export function StepRequest() {
         <Field label="E-mail *" type="email" value={form.email} onChange={(v) => update({ email: v })} />
         <Field label="Projectnaam" value={form.projectName} onChange={(v) => update({ projectName: v })} />
         <Field
-          label="Afleveradres *"
-          value={form.deliveryAddress}
-          onChange={(v) => update({ deliveryAddress: v })}
-          disabled={form.deliverySameAsCompany}
-        />
-        <Field
-          label="Aflever postcode *"
-          value={form.deliveryPostalCode}
-          onChange={(v) => update({ deliveryPostalCode: v })}
-          disabled={form.deliverySameAsCompany}
-        />
-        <Field
-          label="Aflever plaats *"
-          value={form.deliveryCity}
-          onChange={(v) => update({ deliveryCity: v })}
-          disabled={form.deliverySameAsCompany}
-        />
-        <Field
           label="Gewenste leverdatum"
           type="date"
           value={form.desiredDeliveryDate}
           onChange={(v) => update({ desiredDeliveryDate: v })}
         />
+
+        <label className="sm:col-span-2 flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            data-testid="delivery-same-checkbox"
+            checked={form.deliverySameAsCompany}
+            onChange={(e) => update({ deliverySameAsCompany: e.target.checked })}
+          />
+          Afleveradres is gelijk aan bedrijfsadres
+        </label>
+
+        {!form.deliverySameAsCompany && (
+          <div
+            data-testid="delivery-fields-section"
+            className="sm:col-span-2 grid gap-3 rounded-lg border border-[var(--lp-border)] bg-[var(--lp-bg-secondary)] p-4 sm:grid-cols-2"
+          >
+            <p className="sm:col-span-2 text-sm font-semibold">Afwijkend afleveradres</p>
+            <Field
+              label="Adres *"
+              value={form.deliveryAddress}
+              onChange={(v) => update({ deliveryAddress: v })}
+              testId="delivery-address"
+            />
+            <Field
+              label="Postcode *"
+              value={form.deliveryPostalCode}
+              onChange={(v) => update({ deliveryPostalCode: v })}
+              testId="delivery-postal-code"
+            />
+            <Field
+              label="Plaats *"
+              value={form.deliveryCity}
+              onChange={(v) => update({ deliveryCity: v })}
+              testId="delivery-city"
+            />
+          </div>
+        )}
+
         <label className="sm:col-span-2 block text-sm">
           Opmerkingen
           <textarea
@@ -180,14 +221,7 @@ export function StepRequest() {
             rows={3}
           />
         </label>
-        <label className="sm:col-span-2 flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={form.deliverySameAsCompany}
-            onChange={(e) => update({ deliverySameAsCompany: e.target.checked })}
-          />
-          Afleveradres is gelijk aan bedrijfsadres
-        </label>
+
         <label className="sm:col-span-2 flex items-start gap-2 text-xs text-[var(--lp-text-secondary)]">
           <input
             type="checkbox"
@@ -200,7 +234,11 @@ export function StepRequest() {
         </label>
       </WizardCard>
 
-      {error && <p className="mt-3 text-sm text-[var(--lp-danger)]">{error}</p>}
+      {error && (
+        <p className="mt-3 text-sm text-[var(--lp-danger)]" data-testid="lead-form-error">
+          {error}
+        </p>
+      )}
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
@@ -228,12 +266,14 @@ function Field({
   onChange,
   type = "text",
   disabled = false,
+  testId,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
   disabled?: boolean;
+  testId?: string;
 }) {
   return (
     <label className="block text-sm font-medium">
@@ -242,6 +282,7 @@ function Field({
         type={type}
         value={value}
         disabled={disabled}
+        data-testid={testId}
         onChange={(e) => onChange(e.target.value)}
         className="mt-1 w-full rounded-lg border border-[var(--lp-border)] px-3 py-2 disabled:bg-[var(--lp-bg-secondary)]"
       />

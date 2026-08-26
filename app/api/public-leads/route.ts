@@ -7,6 +7,10 @@ import {
   saveLead,
 } from "@/lib/public-wizard/lead-storage";
 import {
+  resolveLeadContactDelivery,
+  validateLeadForm,
+} from "@/lib/public-wizard/lead-form";
+import {
   calculateMaterialPrice,
   countProducts,
   formatMaterialPrice,
@@ -25,6 +29,9 @@ import type {
 
 export const runtime = "nodejs";
 
+const API_ERROR_MESSAGE = "Er ging iets mis bij het versturen van uw aanvraag.";
+const API_SUCCESS_MESSAGE = "Aanvraag ontvangen";
+
 interface SubmitBody {
   contact: LeadContactForm;
   roomFunction: RoomFunctionId;
@@ -40,6 +47,10 @@ interface SubmitBody {
   heatmapImageBase64?: string | null;
 }
 
+function jsonError(message: string, status: number) {
+  return NextResponse.json({ success: false, message }, { status });
+}
+
 function getSmtpConfig() {
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT;
@@ -52,11 +63,21 @@ function getSmtpConfig() {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as SubmitBody;
-    const { contact } = body;
+    let body: SubmitBody;
+    try {
+      body = (await request.json()) as SubmitBody;
+    } catch {
+      return jsonError("Ongeldige aanvraag.", 400);
+    }
 
-    if (!contact?.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
-      return NextResponse.json({ ok: false, error: "Ongeldig e-mailadres" }, { status: 400 });
+    const contact = resolveLeadContactDelivery(body.contact);
+    const validationError = validateLeadForm(contact);
+    if (validationError) {
+      return jsonError(validationError, 400);
+    }
+
+    if (!body.roomFunction || !body.atmosphere || !body.fixtures || !body.roomVertices?.length) {
+      return jsonError("Wizardgegevens ontbreken.", 400);
     }
 
     const areaM2 = createRoomPolygon(body.roomVertices, body.pixelsPerMeter).areaM2;
@@ -74,7 +95,7 @@ export async function POST(request: Request) {
       reference,
       createdAt: new Date().toISOString(),
       status: "nieuw",
-      contact: body.contact,
+      contact,
       wizard: {
         roomFunction: body.roomFunction,
         ceilingHeightM: body.ceilingHeightM,
@@ -124,7 +145,9 @@ export async function POST(request: Request) {
         `E-mail: ${contact.email}`,
         `Factuuradres: ${contact.address}, ${contact.postalCode} ${contact.city}`,
         `Afleveradres: ${contact.deliveryAddress}, ${contact.deliveryPostalCode} ${contact.deliveryCity}`,
+        contact.deliverySameAsCompany ? "(gelijk aan bedrijfsadres)" : "(afwijkend afleveradres)",
         `Project: ${contact.projectName || "—"}`,
+        contact.desiredDeliveryDate ? `Gewenste leverdatum: ${contact.desiredDeliveryDate}` : "",
         "",
         `Ruimtefunctie: ${body.roomFunction}`,
         `Sfeer: ${body.atmosphere}`,
@@ -139,7 +162,9 @@ export async function POST(request: Request) {
         `Opmerkingen: ${contact.remarks || "—"}`,
         "",
         "Het lichtplan is bijgevoegd als PDF.",
-      ].join("\n");
+      ]
+        .filter(Boolean)
+        .join("\n");
 
       const mailFrom = process.env.SMTP_FROM ?? SITE_LINKS.contactEmail;
 
@@ -179,15 +204,13 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      ok: true,
+      success: true,
+      message: API_SUCCESS_MESSAGE,
       reference,
       emailSent,
     });
   } catch (error) {
     console.error("public-leads error:", error);
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Aanvraag mislukt" },
-      { status: 500 },
-    );
+    return jsonError(API_ERROR_MESSAGE, 500);
   }
 }

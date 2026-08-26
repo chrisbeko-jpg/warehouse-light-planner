@@ -85,7 +85,7 @@ test.describe("Public LED site & wizard", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ ok: true, reference: "LP-TEST-002", emailSent: false }),
+        body: JSON.stringify({ success: true, message: "Aanvraag ontvangen", reference: "LP-TEST-002" }),
       });
     });
     await advanceRoom(page);
