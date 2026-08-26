@@ -197,6 +197,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   setTargetLux: (value) => set({ targetLux: Math.max(50, Math.min(1000, value)) }),
 
   selectAtmosphere: (id) => {
+    if (id === "premium_architectural") return;
     const atmosphere = getAtmosphere(id);
     set({
       atmosphere: id,

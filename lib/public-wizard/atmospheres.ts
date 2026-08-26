@@ -30,16 +30,18 @@ export const ATMOSPHERES: AtmosphereDefinition[] = [
     imageGradient: "from-slate-100 to-white",
   },
   {
-    id: "luxe",
+    id: "premium_architectural",
     title: "Luxe & architectonisch",
     subtitle: "Pendelprofielen / design uitstraling",
     cctLabel: "3000K",
     preferredProductId: "led_panel_3000",
-    presentationText: "Premium warme sfeer met architectonische uitstraling; indicatief met LED-panelen 3000K.",
-    imageGradient: "from-emerald-50 to-stone-100",
+    presentationText:
+      "Architectonisch lichtontwerp met pendels, profielen en maatwerk – binnenkort beschikbaar.",
+    imageGradient: "from-stone-200 to-stone-100",
   },
 ];
 
 export function getAtmosphere(id: AtmosphereId): AtmosphereDefinition {
-  return ATMOSPHERES.find((a) => a.id === id) ?? ATMOSPHERES[1]!;
+  const normalized = (id as string) === "luxe" ? "premium_architectural" : id;
+  return ATMOSPHERES.find((a) => a.id === normalized) ?? ATMOSPHERES[1]!;
 }

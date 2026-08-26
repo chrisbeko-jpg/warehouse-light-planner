@@ -32,6 +32,6 @@ test.describe("AI Lichtadvies wizard CMS", () => {
     expect(res.ok()).toBeTruthy();
     const data = (await res.json()) as { roomChoices: unknown[]; atmosphereChoices: { id: string }[] };
     expect(data.roomChoices.length).toBeGreaterThan(0);
-    expect(data.atmosphereChoices.some((c) => c.id === "luxe")).toBeTruthy();
+    expect(data.atmosphereChoices.some((c) => c.id === "premium_architectural")).toBeTruthy();
   });
 });

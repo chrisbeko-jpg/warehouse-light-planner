@@ -101,6 +101,14 @@ const DEFAULT_HOMEPAGE: CmsPage = {
       body: "Gratis AI Lichtadvies maken → Resultaat bekijken op scherm → Lichtplan + projectofferte aanvragen. U ontvangt geen directe PDF-download; het definitieve lichtplan wordt na controle door Lightsale verstuurd.",
     },
     {
+      id: "ai-calculator-cta",
+      type: "ai-calculator-cta",
+      heading: "Uw eigen AI lichtcalculator?",
+      body: "Wilt u voor uw eigen organisatie, groothandel of verlichtingsmerk een vergelijkbare AI-calculator inzetten? Wij denken graag mee over een eigen configurator op basis van uw producten, huisstijl en rekenregels.",
+      buttonText: "Neem contact met ons op",
+      buttonHref: "/ai-calculator",
+    },
+    {
       id: "cta-bottom",
       type: "cta",
       heading: "Klaar om te beginnen?",
@@ -138,9 +146,9 @@ export const DEFAULT_WIZARD_CONTENT: CmsWizardContent = {
     imageAlt: item.title,
     sortOrder: index,
     active: true,
-    flow: item.id === "luxe" ? "kantoorverlichting" : "standard",
-    ctaText:
-      item.id === "luxe" ? "Bekijk professioneel kantoorlichtadvies" : undefined,
+    enabled: item.id !== "premium_architectural",
+    badgeText: item.id === "premium_architectural" ? "ONLY PREMIUM" : undefined,
+    flow: "standard" as const,
   })),
 };
 
@@ -275,6 +283,51 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
           type: "text",
           heading: "Privacyverklaring",
           body: "Wij verwerken uw gegevens uitsluitend voor het opstellen van een indicatief lichtadvies en projectofferte. Gegevens worden niet gedeeld met derden, behalve waar nodig voor uitvoering van uw aanvraag door Lightsale. Voor vragen: info@ledpaneel.nl.",
+        },
+      ],
+    ),
+    "ai-calculator": page(
+      "/ai-calculator",
+      "Uw eigen AI lichtcalculator",
+      "Eigen AI lichtcalculator voor verlichting | Lightsale",
+      "Een AI lichtcalculator of productconfigurator voor uw eigen assortiment? Lightsale ontwikkelt maatwerk calculators met lichtplan, prijzen en leadgeneratie.",
+      [
+        {
+          id: "hero",
+          type: "hero",
+          headline: "Uw eigen AI lichtcalculator",
+          subheadline:
+            "Een slimme configurator voor uw eigen assortiment, merk of klantomgeving.",
+          primaryCta: "Bespreek mijn AI-calculator",
+          primaryCtaHref: "#ai-calculator-form",
+          secondaryCta: "",
+          secondaryCtaHref: "",
+        },
+        {
+          id: "intro",
+          type: "rich-text",
+          html: "<p>Lightsale ontwikkelt maatwerk AI-calculators waarmee uw klanten of medewerkers snel een indicatief lichtplan maken. Denk aan een eigen productselectie, huisstijl en rekenregels — zonder overdreven beloftes, wel met een professionele flow van plattegrond naar offerteaanvraag.</p>",
+        },
+        {
+          id: "benefits",
+          type: "benefits",
+          heading: "Wat kunt u inrichten?",
+          items: [
+            { title: "Eigen producten", description: "Uw assortiment, specificaties en prijslogica." },
+            { title: "Eigen huisstijl", description: "Look & feel passend bij uw merk of klantomgeving." },
+            { title: "Lichtplan-output", description: "Indicatieve plattegrond, armaturenindeling en rapportage." },
+            { title: "Offerteaanvragen", description: "Leadgeneratie met gecontroleerde opvolging." },
+            { title: "Koppelingen", description: "Integratie met CRM, ERP of interne systemen waar gewenst." },
+            { title: "Eigen domein", description: "Publicatie onder uw merk of subdomain." },
+          ],
+        },
+        {
+          id: "form",
+          type: "ai-calculator-form",
+          heading: "Bespreek mijn AI-calculator",
+          intro:
+            "Vertel kort wat u zoekt. We nemen contact op om mogelijkheden, scope en planning te bespreken.",
+          submitButtonText: "Bespreek mijn AI-calculator",
         },
       ],
     ),

@@ -61,12 +61,16 @@ test.describe("Public LED site & wizard", () => {
     await expect(page.getByTestId("floor-plan-editor")).toBeVisible();
   });
 
-  test("luxe atmosphere navigates to kantoorverlichting", async ({ page }) => {
+  test("premium atmosphere is visible but disabled", async ({ page }) => {
     await startWizard(page);
     await selectRoom(page, "open_kantoor");
     await page.getByTestId("wizard-next-button").click();
-    await page.getByTestId("atmosphere-option-luxe").click();
-    await expect(page).toHaveURL(/\/kantoorverlichting/);
+    const premium = page.getByTestId("atmosphere-option-premium_architectural");
+    await expect(premium).toBeVisible();
+    await expect(premium).toHaveAttribute("data-disabled", "true");
+    await page.getByTestId("atmosphere-option-warm").click();
+    await page.getByTestId("wizard-next-button").click();
+    await expect(page.getByText(/plattegrond/i).first()).toBeVisible();
   });
 
   test("wizard CMS endpoint serves room and atmosphere choices", async ({ request }) => {
@@ -74,10 +78,13 @@ test.describe("Public LED site & wizard", () => {
     expect(res.ok()).toBeTruthy();
     const data = (await res.json()) as {
       roomChoices: { id: string; title: string }[];
-      atmosphereChoices: { id: string; flow: string }[];
+      atmosphereChoices: { id: string; enabled: boolean }[];
     };
     expect(data.roomChoices.length).toBeGreaterThan(0);
-    expect(data.atmosphereChoices.some((c) => c.id === "luxe" && c.flow === "kantoorverlichting")).toBeTruthy();
+    expect(data.atmosphereChoices.some((c) => c.id === "warm" && c.enabled !== false)).toBeTruthy();
+    expect(
+      data.atmosphereChoices.some((c) => c.id === "premium_architectural" && c.enabled === false),
+    ).toBeTruthy();
   });
 
   test("lead form validation", async ({ page }) => {

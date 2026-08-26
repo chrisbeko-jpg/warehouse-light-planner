@@ -138,13 +138,13 @@ function AtmosphereChoiceForm({
   images: CmsSiteContent["images"];
   onChange: (choice: WizardAtmosphereChoiceCms) => void;
 }) {
-  const isLuxe = choice.flow === "kantoorverlichting";
+  const isPremium = choice.id === "premium_architectural";
   return (
     <article className="lp-card space-y-3 p-4">
       <p className="text-xs font-semibold text-[var(--lp-text-secondary)]">ID: {choice.id}</p>
-      {isLuxe && (
+      {isPremium && (
         <p className="rounded bg-[var(--lp-bg-secondary)] p-2 text-xs">
-          Technische actie: doorverwijzing naar /kantoorverlichting (flow kan niet worden verwijderd).
+          Premium-teaser: zichtbaar op de site, maar niet selecteerbaar zolang &quot;Ingeschakeld&quot; uit staat.
         </p>
       )}
       <div className="grid gap-3 md:grid-cols-2">
@@ -153,23 +153,12 @@ function AtmosphereChoiceForm({
         <label className="text-sm md:col-span-2">Beschrijving<textarea className="mt-1 w-full rounded border px-2 py-1" rows={2} value={choice.description} onChange={(e) => onChange({ ...choice, description: e.target.value })} /></label>
         <ImageSelect images={images} value={choice.imageId} onChange={(imageId) => onChange({ ...choice, imageId })} />
         <label className="text-sm">Alt-tekst<input className="mt-1 w-full rounded border px-2 py-1" value={choice.imageAlt} onChange={(e) => onChange({ ...choice, imageAlt: e.target.value })} /></label>
-        {isLuxe && (
-          <label className="text-sm md:col-span-2">CTA-tekst<input className="mt-1 w-full rounded border px-2 py-1" value={choice.ctaText ?? ""} onChange={(e) => onChange({ ...choice, ctaText: e.target.value })} /></label>
+        {isPremium && (
+          <label className="text-sm md:col-span-2">Badge tekst<input className="mt-1 w-full rounded border px-2 py-1" value={choice.badgeText ?? "ONLY PREMIUM"} onChange={(e) => onChange({ ...choice, badgeText: e.target.value })} /></label>
         )}
-        <label className="text-sm">
-          Flow
-          <select
-            className="mt-1 w-full rounded border px-2 py-1"
-            value={choice.flow}
-            disabled={isLuxe}
-            onChange={(e) => onChange({ ...choice, flow: e.target.value as "standard" | "kantoorverlichting" })}
-          >
-            <option value="standard">Standaard wizard (3000K/4000K)</option>
-            <option value="kantoorverlichting">Kantoorverlichting-pagina</option>
-          </select>
-        </label>
         <label className="text-sm">Sortering<input type="number" className="mt-1 w-full rounded border px-2 py-1" value={choice.sortOrder} onChange={(e) => onChange({ ...choice, sortOrder: Number(e.target.value) })} /></label>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={choice.active} onChange={(e) => onChange({ ...choice, active: e.target.checked })} />Actief</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={choice.active} onChange={(e) => onChange({ ...choice, active: e.target.checked })} />Zichtbaar</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={choice.enabled} onChange={(e) => onChange({ ...choice, enabled: e.target.checked })} />Ingeschakeld (selecteerbaar)</label>
       </div>
     </article>
   );

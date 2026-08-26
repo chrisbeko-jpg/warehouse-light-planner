@@ -18,7 +18,7 @@ export type RoomFunctionId =
   | "toilet"
   | "overig";
 
-export type AtmosphereId = "warm" | "neutraal" | "luxe";
+export type AtmosphereId = "warm" | "neutraal" | "premium_architectural";
 
 export type PublicProductId =
   | "led_panel_3000"

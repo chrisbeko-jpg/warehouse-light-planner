@@ -198,6 +198,23 @@ export function BlockEditor({
           <Field label="Auteur"><input className={inputClass()} value={block.author} onChange={(e) => onChange({ ...block, author: e.target.value })} /></Field>
         </>
       );
+    case "ai-calculator-cta":
+      return (
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="Kop"><input className={inputClass()} value={block.heading} onChange={(e) => onChange({ ...block, heading: e.target.value })} /></Field>
+          <Field label="CTA tekst"><input className={inputClass()} value={block.buttonText} onChange={(e) => onChange({ ...block, buttonText: e.target.value })} /></Field>
+          <Field label="CTA link"><input className={inputClass()} value={block.buttonHref} onChange={(e) => onChange({ ...block, buttonHref: e.target.value })} /></Field>
+          <Field label="Tekst"><textarea className={inputClass()} rows={3} value={block.body} onChange={(e) => onChange({ ...block, body: e.target.value })} /></Field>
+        </div>
+      );
+    case "ai-calculator-form":
+      return (
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="Kop"><input className={inputClass()} value={block.heading} onChange={(e) => onChange({ ...block, heading: e.target.value })} /></Field>
+          <Field label="Intro"><textarea className={inputClass()} rows={3} value={block.intro} onChange={(e) => onChange({ ...block, intro: e.target.value })} /></Field>
+          <Field label="Knop tekst"><input className={inputClass()} value={block.submitButtonText} onChange={(e) => onChange({ ...block, submitButtonText: e.target.value })} /></Field>
+        </div>
+      );
     default:
       return null;
   }

@@ -12,6 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/over-ons",
     "/contact",
     "/privacy",
+    "/ai-calculator",
   ];
   return routes.map((path) => ({
     url: `${base}${path}`,

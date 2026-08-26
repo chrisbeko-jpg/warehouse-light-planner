@@ -12,7 +12,9 @@ export type ContentBlockType =
   | "faq"
   | "example"
   | "quote"
-  | "comparison";
+  | "comparison"
+  | "ai-calculator-cta"
+  | "ai-calculator-form";
 
 export type CmsPageStatus = "draft" | "published";
 
@@ -140,6 +142,21 @@ export interface QuoteBlock extends ContentBlockBase {
   author: string;
 }
 
+export interface AiCalculatorCtaBlock extends ContentBlockBase {
+  type: "ai-calculator-cta";
+  heading: string;
+  body: string;
+  buttonText: string;
+  buttonHref: string;
+}
+
+export interface AiCalculatorFormBlock extends ContentBlockBase {
+  type: "ai-calculator-form";
+  heading: string;
+  intro: string;
+  submitButtonText: string;
+}
+
 export type ContentBlock =
   | HeroBlock
   | TextBlock
@@ -153,7 +170,9 @@ export type ContentBlock =
   | CtaBlock
   | FaqBlock
   | ExampleBlock
-  | QuoteBlock;
+  | QuoteBlock
+  | AiCalculatorCtaBlock
+  | AiCalculatorFormBlock;
 
 export interface CmsPage {
   slug: string;
@@ -202,6 +221,9 @@ export interface WizardAtmosphereChoiceCms {
   imageAlt: string;
   sortOrder: number;
   active: boolean;
+  /** When false, choice is visible but not selectable (e.g. Premium teaser). */
+  enabled: boolean;
+  badgeText?: string;
   flow: WizardAtmosphereFlow;
   ctaText?: string;
 }
@@ -281,4 +303,6 @@ export const CMS_BLOCK_LABELS: Record<ContentBlockType, string> = {
   example: "Voorbeeldproject",
   quote: "Quote",
   comparison: "Vergelijking (2 kolommen)",
+  "ai-calculator-cta": "AI Calculator CTA (B2B)",
+  "ai-calculator-form": "AI Calculator formulier",
 };

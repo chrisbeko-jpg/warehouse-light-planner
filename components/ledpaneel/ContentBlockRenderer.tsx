@@ -3,6 +3,7 @@ import type { ContentBlock, CmsSiteContent } from "@/types/cms";
 import { imagePublicUrl } from "@/lib/cms/content-store";
 import { RichTextContent } from "@/components/cms/RichTextContent";
 import { sanitizeRichHtml } from "@/lib/cms/sanitize";
+import { AiCalculatorForm } from "@/components/ledpaneel/AiCalculatorForm";
 
 function BlockImage({ imageId, alt, className = "" }: { imageId?: string; alt?: string; className?: string }) {
   if (!imageId) {
@@ -46,7 +47,7 @@ export function ContentBlockRenderer({ block }: { block: ContentBlock; site?: Cm
                 <Link href={block.primaryCtaHref} className="lp-btn-primary">
                   {block.primaryCta}
                 </Link>
-                {block.secondaryCta && block.secondaryCtaHref && (
+                {block.secondaryCta?.trim() && block.secondaryCtaHref?.trim() && (
                   <Link href={block.secondaryCtaHref} className="lp-btn-secondary">
                     {block.secondaryCta}
                   </Link>
@@ -217,7 +218,7 @@ export function ContentBlockRenderer({ block }: { block: ContentBlock; site?: Cm
               <Link href={block.buttonHref} className="lp-btn-primary">
                 {block.buttonText}
               </Link>
-              {block.secondaryButtonText && block.secondaryButtonHref && (
+              {block.secondaryButtonText?.trim() && block.secondaryButtonHref?.trim() && (
                 <Link href={block.secondaryButtonHref} className="lp-btn-secondary">
                   {block.secondaryButtonText}
                 </Link>
@@ -225,6 +226,28 @@ export function ContentBlockRenderer({ block }: { block: ContentBlock; site?: Cm
             </div>
           </div>
         </section>
+      );
+    case "ai-calculator-cta":
+      return (
+        <section className="lp-section" data-testid="ai-calculator-cta">
+          <div className="lp-container">
+            <div className="lp-card border border-[var(--lp-border)] bg-[var(--lp-bg-secondary)] p-8 text-center sm:p-10">
+              <h2 className="lp-heading-2">{block.heading}</h2>
+              <p className="lp-body mx-auto mt-3 max-w-2xl">{block.body}</p>
+              <Link href={block.buttonHref} className="lp-btn-secondary mt-6 inline-flex">
+                {block.buttonText}
+              </Link>
+            </div>
+          </div>
+        </section>
+      );
+    case "ai-calculator-form":
+      return (
+        <AiCalculatorForm
+          heading={block.heading}
+          intro={block.intro}
+          submitButtonText={block.submitButtonText}
+        />
       );
     case "faq":
       return (

@@ -13,15 +13,37 @@ function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardConten
   const defaults = DEFAULT_CMS_SITE.wizard;
   if (!stored) return defaults;
 
-  const mergeChoices = <T extends { id: string }>(defaultItems: T[], storedItems?: T[]): T[] => {
+  const mergeRoomChoices = <T extends { id: string }>(defaultItems: T[], storedItems?: T[]): T[] => {
     if (!storedItems?.length) return defaultItems;
     const byId = new Map(storedItems.map((item) => [item.id, item]));
     return defaultItems.map((item) => ({ ...item, ...byId.get(item.id) }));
   };
 
+  const storedAtmospheres = stored.atmosphereChoices ?? [];
+  const byId = new Map(storedAtmospheres.map((item) => [item.id, item]));
+  const legacyLuxe = byId.get("luxe");
+  if (legacyLuxe) {
+    byId.set("premium_architectural", {
+      ...legacyLuxe,
+      id: "premium_architectural",
+      enabled: false,
+      flow: "standard",
+      badgeText: legacyLuxe.badgeText ?? "ONLY PREMIUM",
+    });
+    byId.delete("luxe");
+  }
+
+  const atmosphereChoices = defaults.atmosphereChoices.map((item) => {
+    const merged = { ...item, ...byId.get(item.id) };
+    if (item.id === "premium_architectural") {
+      return { ...merged, enabled: merged.enabled === true ? true : false };
+    }
+    return merged;
+  });
+
   return {
-    roomChoices: mergeChoices(defaults.roomChoices, stored.roomChoices),
-    atmosphereChoices: mergeChoices(defaults.atmosphereChoices, stored.atmosphereChoices),
+    roomChoices: mergeRoomChoices(defaults.roomChoices, stored.roomChoices),
+    atmosphereChoices,
   };
 }
 
@@ -54,9 +76,30 @@ export function mergeSitePayload(stored?: Partial<CmsSitePayload>): CmsSitePaylo
   };
 }
 
+function mergeHomepage(stored?: Partial<CmsPage>): CmsPage {
+  const defaults = DEFAULT_CMS_SITE.homepage;
+  const merged: CmsPage = {
+    ...defaults,
+    ...stored,
+    seo: { ...defaults.seo, ...stored?.seo },
+    blocks: stored?.blocks?.length ? [...stored.blocks] : [...defaults.blocks],
+  };
+
+  if (!merged.blocks.some((block) => block.id === "ai-calculator-cta")) {
+    const aiBlock = defaults.blocks.find((block) => block.id === "ai-calculator-cta");
+    const ctaBottomIdx = merged.blocks.findIndex((block) => block.id === "cta-bottom");
+    if (aiBlock) {
+      if (ctaBottomIdx >= 0) merged.blocks.splice(ctaBottomIdx, 0, aiBlock);
+      else merged.blocks.push(aiBlock);
+    }
+  }
+
+  return merged;
+}
+
 function mergeSitePayloadDefaults(stored?: Partial<CmsSitePayload>): CmsSitePayload {
   return {
-    homepage: { ...DEFAULT_CMS_SITE.homepage, ...stored?.homepage },
+    homepage: mergeHomepage(stored?.homepage),
     pages: { ...DEFAULT_CMS_SITE.pages, ...stored?.pages },
     images: { ...DEFAULT_CMS_SITE.images, ...stored?.images },
     wizard: mergeWizardContent(stored?.wizard),
@@ -210,6 +253,23 @@ export function createDefaultBlock(type: import("@/types/cms").ContentBlock["typ
       return { id, type: "example", heading: "Voorbeeld", body: "Tekst", imageIds: [] };
     case "quote":
       return { id, type: "quote", quote: "Quote", author: "Auteur" };
+    case "ai-calculator-cta":
+      return {
+        id,
+        type: "ai-calculator-cta",
+        heading: "Uw eigen AI lichtcalculator?",
+        body: "Tekst over een eigen AI-calculator.",
+        buttonText: "Neem contact met ons op",
+        buttonHref: "/ai-calculator",
+      };
+    case "ai-calculator-form":
+      return {
+        id,
+        type: "ai-calculator-form",
+        heading: "Bespreek mijn AI-calculator",
+        intro: "Vertel kort wat u zoekt.",
+        submitButtonText: "Bespreek mijn AI-calculator",
+      };
     default:
       return { id, type: "text", body: "Tekst" };
   }
