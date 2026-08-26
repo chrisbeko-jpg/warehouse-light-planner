@@ -83,6 +83,19 @@ export interface IndicativePriceRange {
   maxEuro: number;
 }
 
+export interface MaterialPriceLine {
+  productId: PublicProductId;
+  name: string;
+  quantity: number;
+  unitEuro: number;
+  subtotalEuro: number;
+}
+
+export interface MaterialPriceIndication {
+  totalEuro: number;
+  lines: MaterialPriceLine[];
+}
+
 export interface LeadContactForm {
   companyName: string;
   contactPerson: string;
@@ -114,9 +127,13 @@ export interface PublicLeadRecord {
     atmosphere: AtmosphereId;
     preferredProductId: PublicProductId;
     fixtures: PlacedPublicFixture[];
+    roomVertices: Point2D[];
+    pixelsPerMeter: number;
     result: IndicativeResult;
-    price: IndicativePriceRange;
+    price: MaterialPriceIndication;
   };
   floorPlanDataUrl: string | null;
+  lightPlanImageBase64: string | null;
+  heatmapImageBase64: string | null;
   pdfBase64: string | null;
 }

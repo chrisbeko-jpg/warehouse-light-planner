@@ -3,9 +3,10 @@
 import { useMemo } from "react";
 import { CALCULATION_DISCLAIMER, calculateIndicativeResult } from "@/lib/public-wizard/calculation";
 import {
-  calculateIndicativePrice,
-  countProducts,
-  formatPriceRange,
+  calculateMaterialPrice,
+  formatMaterialPrice,
+  MATERIAL_PRICE_DISCLAIMER,
+  MATERIAL_PRICE_FOOTNOTE,
 } from "@/lib/public-wizard/pricing";
 import { createRoomPolygon } from "@/lib/public-wizard/placement";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
@@ -29,8 +30,7 @@ export function StepResult() {
     return <p>Geen resultaat beschikbaar. Ga terug en genereer een lichtplan.</p>;
   }
 
-  const price = calculateIndicativePrice(fixtures);
-  const products = countProducts(fixtures);
+  const price = calculateMaterialPrice(fixtures);
 
   return (
     <div>
@@ -60,20 +60,19 @@ export function StepResult() {
         <div>
           <h3 className="mb-2 text-sm font-semibold">Producten</h3>
           <ul className="space-y-1 text-sm text-[var(--lp-text-secondary)]">
-            {Object.entries(products).map(([name, qty]) => (
-              <li key={name}>
-                {name}: {qty} st
+            {price.lines.map((line) => (
+              <li key={line.productId}>
+                {line.quantity} × {line.name} à €{line.unitEuro.toFixed(2)} = €{line.subtotalEuro.toFixed(2)}
               </li>
             ))}
           </ul>
         </div>
 
         <div className="rounded-xl bg-[var(--lp-editor-bg)] p-4 text-white">
-          <p className="text-sm text-white/70">Indicatieve projectprijs</p>
-          <p className="text-2xl font-bold text-[var(--lp-green)]">{formatPriceRange(price)}</p>
-          <p className="mt-2 text-xs text-white/70">
-            De definitieve prijs ontvangt u na controle van het lichtplan.
-          </p>
+          <p className="text-sm text-white/70">Indicatieve materiaalprijs</p>
+          <p className="text-2xl font-bold text-[var(--lp-green)]">{formatMaterialPrice(price)}</p>
+          <p className="mt-2 text-xs text-white/80">{MATERIAL_PRICE_DISCLAIMER}</p>
+          <p className="mt-1 text-xs text-white/70">{MATERIAL_PRICE_FOOTNOTE}</p>
         </div>
 
         <p className="text-xs text-[var(--lp-text-secondary)]">{CALCULATION_DISCLAIMER}</p>

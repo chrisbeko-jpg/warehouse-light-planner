@@ -22,8 +22,10 @@ import type {
   RoomFunctionId,
   WizardStepId,
 } from "@/types/public-wizard";
+import { computeFitView, parseDistanceMeters, type EditorViewState } from "@/lib/public-wizard/viewport";
 
-export type PublicEditorMode = "select" | "calibrate" | "drawRoom" | "placeDownlight";
+export type PublicEditorMode = "select" | "calibrate" | "drawRoom" | "placeDownlight" | "pan";
+export type EditorPhase = "scale" | "room" | "review";
 
 const WIZARD_STEPS: WizardStepId[] = [
   "room",
@@ -61,6 +63,11 @@ export interface PublicWizardStore {
   downlightProductId: PublicProductId;
   submitReference: string | null;
   submitEmail: string | null;
+  viewState: EditorViewState;
+  editorPhase: EditorPhase;
+  sidePanelCollapsed: boolean;
+  scaleStepCollapsed: boolean;
+  calibrationLine: Point2D[];
 
   setStep: (step: WizardStepId) => void;
   nextStep: () => boolean;
@@ -91,6 +98,13 @@ export interface PublicWizardStore {
   addDownlightAtPoint: (x: number, y: number) => void;
   setShowHeatmap: (value: boolean) => void;
   setDownlightProductId: (id: PublicProductId) => void;
+  setViewState: (view: EditorViewState) => void;
+  updateViewState: (patch: Partial<EditorViewState>) => void;
+  fitViewToScreen: (viewportWidth: number, viewportHeight: number) => void;
+  setEditorPhase: (phase: EditorPhase) => void;
+  setSidePanelCollapsed: (value: boolean) => void;
+  setScaleStepCollapsed: (value: boolean) => void;
+  setCalibrationLine: (points: Point2D[]) => void;
   getIndicativeResult: () => ReturnType<typeof calculateIndicativeResult> | null;
   setSubmitResult: (reference: string, email: string) => void;
   resetWizard: () => void;
@@ -125,6 +139,11 @@ const initialState = {
   downlightProductId: "downlight_4000" as PublicProductId,
   submitReference: null as string | null,
   submitEmail: null as string | null,
+  viewState: { scale: 1, positionX: 0, positionY: 0 } as EditorViewState,
+  editorPhase: "scale" as EditorPhase,
+  sidePanelCollapsed: false,
+  scaleStepCollapsed: false,
+  calibrationLine: [] as Point2D[],
 };
 
 function cloneFixtures(fixtures: PlacedPublicFixture[]): PlacedPublicFixture[] {
@@ -198,14 +217,17 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   applyCalibration: () => {
     const { calibrationDraft, calibrationDistanceMm } = get();
     if (calibrationDraft.length !== 2) return false;
-    const distanceMm = Number(calibrationDistanceMm);
-    if (!Number.isFinite(distanceMm) || distanceMm <= 0) return false;
-    const ppm = computePixelsPerMeter(calibrationDraft[0]!, calibrationDraft[1]!, distanceMm);
+    const meters = parseDistanceMeters(calibrationDistanceMm);
+    if (!meters) return false;
+    const ppm = computePixelsPerMeter(calibrationDraft[0]!, calibrationDraft[1]!, meters * 1000);
     if (!ppm || ppm <= 0) return false;
     set({
       pixelsPerMeter: ppm,
-      editorMode: "select",
+      editorMode: "drawRoom",
+      editorPhase: "room",
+      scaleStepCollapsed: true,
       calibrationDraft: [],
+      calibrationLine: calibrationDraft,
     });
     return true;
   },
@@ -221,6 +243,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       roomVertices: polygonDraft,
       polygonDraft: [],
       editorMode: "select",
+      editorPhase: "review",
     });
     return true;
   },
@@ -331,6 +354,27 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   setShowHeatmap: (value) => set({ showHeatmap: value }),
 
   setDownlightProductId: (id) => set({ downlightProductId: id }),
+
+  setViewState: (view) => set({ viewState: view }),
+
+  updateViewState: (patch) =>
+    set({ viewState: { ...get().viewState, ...patch } }),
+
+  fitViewToScreen: (viewportWidth, viewportHeight) => {
+    const { backgroundWidth, backgroundHeight } = get();
+    if (!backgroundWidth || !backgroundHeight) return;
+    set({
+      viewState: computeFitView(viewportWidth, viewportHeight, backgroundWidth, backgroundHeight),
+    });
+  },
+
+  setEditorPhase: (phase) => set({ editorPhase: phase }),
+
+  setSidePanelCollapsed: (value) => set({ sidePanelCollapsed: value }),
+
+  setScaleStepCollapsed: (value) => set({ scaleStepCollapsed: value }),
+
+  setCalibrationLine: (points) => set({ calibrationLine: points }),
 
   getIndicativeResult: () => {
     const { roomVertices, pixelsPerMeter, targetLux, ceilingHeightM, fixtures } = get();

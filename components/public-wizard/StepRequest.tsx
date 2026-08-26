@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { exportPlanSnapshots } from "@/lib/public-wizard/export-plan-snapshot";
 import { usePublicWizardStore, validateLeadForm } from "@/lib/public-wizard/store";
 import { WizardCard, WizardNav } from "@/components/public-wizard/WizardShell";
 import type { LeadContactForm } from "@/types/public-wizard";
@@ -37,6 +38,8 @@ export function StepRequest() {
   const roomVertices = usePublicWizardStore((s) => s.roomVertices);
   const pixelsPerMeter = usePublicWizardStore((s) => s.pixelsPerMeter);
   const backgroundDataUrl = usePublicWizardStore((s) => s.backgroundDataUrl);
+  const backgroundWidth = usePublicWizardStore((s) => s.backgroundWidth);
+  const backgroundHeight = usePublicWizardStore((s) => s.backgroundHeight);
   const setSubmitResult = usePublicWizardStore((s) => s.setSubmitResult);
   const submitReference = usePublicWizardStore((s) => s.submitReference);
   const submitEmail = usePublicWizardStore((s) => s.submitEmail);
@@ -59,7 +62,7 @@ export function StepRequest() {
       setError(validationError);
       return;
     }
-    if (!roomFunction || !atmosphere || !pixelsPerMeter) {
+    if (!roomFunction || !atmosphere || !pixelsPerMeter || !backgroundDataUrl) {
       setError("Wizardgegevens ontbreken. Start opnieuw.");
       return;
     }
@@ -67,6 +70,17 @@ export function StepRequest() {
     setSubmitting(true);
     setError(null);
     try {
+      const snapshots = await exportPlanSnapshots({
+        backgroundDataUrl,
+        backgroundWidth,
+        backgroundHeight,
+        roomVertices,
+        fixtures,
+        pixelsPerMeter,
+        targetLux,
+        ceilingHeightM,
+      });
+
       const response = await fetch("/api/public-leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -81,6 +95,8 @@ export function StepRequest() {
           roomVertices,
           pixelsPerMeter,
           floorPlanDataUrl: backgroundDataUrl,
+          lightPlanImageBase64: snapshots.lightPlanPng,
+          heatmapImageBase64: snapshots.heatmapPng,
         }),
       });
       const data = (await response.json()) as {

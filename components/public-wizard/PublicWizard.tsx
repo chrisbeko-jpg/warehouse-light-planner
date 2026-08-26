@@ -13,6 +13,10 @@ import { StepRequest } from "@/components/public-wizard/StepRequest";
 export function PublicWizard() {
   const step = usePublicWizardStore((s) => s.step);
 
+  if (step === "editor") {
+    return <StepEditor />;
+  }
+
   return (
     <div className="lp-container py-8">
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -28,7 +32,6 @@ export function PublicWizard() {
       {step === "room" && <StepRoom />}
       {step === "atmosphere" && <StepAtmosphere />}
       {step === "floorplan" && <StepFloorPlanUpload />}
-      {step === "editor" && <StepEditor />}
       {step === "result" && <StepResult />}
       {step === "request" && <StepRequest />}
     </div>

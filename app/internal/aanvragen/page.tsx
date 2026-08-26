@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { formatPriceRange } from "@/lib/public-wizard/pricing";
+import { formatMaterialPrice } from "@/lib/public-wizard/pricing";
 import type { LeadStatus, PublicLeadRecord } from "@/types/public-wizard";
 
 const STATUSES: LeadStatus[] = [
@@ -109,7 +109,7 @@ export default function InternalLeadsPage() {
                 </p>
                 <p className="text-sm">
                   Indicatief: {lead.wizard.result.indicativeAverageLux} lux ·{" "}
-                  {formatPriceRange(lead.wizard.price)}
+                  {formatMaterialPrice(lead.wizard.price)}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -133,6 +133,37 @@ export default function InternalLeadsPage() {
                 </button>
               </div>
             </div>
+            {(lead.lightPlanImageBase64 || lead.heatmapImageBase64 || lead.floorPlanDataUrl) && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {lead.floorPlanDataUrl && (
+                  <div>
+                    <p className="mb-1 text-xs font-semibold text-gray-500">Originele plattegrond</p>
+                    <img src={lead.floorPlanDataUrl} alt="Plattegrond" className="max-h-48 rounded border object-contain" />
+                  </div>
+                )}
+                {lead.lightPlanImageBase64 && (
+                  <div>
+                    <p className="mb-1 text-xs font-semibold text-gray-500">Lichtplan</p>
+                    <img src={`data:image/png;base64,${lead.lightPlanImageBase64}`} alt="Lichtplan" className="max-h-48 rounded border object-contain" />
+                  </div>
+                )}
+                {lead.heatmapImageBase64 && (
+                  <div>
+                    <p className="mb-1 text-xs font-semibold text-gray-500">Light Indicator</p>
+                    <img src={`data:image/png;base64,${lead.heatmapImageBase64}`} alt="Heatmap" className="max-h-48 rounded border object-contain" />
+                  </div>
+                )}
+              </div>
+            )}
+            {(lead.wizard.price?.lines?.length ?? 0) > 0 && (
+              <ul className="mt-3 text-sm text-gray-600">
+                {lead.wizard.price.lines.map((line) => (
+                  <li key={line.productId}>
+                    {line.quantity} × {line.name} — €{line.subtotalEuro.toFixed(2)}
+                  </li>
+                ))}
+              </ul>
+            )}
           </article>
         ))}
         {!loading && leads.length === 0 && (

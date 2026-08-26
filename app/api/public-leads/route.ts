@@ -6,7 +6,12 @@ import {
   generateReference,
   saveLead,
 } from "@/lib/public-wizard/lead-storage";
-import { calculateIndicativePrice, countProducts, formatPriceRange } from "@/lib/public-wizard/pricing";
+import {
+  calculateMaterialPrice,
+  countProducts,
+  formatMaterialPrice,
+  MATERIAL_PRICE_DISCLAIMER,
+} from "@/lib/public-wizard/pricing";
 import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
 import { createRoomPolygon } from "@/lib/public-wizard/placement";
 import type {
@@ -31,6 +36,8 @@ interface SubmitBody {
   roomVertices: { x: number; y: number }[];
   pixelsPerMeter: number;
   floorPlanDataUrl: string | null;
+  lightPlanImageBase64?: string | null;
+  heatmapImageBase64?: string | null;
 }
 
 function getSmtpConfig() {
@@ -59,7 +66,7 @@ export async function POST(request: Request) {
       body.ceilingHeightM,
       body.fixtures,
     );
-    const price = calculateIndicativePrice(body.fixtures);
+    const price = calculateMaterialPrice(body.fixtures);
     const reference = generateReference();
 
     const record: PublicLeadRecord = {
@@ -75,10 +82,14 @@ export async function POST(request: Request) {
         atmosphere: body.atmosphere,
         preferredProductId: body.preferredProductId,
         fixtures: body.fixtures,
+        roomVertices: body.roomVertices,
+        pixelsPerMeter: body.pixelsPerMeter,
         result,
         price,
       },
       floorPlanDataUrl: body.floorPlanDataUrl,
+      lightPlanImageBase64: body.lightPlanImageBase64 ?? null,
+      heatmapImageBase64: body.heatmapImageBase64 ?? null,
       pdfBase64: null,
     };
 
@@ -105,18 +116,29 @@ export async function POST(request: Request) {
       });
 
       const textBody = [
-        `Nieuwe lichtplan aanvraag – ${contact.companyName} – ${reference}`,
+        `Nieuwe AI Lichtadvies aanvraag – ${contact.companyName} – ${reference}`,
         "",
         `Bedrijf: ${contact.companyName}`,
         `Contact: ${contact.contactPerson}`,
         `Telefoon: ${contact.telephone}`,
         `E-mail: ${contact.email}`,
+        `Factuuradres: ${contact.address}, ${contact.postalCode} ${contact.city}`,
+        `Afleveradres: ${contact.deliveryAddress}, ${contact.deliveryPostalCode} ${contact.deliveryCity}`,
         `Project: ${contact.projectName || "—"}`,
         "",
+        `Ruimtefunctie: ${body.roomFunction}`,
+        `Sfeer: ${body.atmosphere}`,
+        `Plafondhoogte: ${body.ceilingHeightM} m`,
         `Doel lux: ${body.targetLux}`,
         `Indicatief lux: ${result.indicativeAverageLux}`,
+        `Voldoet: ${result.meetsTarget ? "Ja" : "Nee"}`,
         `Producten: ${productSummary || "—"}`,
-        `Indicatieve prijs: ${formatPriceRange(price)}`,
+        `Materiaalindicatie: ${formatMaterialPrice(price)}`,
+        MATERIAL_PRICE_DISCLAIMER,
+        "",
+        `Opmerkingen: ${contact.remarks || "—"}`,
+        "",
+        "Het lichtplan is bijgevoegd als PDF.",
       ].join("\n");
 
       const mailFrom = process.env.SMTP_FROM ?? SITE_LINKS.contactEmail;
@@ -125,7 +147,7 @@ export async function POST(request: Request) {
         from: mailFrom,
         replyTo: contact.email,
         to: SITE_LINKS.salesEmail,
-        subject: `Nieuwe lichtplan aanvraag – ${contact.companyName} – ${reference}`,
+        subject: `Nieuwe AI Lichtadvies aanvraag – ${contact.companyName} – ${reference}`,
         text: textBody,
         attachments: record.pdfBase64
           ? [

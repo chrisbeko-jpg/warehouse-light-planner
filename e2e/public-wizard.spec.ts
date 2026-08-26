@@ -24,7 +24,8 @@ async function startWizard(page: import("@playwright/test").Page) {
 
 async function advanceRoom(page: import("@playwright/test").Page) {
   await startWizard(page);
-  await page.getByRole("button", { name: "Open kantoor" }).click();
+  await page.getByTestId("room-option-open_kantoor").click();
+  await expect(page.getByTestId("wizard-next-button")).toBeEnabled({ timeout: 10000 });
   await page.getByTestId("wizard-next-button").click();
 }
 
@@ -36,18 +37,21 @@ async function advanceAtmosphere(page: import("@playwright/test").Page) {
 async function uploadFloorPlan(page: import("@playwright/test").Page) {
   await page.setInputFiles('input[type="file"]', FIXTURE_PNG);
   await page.getByRole("button", { name: "Plattegrond gebruiken" }).click();
+  await expect(page.getByTestId("floor-plan-editor")).toBeVisible();
 }
 
 async function setupEditor(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "Schaal instellen" }).click();
   const stage = page.locator("canvas").first();
   await expect(stage).toBeVisible();
   const box = await stage.boundingBox();
   if (!box) throw new Error("Stage not found");
-  await stage.click({ position: { x: box.width * 0.3, y: box.height * 0.5 } });
-  await stage.click({ position: { x: box.width * 0.7, y: box.height * 0.5 } });
-  await page.getByPlaceholder("Afstand in mm").fill("5000");
-  await page.getByRole("button", { name: "Schaal toepassen" }).click();
+
+  await stage.click({ position: { x: box.width * 0.3, y: box.height * 0.5 }, force: true });
+  await stage.click({ position: { x: box.width * 0.7, y: box.height * 0.5 }, force: true });
+  await expect(page.getByPlaceholder("4,80 m")).toBeVisible({ timeout: 10000 });
+  await page.getByPlaceholder("4,80 m").fill("5");
+  await page.getByTestId("apply-scale-button").click();
+
   await page.getByRole("button", { name: "Ruimte tekenen" }).click();
   await stage.click({ position: { x: box.width * 0.15, y: box.height * 0.15 } });
   await stage.click({ position: { x: box.width * 0.85, y: box.height * 0.15 } });
@@ -59,7 +63,6 @@ async function setupEditor(page: import("@playwright/test").Page) {
 async function generateAndOpenResult(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Genereer mijn lichtplan" }).click();
   await expect(page.getByRole("button", { name: "Bekijk lichtverdeling" })).toBeVisible();
-  await expect(page.getByTestId("wizard-next-button")).toBeEnabled();
   await page.getByTestId("wizard-next-button").click();
   await expect(page.getByText("Indicatief resultaat")).toBeVisible();
 }
@@ -73,8 +76,19 @@ test.describe("Public LED site & wizard", () => {
 
   test("room function selection", async ({ page }) => {
     await startWizard(page);
-    await page.getByRole("button", { name: /^Gang\b/ }).click();
+    await page.getByTestId("room-option-gang").click();
     await expect(page.locator('input[type="number"]').nth(1)).toHaveValue("100");
+  });
+
+  test("fullscreen editor layout", async ({ page }) => {
+    await advanceRoom(page);
+    await advanceAtmosphere(page);
+    await uploadFloorPlan(page);
+    await expect(page.getByTestId("floor-plan-editor")).toBeVisible();
+    await expect(page.getByLabel("Zoom in")).toBeVisible();
+    const editor = page.getByTestId("floor-plan-editor");
+    const box = await editor.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThan(600);
   });
 
   test("full wizard flow through editor", async ({ page }) => {
@@ -83,6 +97,8 @@ test.describe("Public LED site & wizard", () => {
     await uploadFloorPlan(page);
     await setupEditor(page);
     await generateAndOpenResult(page);
+    await expect(page.getByText("Indicatieve materiaalprijs")).toBeVisible();
+    await expect(page.getByText(/Exclusief btw, verzending, montage/i)).toBeVisible();
   });
 
   test("lead form validation", async ({ page }) => {
