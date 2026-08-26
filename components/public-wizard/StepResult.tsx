@@ -34,8 +34,8 @@ export function StepResult() {
 
   return (
     <div>
-      <h1 className="mb-2 text-2xl font-bold sm:text-3xl">Indicatief resultaat</h1>
-      <p className="mb-6 text-[var(--ls-gray)]">
+      <h1 className="lp-heading-2 mb-2">Indicatief resultaat</h1>
+      <p className="lp-body mb-6">
         Onderstaande waarden zijn gebaseerd op daadwerkelijk geplaatste armaturen.
       </p>
 
@@ -59,7 +59,7 @@ export function StepResult() {
 
         <div>
           <h3 className="mb-2 text-sm font-semibold">Producten</h3>
-          <ul className="space-y-1 text-sm text-[var(--ls-gray)]">
+          <ul className="space-y-1 text-sm text-[var(--lp-text-secondary)]">
             {Object.entries(products).map(([name, qty]) => (
               <li key={name}>
                 {name}: {qty} st
@@ -68,15 +68,15 @@ export function StepResult() {
           </ul>
         </div>
 
-        <div className="rounded-xl bg-[var(--ls-dark)] p-4 text-white">
-          <p className="text-sm text-[var(--ls-gray-light)]">Indicatieve projectprijs</p>
-          <p className="text-2xl font-bold text-[var(--ls-yellow)]">{formatPriceRange(price)}</p>
-          <p className="mt-2 text-xs text-[var(--ls-gray-light)]">
+        <div className="rounded-xl bg-[var(--lp-editor-bg)] p-4 text-white">
+          <p className="text-sm text-white/70">Indicatieve projectprijs</p>
+          <p className="text-2xl font-bold text-[var(--lp-green)]">{formatPriceRange(price)}</p>
+          <p className="mt-2 text-xs text-white/70">
             De definitieve prijs ontvangt u na controle van het lichtplan.
           </p>
         </div>
 
-        <p className="text-xs text-[var(--ls-gray)]">{CALCULATION_DISCLAIMER}</p>
+        <p className="text-xs text-[var(--lp-text-secondary)]">{CALCULATION_DISCLAIMER}</p>
       </WizardCard>
 
       <WizardNav nextLabel="Aanvragen" onNext={() => nextStep()} />
@@ -94,14 +94,14 @@ function Stat({
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-[var(--ls-gray-light)] p-3">
-      <p className="text-xs text-[var(--ls-gray)]">{label}</p>
+    <div className="rounded-lg border border-[var(--lp-border)] p-3">
+      <p className="text-xs text-[var(--lp-text-secondary)]">{label}</p>
       <p
         className={`text-sm font-semibold ${
           highlight === true
-            ? "text-[var(--ls-success)]"
+            ? "text-[var(--lp-green)]"
             : highlight === false
-              ? "text-[var(--ls-warn)]"
+              ? "text-[var(--lp-warn)]"
               : ""
         }`}
       >

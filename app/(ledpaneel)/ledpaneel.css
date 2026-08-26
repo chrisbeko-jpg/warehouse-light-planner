@@ -1,0 +1,111 @@
+:root {
+  --lp-bg: #ffffff;
+  --lp-bg-secondary: #f5f7f6;
+  --lp-green: #18a66a;
+  --lp-green-dark: #087a4c;
+  --lp-green-soft: #e8f7ef;
+  --lp-text: #17211c;
+  --lp-text-secondary: #66706a;
+  --lp-border: #e1e7e3;
+  --lp-white: #ffffff;
+  --lp-shadow: 0 8px 30px rgba(23, 33, 28, 0.06);
+  --lp-editor-bg: #1a2420;
+  --lp-warn: #b45309;
+  --lp-warn-soft: #fef3c7;
+  --lp-danger: #dc2626;
+}
+
+.lp-shell {
+  background: var(--lp-bg);
+  color: var(--lp-text);
+  min-height: 100vh;
+}
+
+.lp-container {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .lp-container {
+    padding-inline: 1.5rem;
+  }
+}
+
+.lp-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  background: var(--lp-green);
+  color: var(--lp-white);
+  font-weight: 700;
+  padding: 0.875rem 1.5rem;
+  transition: background 0.15s ease;
+}
+
+.lp-btn-primary:hover {
+  background: var(--lp-green-dark);
+}
+
+.lp-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--lp-border);
+  background: var(--lp-white);
+  color: var(--lp-text);
+  font-weight: 600;
+  padding: 0.875rem 1.5rem;
+}
+
+.lp-btn-secondary:hover {
+  background: var(--lp-bg-secondary);
+}
+
+.lp-card {
+  border: 1px solid var(--lp-border);
+  border-radius: 1rem;
+  background: var(--lp-white);
+  box-shadow: var(--lp-shadow);
+}
+
+.lp-section {
+  padding-block: 4rem;
+}
+
+.lp-section-alt {
+  background: var(--lp-bg-secondary);
+}
+
+.lp-heading-1 {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.lp-heading-2 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.lp-body {
+  color: var(--lp-text-secondary);
+  line-height: 1.7;
+}
+
+.lp-link {
+  color: var(--lp-green-dark);
+  font-weight: 600;
+}
+
+.lp-link:hover {
+  text-decoration: underline;
+}

@@ -15,8 +15,9 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: "npm run dev",
-        url: "http://127.0.0.1:3000",
-        reuseExistingServer: !process.env.CI,
+        command: "npm run build && npm run start",
+        url: "http://127.0.0.1:3000/home",
+        reuseExistingServer: false,
+        timeout: 180000,
       },
 });

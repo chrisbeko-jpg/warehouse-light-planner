@@ -4,7 +4,7 @@ export type WizardStepId =
   | "room"
   | "atmosphere"
   | "floorplan"
-  | "generate"
+  | "editor"
   | "result"
   | "request";
 

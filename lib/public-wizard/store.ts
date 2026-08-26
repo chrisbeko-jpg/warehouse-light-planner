@@ -29,7 +29,7 @@ const WIZARD_STEPS: WizardStepId[] = [
   "room",
   "atmosphere",
   "floorplan",
-  "generate",
+  "editor",
   "result",
   "request",
 ];
@@ -345,13 +345,13 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   resetWizard: () => set({ ...initialState }),
 }));
 
-export const WIZARD_STEP_LABELS: { id: WizardStepId; label: string }[] = [
-  { id: "room", label: "Ruimte" },
-  { id: "atmosphere", label: "Sfeer" },
-  { id: "floorplan", label: "Plattegrond" },
-  { id: "generate", label: "Lichtplan" },
-  { id: "result", label: "Resultaat" },
-  { id: "request", label: "Aanvragen" },
+export const WIZARD_STEP_LABELS: { id: WizardStepId; label: string; showInProgress: boolean }[] = [
+  { id: "room", label: "Ruimte", showInProgress: true },
+  { id: "atmosphere", label: "Sfeer", showInProgress: true },
+  { id: "floorplan", label: "Plattegrond", showInProgress: true },
+  { id: "editor", label: "Lichtplan", showInProgress: true },
+  { id: "result", label: "Resultaat", showInProgress: true },
+  { id: "request", label: "Aanvragen", showInProgress: false },
 ];
 
 export function validateLeadForm(form: LeadContactForm): string | null {

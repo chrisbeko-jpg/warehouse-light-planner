@@ -38,6 +38,11 @@ next-env.d.ts
 # lead storage (runtime)
 /data/leads/*.json
 /data/leads/*.pdf
+/data/cms/site.json
+/data/uploads/*
+!data/uploads/.gitkeep
+/data/cms/*
+!data/cms/.gitkeep
 
 # playwright
 /test-results/

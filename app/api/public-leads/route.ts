@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
 import { generatePublicLeadPdf } from "@/lib/public-wizard/generate-lead-pdf";
 import {
   generateReference,
@@ -118,9 +119,12 @@ export async function POST(request: Request) {
         `Indicatieve prijs: ${formatPriceRange(price)}`,
       ].join("\n");
 
+      const mailFrom = process.env.SMTP_FROM ?? SITE_LINKS.contactEmail;
+
       await transporter.sendMail({
-        from: smtp.from,
-        to: "info@lightsale.nl",
+        from: mailFrom,
+        replyTo: contact.email,
+        to: SITE_LINKS.salesEmail,
         subject: `Nieuwe lichtplan aanvraag – ${contact.companyName} – ${reference}`,
         text: textBody,
         attachments: record.pdfBase64
@@ -136,11 +140,11 @@ export async function POST(request: Request) {
 
       if (contact.email) {
         await transporter.sendMail({
-          from: smtp.from,
+          from: mailFrom,
           to: contact.email,
-          subject: `Bevestiging lichtplan aanvraag – ${reference}`,
+          subject: `Bevestiging AI Lichtadvies – ${reference} | ledpaneel.nl`,
           text: [
-            "Bedankt voor uw aanvraag.",
+            "Bedankt voor uw aanvraag via ledpaneel.nl.",
             "",
             "Lightsale controleert het lichtplan en de productspecificatie.",
             "U ontvangt vervolgens het uitgewerkte lichtplan samen met een projectofferte.",

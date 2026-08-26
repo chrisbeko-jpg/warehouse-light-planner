@@ -16,10 +16,8 @@ export function StepRoom() {
 
   return (
     <div>
-      <h1 className="mb-2 text-2xl font-bold text-[var(--ls-black)] sm:text-3xl">
-        Wat voor ruimte wilt u verlichten?
-      </h1>
-      <p className="mb-6 text-[var(--ls-gray)]">
+      <h1 className="lp-heading-2 mb-2">Welke ruimte wilt u verlichten?</h1>
+      <p className="lp-body mb-6">
         Kies het ruimtetype. De voorgestelde luxwaarde kunt u later aanpassen.
       </p>
 
@@ -31,8 +29,8 @@ export function StepRoom() {
             onClick={() => selectRoomFunction(room.id as RoomFunctionId)}
             className={`overflow-hidden rounded-xl border-2 text-left transition ${
               roomFunction === room.id
-                ? "border-[var(--ls-yellow)] ring-2 ring-[var(--ls-yellow)]"
-                : "border-[var(--ls-gray-light)] hover:border-[var(--ls-yellow)]"
+                ? "border-[var(--lp-green)] ring-2 ring-[var(--lp-green)]"
+                : "border-[var(--lp-border)] hover:border-[var(--lp-green)]"
             }`}
           >
             <div
@@ -41,10 +39,10 @@ export function StepRoom() {
               <span className="text-sm font-bold text-white drop-shadow">{room.name}</span>
             </div>
             <div className="space-y-1 p-3">
-              <p className="text-xs font-semibold text-[var(--ls-yellow-hover)]">
+              <p className="text-xs font-semibold text-[var(--lp-green-dark)]">
                 {room.suggestedLux} lux
               </p>
-              <p className="text-xs text-[var(--ls-gray)]">{room.explanation}</p>
+              <p className="text-xs text-[var(--lp-text-secondary)]">{room.explanation}</p>
             </div>
           </button>
         ))}
@@ -60,7 +58,7 @@ export function StepRoom() {
             step={0.1}
             value={ceilingHeightM}
             onChange={(e) => setCeilingHeightM(Number(e.target.value))}
-            className="mt-1 w-full rounded-lg border border-[var(--ls-gray-light)] px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-[var(--lp-border)] px-3 py-2"
           />
         </label>
         <label className="block text-sm font-medium">
@@ -72,7 +70,7 @@ export function StepRoom() {
             step={10}
             value={targetLux}
             onChange={(e) => setTargetLux(Number(e.target.value))}
-            className="mt-1 w-full rounded-lg border border-[var(--ls-gray-light)] px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-[var(--lp-border)] px-3 py-2"
           />
         </label>
       </WizardCard>

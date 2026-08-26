@@ -1,9 +1,10 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { getLeadsDir as getLeadsDirFromStorage } from "@/lib/storage/data-dir";
 import type { LeadStatus, PublicLeadRecord } from "@/types/public-wizard";
 
 function getLeadsDir(): string {
-  return process.env.LEAD_STORAGE_DIR ?? path.join(process.cwd(), "data", "leads");
+  return process.env.LEAD_STORAGE_DIR ?? getLeadsDirFromStorage();
 }
 
 export function generateReference(): string {

@@ -12,8 +12,8 @@ export function StepAtmosphere() {
 
   return (
     <div>
-      <h1 className="mb-2 text-2xl font-bold sm:text-3xl">Kies de lichtsfeer</h1>
-      <p className="mb-6 text-[var(--ls-gray)]">
+      <h1 className="lp-heading-2 mb-2">Kies de lichtsfeer</h1>
+      <p className="lp-body mb-6">
         Selecteer de gewenste uitstraling voor uw kantoorverlichting.
       </p>
 
@@ -25,17 +25,17 @@ export function StepAtmosphere() {
             onClick={() => selectAtmosphere(item.id as AtmosphereId)}
             className={`overflow-hidden rounded-2xl border-2 text-left transition ${
               atmosphere === item.id
-                ? "border-[var(--ls-yellow)] ring-2 ring-[var(--ls-yellow)]"
-                : "border-[var(--ls-gray-light)] hover:border-[var(--ls-yellow)]"
+                ? "border-[var(--lp-green)] ring-2 ring-[var(--lp-green)]"
+                : "border-[var(--lp-border)] hover:border-[var(--lp-green)]"
             }`}
           >
             <div className={`h-40 bg-gradient-to-br ${item.imageGradient}`} />
             <div className="space-y-2 p-4">
               <h2 className="text-lg font-bold">{item.title}</h2>
-              <p className="text-sm font-medium text-[var(--ls-yellow-hover)]">
+              <p className="text-sm font-medium text-[var(--lp-green-dark)]">
                 {item.subtitle}
               </p>
-              <p className="text-sm text-[var(--ls-gray)]">{item.presentationText}</p>
+              <p className="text-sm text-[var(--lp-text-secondary)]">{item.presentationText}</p>
             </div>
           </button>
         ))}

@@ -103,20 +103,20 @@ export function StepRequest() {
     return (
       <WizardCard className="text-center">
         <h1 className="mb-4 text-2xl font-bold">Bedankt voor uw aanvraag.</h1>
-        <p className="mb-4 text-[var(--ls-gray)]">
+        <p className="mb-4 text-[var(--lp-text-secondary)]">
           Lightsale controleert het lichtplan en de productspecificatie. U ontvangt vervolgens het
           uitgewerkte lichtplan samen met een projectofferte.
         </p>
         <p className="font-semibold">Referentie: {submitReference}</p>
-        <p className="text-sm text-[var(--ls-gray)]">Bevestiging verzonden naar: {submitEmail}</p>
+        <p className="text-sm text-[var(--lp-text-secondary)]">Bevestiging verzonden naar: {submitEmail}</p>
       </WizardCard>
     );
   }
 
   return (
     <div>
-      <h1 className="mb-2 text-2xl font-bold sm:text-3xl">Ontvang mijn lichtplan + projectofferte</h1>
-      <p className="mb-4 text-[var(--ls-gray)]">
+      <h1 className="lp-heading-2 mb-2">Ontvang mijn lichtplan + projectofferte</h1>
+      <p className="lp-body mb-4">
         Vul uw gegevens in. U ontvangt geen directe PDF-download — Lightsale stuurt het uitgewerkte
         plan na controle.
       </p>
@@ -171,7 +171,7 @@ export function StepRequest() {
           />
           Afleveradres is gelijk aan bedrijfsadres
         </label>
-        <label className="sm:col-span-2 flex items-start gap-2 text-xs text-[var(--ls-gray)]">
+        <label className="sm:col-span-2 flex items-start gap-2 text-xs text-[var(--lp-text-secondary)]">
           <input
             type="checkbox"
             checked={form.privacyConsent}
@@ -183,7 +183,7 @@ export function StepRequest() {
         </label>
       </WizardCard>
 
-      {error && <p className="mt-3 text-sm text-[var(--ls-danger)]">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[var(--lp-danger)]">{error}</p>}
 
       <WizardNav
         showPrev
@@ -216,7 +216,7 @@ function Field({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-lg border border-[var(--ls-gray-light)] px-3 py-2 disabled:bg-[var(--ls-bg)]"
+        className="mt-1 w-full rounded-lg border border-[var(--lp-border)] px-3 py-2 disabled:bg-[var(--lp-bg-secondary)]"
       />
     </label>
   );

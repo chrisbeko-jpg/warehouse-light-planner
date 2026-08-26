@@ -3,21 +3,26 @@ import type { NextRequest } from "next/server";
 
 const LEDPANEEL_HOSTS = new Set(["ledpaneel.nl", "www.ledpaneel.nl"]);
 
+function isLedpaneelSite(host: string): boolean {
+  return LEDPANEEL_HOSTS.has(host) || process.env.NEXT_PUBLIC_SITE_MODE === "ledpaneel";
+}
+
 export function middleware(request: NextRequest) {
   const host = request.headers.get("host")?.split(":")[0]?.toLowerCase() ?? "";
   const { pathname } = request.nextUrl;
 
-  if (LEDPANEEL_HOSTS.has(host)) {
-    if (host === "www.ledpaneel.nl") {
-      const url = request.nextUrl.clone();
-      url.host = "ledpaneel.nl";
-      return NextResponse.redirect(url, 308);
-    }
-    if (pathname === "/") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/wizard";
-      return NextResponse.rewrite(url);
-    }
+  if (LEDPANEEL_HOSTS.has(host) && host === "www.ledpaneel.nl") {
+    const url = request.nextUrl.clone();
+    url.host = "ledpaneel.nl";
+    return NextResponse.redirect(url, 308);
+  }
+
+  if (isLedpaneelSite(host) && pathname === "/") {
+    return NextResponse.rewrite(new URL("/home", request.url));
+  }
+
+  if (pathname === "/wizard" || pathname.startsWith("/wizard/")) {
+    return NextResponse.redirect(new URL("/lichtadvies", request.url));
   }
 
   if (pathname.startsWith("/internal") && !pathname.startsWith("/internal/login")) {
@@ -39,5 +44,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/wizard/:path*", "/internal/:path*"],
+  matcher: ["/", "/wizard", "/wizard/:path*", "/internal/:path*"],
 };

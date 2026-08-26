@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { formatPriceRange } from "@/lib/public-wizard/pricing";
 import type { LeadStatus, PublicLeadRecord } from "@/types/public-wizard";
@@ -86,16 +87,21 @@ export default function InternalLeadsPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-bold">Lichtplan aanvragen</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Lichtplan aanvragen</h1>
+        <Link href="/internal/content" className="text-sm font-medium text-[var(--lp-green-dark)] hover:underline">
+          Contentbeheer →
+        </Link>
+      </div>
       {loading && <p>Laden…</p>}
-      {error && <p className="text-[var(--ls-danger)]">{error}</p>}
+      {error && <p className="text-red-600">{error}</p>}
       <div className="space-y-4">
         {leads.map((lead) => (
           <article key={lead.reference} className="rounded-xl border bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-semibold">{lead.contact.companyName}</p>
-                <p className="text-sm text-[var(--ls-gray)]">
+                <p className="text-sm text-gray-500">
                   {lead.reference} · {new Date(lead.createdAt).toLocaleString("nl-NL")}
                 </p>
                 <p className="text-sm">
@@ -120,7 +126,7 @@ export default function InternalLeadsPage() {
                 </select>
                 <button
                   type="button"
-                  className="btn-secondary text-sm"
+                  className="rounded border px-3 py-1 text-sm"
                   onClick={() => void downloadPdf(lead.reference)}
                 >
                   PDF downloaden
@@ -130,7 +136,7 @@ export default function InternalLeadsPage() {
           </article>
         ))}
         {!loading && leads.length === 0 && (
-          <p className="text-sm text-[var(--ls-gray)]">Nog geen aanvragen opgeslagen.</p>
+          <p className="text-sm text-gray-500">Nog geen aanvragen opgeslagen.</p>
         )}
       </div>
     </main>
