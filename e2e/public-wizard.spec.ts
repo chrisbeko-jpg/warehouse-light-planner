@@ -73,7 +73,7 @@ test.describe("Public LED site & wizard", () => {
 
   test("room function selection", async ({ page }) => {
     await startWizard(page);
-    await page.getByRole("button", { name: "Gang 100 lux" }).click();
+    await page.getByRole("button", { name: /^Gang\b/ }).click();
     await expect(page.locator('input[type="number"]').nth(1)).toHaveValue("100");
   });
 
