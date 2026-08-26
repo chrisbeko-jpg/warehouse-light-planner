@@ -38,17 +38,15 @@ export function StepGenerate() {
   const targetLux = usePublicWizardStore((s) => s.targetLux);
   const ceilingHeightM = usePublicWizardStore((s) => s.ceilingHeightM);
   const downlightProductId = usePublicWizardStore((s) => s.downlightProductId);
-  const editorMode = usePublicWizardStore((s) => s.editorMode);
   const preferredProductId = usePublicWizardStore((s) => s.preferredProductId);
 
   const generateLightingPlan = usePublicWizardStore((s) => s.generateLightingPlan);
   const selectFixture = usePublicWizardStore((s) => s.selectFixture);
   const moveFixtureById = usePublicWizardStore((s) => s.moveFixtureById);
   const deleteSelectedFixture = usePublicWizardStore((s) => s.deleteSelectedFixture);
-  const addDownlightAtPoint = usePublicWizardStore((s) => s.addDownlightAtPoint);
+  const addDownlight = usePublicWizardStore((s) => s.addDownlight);
   const setShowHeatmap = usePublicWizardStore((s) => s.setShowHeatmap);
   const setDownlightProductId = usePublicWizardStore((s) => s.setDownlightProductId);
-  const setEditorMode = usePublicWizardStore((s) => s.setEditorMode);
   const undo = usePublicWizardStore((s) => s.undo);
   const redo = usePublicWizardStore((s) => s.redo);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
@@ -80,11 +78,6 @@ export function StepGenerate() {
       const pos = stage.getPointerPosition();
       if (!pos) return;
 
-      if (editorMode === "place-downlight") {
-        addDownlightAtPoint(pos.x, pos.y);
-        return;
-      }
-
       const clicked = fixtures.find((f) => {
         const product = getPublicProduct(f.productId);
         const sizePx = product.widthM * pixelsPerMeter;
@@ -97,7 +90,7 @@ export function StepGenerate() {
       });
       selectFixture(clicked?.id ?? null);
     },
-    [editorMode, fixtures, pixelsPerMeter, addDownlightAtPoint, selectFixture],
+    [fixtures, pixelsPerMeter, selectFixture],
   );
 
   const handleDragEnd = useCallback(
@@ -136,11 +129,7 @@ export function StepGenerate() {
               <button type="button" className="btn-secondary text-sm" onClick={deleteSelectedFixture}>
                 Verwijder selectie
               </button>
-              <button
-                type="button"
-                className="btn-secondary text-sm"
-                onClick={() => setEditorMode("place-downlight")}
-              >
+              <button type="button" className="btn-secondary text-sm" onClick={() => addDownlight()}>
                 Downlight toevoegen
               </button>
               <button

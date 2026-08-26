@@ -19,6 +19,7 @@ export function StepResult() {
   const ceilingHeightM = usePublicWizardStore((s) => s.ceilingHeightM);
   const fixtures = usePublicWizardStore((s) => s.fixtures);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
+  const goToEditor = usePublicWizardStore((s) => s.goToEditor);
 
   const result = useMemo(() => {
     if (roomVertices.length < 3 || !pixelsPerMeter) return null;
@@ -78,7 +79,17 @@ export function StepResult() {
         <p className="text-xs text-[var(--lp-text-secondary)]">{CALCULATION_DISCLAIMER}</p>
       </WizardCard>
 
-      <WizardNav nextLabel="Aanvragen" onNext={() => nextStep()} />
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          data-testid="edit-light-plan-button"
+          className="lp-btn-secondary px-8 py-3"
+          onClick={() => goToEditor()}
+        >
+          Lichtplan aanpassen
+        </button>
+        <WizardNav nextLabel="Aanvragen" onNext={() => nextStep()} showPrev={false} />
+      </div>
     </div>
   );
 }

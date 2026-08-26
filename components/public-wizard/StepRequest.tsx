@@ -43,6 +43,7 @@ export function StepRequest() {
   const setSubmitResult = usePublicWizardStore((s) => s.setSubmitResult);
   const submitReference = usePublicWizardStore((s) => s.submitReference);
   const submitEmail = usePublicWizardStore((s) => s.submitEmail);
+  const goToEditor = usePublicWizardStore((s) => s.goToEditor);
 
   const update = (patch: Partial<LeadContactForm>) => {
     setForm((prev) => {
@@ -201,12 +202,22 @@ export function StepRequest() {
 
       {error && <p className="mt-3 text-sm text-[var(--lp-danger)]">{error}</p>}
 
-      <WizardNav
-        showPrev
-        nextLabel={submitting ? "Versturen…" : "Ontvang lichtplan + offerte"}
-        nextDisabled={submitting}
-        onNext={() => void handleSubmit()}
-      />
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          data-testid="edit-light-plan-button"
+          className="lp-btn-secondary px-8 py-3"
+          onClick={() => goToEditor()}
+        >
+          Lichtplan aanpassen
+        </button>
+        <WizardNav
+          showPrev
+          nextLabel={submitting ? "Versturen…" : "Ontvang lichtplan + offerte"}
+          nextDisabled={submitting}
+          onNext={() => void handleSubmit()}
+        />
+      </div>
     </div>
   );
 }

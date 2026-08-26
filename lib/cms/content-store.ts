@@ -2,9 +2,25 @@ import { promises as fs } from "fs";
 import path from "path";
 import { DEFAULT_CMS_SITE } from "@/lib/cms/defaults";
 import { getCmsDir, getUploadsDir } from "@/lib/storage/data-dir";
-import type { CmsImageRecord, CmsPage, CmsSiteContent } from "@/types/cms";
+import type { CmsImageRecord, CmsPage, CmsSiteContent, CmsWizardContent } from "@/types/cms";
 
 const SITE_FILE = "site.json";
+
+function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardContent {
+  const defaults = DEFAULT_CMS_SITE.wizard;
+  if (!stored) return defaults;
+
+  const mergeChoices = <T extends { id: string }>(defaultItems: T[], storedItems?: T[]): T[] => {
+    if (!storedItems?.length) return defaultItems;
+    const byId = new Map(storedItems.map((item) => [item.id, item]));
+    return defaultItems.map((item) => ({ ...item, ...byId.get(item.id) }));
+  };
+
+  return {
+    roomChoices: mergeChoices(defaults.roomChoices, stored.roomChoices),
+    atmosphereChoices: mergeChoices(defaults.atmosphereChoices, stored.atmosphereChoices),
+  };
+}
 
 export async function loadCmsSite(): Promise<CmsSiteContent> {
   const filePath = path.join(getCmsDir(), SITE_FILE);
@@ -17,6 +33,7 @@ export async function loadCmsSite(): Promise<CmsSiteContent> {
       homepage: stored.homepage ?? DEFAULT_CMS_SITE.homepage,
       pages: { ...DEFAULT_CMS_SITE.pages, ...stored.pages },
       images: { ...DEFAULT_CMS_SITE.images, ...stored.images },
+      wizard: mergeWizardContent(stored.wizard),
     };
   } catch {
     return DEFAULT_CMS_SITE;

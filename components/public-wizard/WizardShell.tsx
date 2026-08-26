@@ -4,27 +4,35 @@ import { usePublicWizardStore, WIZARD_STEP_LABELS } from "@/lib/public-wizard/st
 
 export function WizardProgress() {
   const step = usePublicWizardStore((s) => s.step);
+  const setStep = usePublicWizardStore((s) => s.setStep);
   const progressSteps = WIZARD_STEP_LABELS.filter((s) => s.showInProgress);
   const currentIdx = progressSteps.findIndex((s) => s.id === step);
 
   return (
-    <nav className="mb-8 flex flex-wrap gap-2" aria-label="Wizard voortgang">
+    <nav className="flex flex-wrap gap-2" aria-label="Wizard voortgang">
       {progressSteps.map((item, idx) => {
         const active = item.id === step;
         const done = idx < currentIdx;
+        const canNavigate = idx <= currentIdx;
         return (
-          <div
+          <button
             key={item.id}
+            type="button"
+            disabled={!canNavigate}
+            onClick={() => {
+              if (canNavigate) setStep(item.id);
+            }}
+            data-testid={`wizard-progress-${item.id}`}
             className={`rounded-full px-3 py-1 text-xs font-semibold sm:px-4 sm:text-sm ${
               active
                 ? "bg-[var(--lp-green)] text-white"
                 : done
                   ? "bg-[var(--lp-green-dark)] text-white"
                   : "bg-[var(--lp-bg-secondary)] text-[var(--lp-text-secondary)]"
-            }`}
+            } ${canNavigate ? "cursor-pointer" : "cursor-default opacity-60"}`}
           >
             {item.label}
-          </div>
+          </button>
         );
       })}
     </nav>

@@ -18,6 +18,7 @@ import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import { flattenVertices } from "@/lib/polygon-area";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
+import { WizardProgress } from "@/components/public-wizard/WizardShell";
 import {
   computeFitView,
   pointNear,
@@ -53,6 +54,8 @@ export function StepEditor() {
   const selectedFixtureId = usePublicWizardStore((s) => s.selectedFixtureId);
   const showHeatmap = usePublicWizardStore((s) => s.showHeatmap);
   const lightingPlanGenerated = usePublicWizardStore((s) => s.lightingPlanGenerated);
+  const layoutWarning = usePublicWizardStore((s) => s.layoutWarning);
+  const editorMessage = usePublicWizardStore((s) => s.editorMessage);
   const viewState = usePublicWizardStore((s) => s.viewState);
   const aiRecognitionFailed = usePublicWizardStore((s) => s.aiRecognitionFailed);
   const aiRecognitionAttempted = usePublicWizardStore((s) => s.aiRecognitionAttempted);
@@ -77,8 +80,9 @@ export function StepEditor() {
   const moveFixtureByIdWithHistory = usePublicWizardStore((s) => s.moveFixtureByIdWithHistory);
   const deleteSelectedFixture = usePublicWizardStore((s) => s.deleteSelectedFixture);
   const duplicateSelectedFixture = usePublicWizardStore((s) => s.duplicateSelectedFixture);
-  const addDownlightAtPoint = usePublicWizardStore((s) => s.addDownlightAtPoint);
-  const addPanelAtPoint = usePublicWizardStore((s) => s.addPanelAtPoint);
+  const addPanel = usePublicWizardStore((s) => s.addPanel);
+  const addDownlight = usePublicWizardStore((s) => s.addDownlight);
+  const clearEditorMessage = usePublicWizardStore((s) => s.clearEditorMessage);
   const setShowHeatmap = usePublicWizardStore((s) => s.setShowHeatmap);
   const reopenScaleCalibration = usePublicWizardStore((s) => s.reopenScaleCalibration);
   const reopenRoomDrawing = usePublicWizardStore((s) => s.reopenRoomDrawing);
@@ -251,16 +255,6 @@ export function StepEditor() {
 
       if (!pixelsPerMeter) return;
 
-      if (editorMode === "place-downlight") {
-        addDownlightAtPoint(clamped.x, clamped.y);
-        return;
-      }
-
-      if (editorMode === "place-panel") {
-        addPanelAtPoint(clamped.x, clamped.y);
-        return;
-      }
-
       if (editorMode !== "select") return;
 
       const clicked = fixtures.find((f) => {
@@ -289,8 +283,6 @@ export function StepEditor() {
       addCalibrationPoint,
       addPolygonDraftPoint,
       finishPolygonDraft,
-      addDownlightAtPoint,
-      addPanelAtPoint,
       selectFixture,
     ],
   );
@@ -430,6 +422,10 @@ export function StepEditor() {
         </div>
       </header>
 
+      <div className="shrink-0 border-b border-[var(--lp-border)] bg-white px-3 py-2 sm:px-4">
+        <WizardProgress />
+      </div>
+
       <div className="relative flex min-h-0 flex-1">
         <aside
           className={`shrink-0 overflow-y-auto border-r border-[var(--lp-border)] bg-[var(--lp-bg-secondary)] transition-all ${
@@ -461,8 +457,16 @@ export function StepEditor() {
             onRedo={redo}
             onDelete={deleteSelectedFixture}
             onDuplicate={duplicateSelectedFixture}
-            onAddPanel={() => setEditorMode("place-panel")}
-            onAddDownlight={() => setEditorMode("place-downlight")}
+            onAddPanel={() => {
+              clearEditorMessage();
+              addPanel();
+            }}
+            onAddDownlight={() => {
+              clearEditorMessage();
+              addDownlight();
+            }}
+            layoutWarning={layoutWarning}
+            editorMessage={editorMessage}
             onToggleHeatmap={() => setShowHeatmap(!showHeatmap)}
             onContinue={() => {
               if (fixtures.length > 0) nextStep();
@@ -746,6 +750,8 @@ function SidePanel({
   onDuplicate,
   onAddPanel,
   onAddDownlight,
+  layoutWarning,
+  editorMessage,
   onToggleHeatmap,
   onContinue,
 }: {
@@ -771,6 +777,8 @@ function SidePanel({
   onDuplicate: () => void;
   onAddPanel: () => void;
   onAddDownlight: () => void;
+  layoutWarning: string | null;
+  editorMessage: string | null;
   onToggleHeatmap: () => void;
   onContinue: () => void;
 }) {
@@ -849,6 +857,16 @@ function SidePanel({
         )}
         {roomComplete && (
           <div className="space-y-2">
+            {layoutWarning && (
+              <p className="rounded-lg bg-orange-50 p-2 text-xs text-orange-800" data-testid="layout-warning">
+                {layoutWarning}
+              </p>
+            )}
+            {editorMessage && (
+              <p className="rounded-lg bg-[var(--lp-green-soft)] p-2 text-xs text-[var(--lp-green-dark)]" data-testid="editor-message">
+                {editorMessage}
+              </p>
+            )}
             {lightingPlanGenerated && (
               <>
                 <div className="flex flex-wrap gap-2">
@@ -865,10 +883,20 @@ function SidePanel({
                     Dupliceren
                   </button>
                 </div>
-                <button type="button" className="lp-btn-secondary w-full text-sm" onClick={onAddPanel}>
+                <button
+                  type="button"
+                  data-testid="add-panel-button"
+                  className="lp-btn-secondary w-full text-sm"
+                  onClick={onAddPanel}
+                >
                   LED-paneel toevoegen
                 </button>
-                <button type="button" className="lp-btn-secondary w-full text-sm" onClick={onAddDownlight}>
+                <button
+                  type="button"
+                  data-testid="add-downlight-button"
+                  className="lp-btn-secondary w-full text-sm"
+                  onClick={onAddDownlight}
+                >
                   Downlight toevoegen
                 </button>
               </>
@@ -887,10 +915,10 @@ function SidePanel({
               <p className="text-xs text-[var(--lp-text-secondary)]">{PUBLIC_HEATMAP_DISCLAIMER}</p>
             )}
             {indicativeResult && fixturesCount > 0 && (
-              <div className="rounded-lg border border-[var(--lp-border)] bg-[var(--lp-bg)] p-2 text-xs">
+              <div className="rounded-lg border border-[var(--lp-border)] bg-[var(--lp-bg)] p-2 text-xs" data-testid="fixtures-summary">
                 <p>Doel-lux: {indicativeResult.targetLux}</p>
+                <p data-testid="fixtures-count">Armaturen: {indicativeResult.fixtureCount}</p>
                 <p>Indicatief gemiddelde lux: {indicativeResult.indicativeAverageLux}</p>
-                <p>Armaturen: {indicativeResult.fixtureCount}</p>
                 <p>Totaal wattage: {indicativeResult.totalWattage} W</p>
                 <p className={indicativeResult.meetsTarget ? "text-[var(--lp-green-dark)]" : "text-orange-600"}>
                   Voldoet: {indicativeResult.meetsTarget ? "ja" : "nee"}

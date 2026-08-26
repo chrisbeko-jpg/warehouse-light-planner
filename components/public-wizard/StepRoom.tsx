@@ -1,9 +1,19 @@
 "use client";
 
-import { ROOM_FUNCTIONS } from "@/lib/public-wizard/room-functions";
+import { useEffect, useMemo, useState } from "react";
+import { getRoomFunction, ROOM_FUNCTIONS } from "@/lib/public-wizard/room-functions";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardCard, WizardNav } from "@/components/public-wizard/WizardShell";
 import type { RoomFunctionId } from "@/types/public-wizard";
+
+interface WizardRoomChoiceView {
+  id: string;
+  title: string;
+  description: string;
+  suggestedLux: number;
+  imageUrl: string | null;
+  imageAlt: string;
+}
 
 export function StepRoom() {
   const roomFunction = usePublicWizardStore((s) => s.roomFunction);
@@ -13,6 +23,30 @@ export function StepRoom() {
   const setCeilingHeightM = usePublicWizardStore((s) => s.setCeilingHeightM);
   const setTargetLux = usePublicWizardStore((s) => s.setTargetLux);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
+  const [cmsChoices, setCmsChoices] = useState<WizardRoomChoiceView[]>([]);
+
+  useEffect(() => {
+    void fetch("/api/cms/wizard")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { roomChoices?: WizardRoomChoiceView[] } | null) => {
+        if (data?.roomChoices?.length) setCmsChoices(data.roomChoices);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const roomChoices = useMemo(() => {
+    if (cmsChoices.length === 0) {
+      return ROOM_FUNCTIONS.map((room) => ({
+        id: room.id,
+        title: room.name,
+        description: room.explanation,
+        suggestedLux: room.suggestedLux,
+        imageUrl: null as string | null,
+        imageAlt: room.name,
+      }));
+    }
+    return cmsChoices;
+  }, [cmsChoices]);
 
   return (
     <div>
@@ -22,32 +56,43 @@ export function StepRoom() {
       </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {ROOM_FUNCTIONS.map((room) => (
-          <button
-            key={room.id}
-            type="button"
-            data-testid={`room-option-${room.id}`}
-            onClick={() => selectRoomFunction(room.id as RoomFunctionId)}
-            aria-pressed={roomFunction === room.id}
-            className={`overflow-hidden rounded-xl border-2 text-left transition ${
-              roomFunction === room.id
-                ? "border-[var(--lp-green)] ring-2 ring-[var(--lp-green)]"
-                : "border-[var(--lp-border)] hover:border-[var(--lp-green)]"
-            }`}
-          >
-            <div
-              className={`flex h-24 items-end bg-gradient-to-br p-3 ${room.imageGradient}`}
+        {roomChoices.map((room) => {
+          const fallback = getRoomFunction(room.id as RoomFunctionId);
+          return (
+            <button
+              key={room.id}
+              type="button"
+              data-testid={`room-option-${room.id}`}
+              onClick={() => selectRoomFunction(room.id as RoomFunctionId)}
+              aria-pressed={roomFunction === room.id}
+              className={`overflow-hidden rounded-xl border-2 text-left transition ${
+                roomFunction === room.id
+                  ? "border-[var(--lp-green)] ring-2 ring-[var(--lp-green)]"
+                  : "border-[var(--lp-border)] hover:border-[var(--lp-green)]"
+              }`}
             >
-              <span className="text-sm font-bold text-white drop-shadow">{room.name}</span>
-            </div>
-            <div className="space-y-1 p-3">
-              <p className="text-xs font-semibold text-[var(--lp-green-dark)]">
-                {room.suggestedLux} lux
-              </p>
-              <p className="text-xs text-[var(--lp-text-secondary)]">{room.explanation}</p>
-            </div>
-          </button>
-        ))}
+              <div
+                className={`relative flex h-24 items-end bg-gradient-to-br p-3 ${fallback.imageGradient}`}
+              >
+                {room.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={room.imageUrl}
+                    alt={room.imageAlt || room.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                )}
+                <span className="relative text-sm font-bold text-white drop-shadow">{room.title}</span>
+              </div>
+              <div className="space-y-1 p-3">
+                <p className="text-xs font-semibold text-[var(--lp-green-dark)]">
+                  {room.suggestedLux} lux
+                </p>
+                <p className="text-xs text-[var(--lp-text-secondary)]">{room.description}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       <WizardCard className="mt-6 grid gap-4 sm:grid-cols-2">

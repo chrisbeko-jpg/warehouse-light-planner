@@ -131,12 +131,43 @@ export interface CmsImageRecord {
   createdAt: string;
 }
 
+export type WizardAtmosphereFlow = "standard" | "kantoorverlichting";
+
+export interface WizardRoomChoiceCms {
+  id: string;
+  title: string;
+  description: string;
+  suggestedLux: number;
+  imageId?: string;
+  imageAlt: string;
+  sortOrder: number;
+  active: boolean;
+}
+
+export interface WizardAtmosphereChoiceCms {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  imageId?: string;
+  imageAlt: string;
+  sortOrder: number;
+  active: boolean;
+  flow: WizardAtmosphereFlow;
+}
+
+export interface CmsWizardContent {
+  roomChoices: WizardRoomChoiceCms[];
+  atmosphereChoices: WizardAtmosphereChoiceCms[];
+}
+
 export interface CmsSiteContent {
   version: number;
   updatedAt: string;
   homepage: CmsPage;
   pages: Record<string, CmsPage>;
   images: Record<string, CmsImageRecord>;
+  wizard: CmsWizardContent;
 }
 
 export interface HomepageFields {

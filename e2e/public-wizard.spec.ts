@@ -45,6 +45,41 @@ test.describe("Public LED site & wizard", () => {
     await expect(page.getByText(/Exclusief btw, verzending, montage/i)).toBeVisible();
   });
 
+  test("result and request allow returning to editor with state", async ({ page }) => {
+    await advanceRoom(page);
+    await advanceAtmosphere(page);
+    await uploadFloorPlan(page);
+    await setupEditor(page);
+    await generateAndOpenResult(page);
+    await page.getByTestId("edit-light-plan-button").click();
+    await expect(page.getByTestId("floor-plan-editor")).toBeVisible();
+    await expect(page.getByTestId("toggle-heatmap-button")).toBeVisible();
+    await page.getByTestId("editor-continue-button").click();
+    await expect(page.getByText("Indicatief resultaat")).toBeVisible();
+    await page.getByRole("button", { name: "Aanvragen" }).click();
+    await page.getByTestId("edit-light-plan-button").click();
+    await expect(page.getByTestId("floor-plan-editor")).toBeVisible();
+  });
+
+  test("luxe atmosphere navigates to kantoorverlichting", async ({ page }) => {
+    await startWizard(page);
+    await selectRoom(page, "open_kantoor");
+    await page.getByTestId("wizard-next-button").click();
+    await page.getByTestId("atmosphere-option-luxe").click();
+    await expect(page).toHaveURL(/\/kantoorverlichting/);
+  });
+
+  test("wizard CMS endpoint serves room and atmosphere choices", async ({ request }) => {
+    const res = await request.get("/api/cms/wizard");
+    expect(res.ok()).toBeTruthy();
+    const data = (await res.json()) as {
+      roomChoices: { id: string; title: string }[];
+      atmosphereChoices: { id: string; flow: string }[];
+    };
+    expect(data.roomChoices.length).toBeGreaterThan(0);
+    expect(data.atmosphereChoices.some((c) => c.id === "luxe" && c.flow === "kantoorverlichting")).toBeTruthy();
+  });
+
   test("lead form validation", async ({ page }) => {
     await page.route("**/api/public-leads", async (route) => {
       await route.fulfill({

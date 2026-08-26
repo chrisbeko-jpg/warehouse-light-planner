@@ -40,7 +40,9 @@ export function PublicWizard() {
           </p>
         </div>
       </header>
-      <WizardProgress />
+      <div className="mb-8">
+        <WizardProgress />
+      </div>
       {step === "room" && <StepRoom />}
       {step === "atmosphere" && <StepAtmosphere />}
       {step === "floorplan" && <StepFloorPlanUpload />}

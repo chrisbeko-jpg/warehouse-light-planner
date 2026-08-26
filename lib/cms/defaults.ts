@@ -1,4 +1,6 @@
-import type { CmsPage, CmsSiteContent } from "@/types/cms";
+import type { CmsPage, CmsSiteContent, CmsWizardContent } from "@/types/cms";
+import { ATMOSPHERES } from "@/lib/public-wizard/atmospheres";
+import { ROOM_FUNCTIONS } from "@/lib/public-wizard/room-functions";
 import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
 
 const DEFAULT_HOMEPAGE: CmsPage = {
@@ -117,6 +119,28 @@ function page(slug: string, title: string, seoTitle: string, description: string
   };
 }
 
+export const DEFAULT_WIZARD_CONTENT: CmsWizardContent = {
+  roomChoices: ROOM_FUNCTIONS.map((room, index) => ({
+    id: room.id,
+    title: room.name,
+    description: room.explanation,
+    suggestedLux: room.suggestedLux,
+    imageAlt: room.name,
+    sortOrder: index,
+    active: true,
+  })),
+  atmosphereChoices: ATMOSPHERES.map((item, index) => ({
+    id: item.id,
+    title: item.title,
+    subtitle: item.subtitle,
+    description: item.presentationText,
+    imageAlt: item.title,
+    sortOrder: index,
+    active: true,
+    flow: item.id === "luxe" ? "kantoorverlichting" : "standard",
+  })),
+};
+
 export const DEFAULT_CMS_SITE: CmsSiteContent = {
   version: 1,
   updatedAt: new Date().toISOString(),
@@ -184,6 +208,14 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
           type: "cta",
           heading: "Start uw kantoorlichtplan",
           body: "Gratis en indicatief — het definitieve plan volgt na controle.",
+          buttonText: "Start gratis AI Lichtadvies",
+          buttonHref: "/lichtadvies",
+        },
+        {
+          id: "cta-wizard",
+          type: "cta",
+          heading: "Liever snel een indicatief LED-paneel lichtadvies?",
+          body: "Upload uw plattegrond en ontvang binnen enkele minuten een indicatief lichtplan met LED-panelen.",
           buttonText: "Start gratis AI Lichtadvies",
           buttonHref: "/lichtadvies",
         },
@@ -265,6 +297,7 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
     ),
   },
   images: {},
+  wizard: DEFAULT_WIZARD_CONTENT,
 };
 
 export function getDefaultPageBySlug(slug: string): CmsPage | null {

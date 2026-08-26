@@ -6,12 +6,11 @@ import {
 } from "@/lib/public-wizard/calculation";
 import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
 import {
-  addDownlightAt,
-  addFixtureAt,
   createRoomPolygon,
   duplicateFixture,
+  findFreeGridPosition,
   moveFixture,
-  placeFixturesInPolygon,
+  placeFixturesWithLayoutInfo,
   removeFixture,
   snapFixtureCenter,
 } from "@/lib/public-wizard/placement";
@@ -27,13 +26,7 @@ import type {
 } from "@/types/public-wizard";
 import { computeFitView, parseDistanceMeters, type EditorViewState } from "@/lib/public-wizard/viewport";
 
-export type PublicEditorMode =
-  | "select"
-  | "calibrate-scale"
-  | "draw-room"
-  | "place-panel"
-  | "place-downlight"
-  | "pan";
+export type PublicEditorMode = "select" | "calibrate-scale" | "draw-room" | "pan";
 
 export type EditorPhase = "scale" | "room" | "plan";
 
@@ -80,6 +73,8 @@ export interface PublicWizardStore {
   calibrationLine: Point2D[];
   roomAreaM2: number | null;
   lightingPlanGenerated: boolean;
+  layoutWarning: string | null;
+  editorMessage: string | null;
 
   setStep: (step: WizardStepId) => void;
   nextStep: () => boolean;
@@ -108,9 +103,11 @@ export interface PublicWizardStore {
   moveFixtureById: (id: string, x: number, y: number) => void;
   moveFixtureByIdWithHistory: (id: string, x: number, y: number) => void;
   deleteSelectedFixture: () => void;
-  addDownlightAtPoint: (x: number, y: number) => void;
-  addPanelAtPoint: (x: number, y: number) => void;
+  addPanel: () => boolean;
+  addDownlight: () => boolean;
   duplicateSelectedFixture: () => void;
+  goToEditor: () => void;
+  clearEditorMessage: () => void;
   setShowHeatmap: (value: boolean) => void;
   setDownlightProductId: (id: PublicProductId) => void;
   setViewState: (view: EditorViewState) => void;
@@ -163,6 +160,8 @@ const initialState = {
   calibrationLine: [] as Point2D[],
   roomAreaM2: null as number | null,
   lightingPlanGenerated: false,
+  layoutWarning: null as string | null,
+  editorMessage: null as string | null,
 };
 
 function cloneFixtures(fixtures: PlacedPublicFixture[]): PlacedPublicFixture[] {
@@ -313,18 +312,19 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       preferredProductId,
       ceilingHeightM,
     );
-    const fixtures = placeFixturesInPolygon(
+    const layout = placeFixturesWithLayoutInfo(
       roomVertices,
       pixelsPerMeter,
       count,
       preferredProductId,
     );
     set({
-      fixtures,
+      fixtures: layout.fixtures,
       historyPast: [],
       historyFuture: [],
       selectedFixtureId: null,
       lightingPlanGenerated: true,
+      layoutWarning: layout.warning ?? null,
       editorMode: "select",
       editorPhase: "plan",
     });
@@ -373,25 +373,41 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   },
 
   moveFixtureById: (id, x, y) => {
-    const { fixtures, pixelsPerMeter, roomVertices, backgroundWidth, backgroundHeight } = get();
+    const { fixtures, pixelsPerMeter, roomVertices } = get();
     if (!pixelsPerMeter) return;
+    const fixture = fixtures.find((f) => f.id === id);
+    if (!fixture) return;
+    const previous = { x: fixture.x, y: fixture.y };
     const snapped = snapFixtureCenter(
       x,
       y,
       pixelsPerMeter,
       roomVertices,
-      backgroundWidth,
-      backgroundHeight,
+      fixture.productId,
+      previous,
     );
+    if (!snapped) {
+      set({ editorMessage: "Geen geldige rasterpositie. Armatuur teruggezet." });
+      return;
+    }
     set({
       fixtures: moveFixture(fixtures, id, snapped.x, snapped.y),
       selectedFixtureId: id,
+      editorMessage: null,
     });
   },
 
   moveFixtureByIdWithHistory: (id, x, y) => {
-    get().pushHistory();
+    const before = cloneFixtures(get().fixtures);
     get().moveFixtureById(id, x, y);
+    const source = before.find((f) => f.id === id);
+    const updated = get().fixtures.find((f) => f.id === id);
+    if (!source || !updated) return;
+    if (source.x === updated.x && source.y === updated.y) return;
+    set({
+      historyPast: [...get().historyPast, before],
+      historyFuture: [],
+    });
   },
 
   deleteSelectedFixture: () => {
@@ -404,53 +420,97 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     });
   },
 
-  addDownlightAtPoint: (x, y) => {
-    const { fixtures, downlightProductId, pixelsPerMeter, roomVertices, backgroundWidth, backgroundHeight } =
-      get();
-    if (!pixelsPerMeter) return;
-    get().pushHistory();
-    const snapped = snapFixtureCenter(
-      x,
-      y,
-      pixelsPerMeter,
+  addPanel: () => {
+    const { fixtures, preferredProductId, pixelsPerMeter, roomVertices } = get();
+    if (!pixelsPerMeter || roomVertices.length < 3) return false;
+    const position = findFreeGridPosition(
       roomVertices,
-      backgroundWidth,
-      backgroundHeight,
+      pixelsPerMeter,
+      fixtures,
+      preferredProductId,
     );
+    if (!position) {
+      set({
+        editorMessage: "Er is geen vrije rasterpositie beschikbaar. Verplaats eerst een bestaand armatuur.",
+      });
+      return false;
+    }
+    get().pushHistory();
+    const newFixture = {
+      id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      productId: preferredProductId,
+      x: position.x,
+      y: position.y,
+      rotation: 0,
+    };
     set({
-      fixtures: addDownlightAt(fixtures, snapped.x, snapped.y, downlightProductId),
+      fixtures: [...fixtures, newFixture],
+      selectedFixtureId: newFixture.id,
       editorMode: "select",
+      editorMessage: null,
     });
+    return true;
   },
 
-  addPanelAtPoint: (x, y) => {
-    const { fixtures, preferredProductId, pixelsPerMeter, roomVertices, backgroundWidth, backgroundHeight } =
-      get();
-    if (!pixelsPerMeter) return;
-    get().pushHistory();
-    const snapped = snapFixtureCenter(
-      x,
-      y,
-      pixelsPerMeter,
+  addDownlight: () => {
+    const { fixtures, downlightProductId, pixelsPerMeter, roomVertices } = get();
+    if (!pixelsPerMeter || roomVertices.length < 3) return false;
+    const position = findFreeGridPosition(
       roomVertices,
-      backgroundWidth,
-      backgroundHeight,
+      pixelsPerMeter,
+      fixtures,
+      downlightProductId,
     );
+    if (!position) {
+      set({
+        editorMessage: "Er is geen vrije rasterpositie beschikbaar. Verplaats eerst een bestaand armatuur.",
+      });
+      return false;
+    }
+    get().pushHistory();
+    const newFixture = {
+      id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      productId: downlightProductId,
+      x: position.x,
+      y: position.y,
+      rotation: 0,
+    };
     set({
-      fixtures: addFixtureAt(fixtures, snapped.x, snapped.y, preferredProductId),
+      fixtures: [...fixtures, newFixture],
+      selectedFixtureId: newFixture.id,
       editorMode: "select",
+      editorMessage: null,
     });
+    return true;
   },
 
   duplicateSelectedFixture: () => {
-    const { selectedFixtureId, fixtures, pixelsPerMeter } = get();
+    const { selectedFixtureId, fixtures, pixelsPerMeter, roomVertices } = get();
     if (!selectedFixtureId || !pixelsPerMeter) return;
     get().pushHistory();
+    const next = duplicateFixture(fixtures, selectedFixtureId, pixelsPerMeter, roomVertices);
+    if (next.length === fixtures.length) {
+      set({
+        editorMessage: "Er is geen vrije rasterpositie beschikbaar. Verplaats eerst een bestaand armatuur.",
+      });
+      return;
+    }
+    const added = next[next.length - 1]!;
     set({
-      fixtures: duplicateFixture(fixtures, selectedFixtureId, pixelsPerMeter),
-      selectedFixtureId: null,
+      fixtures: next,
+      selectedFixtureId: added.id,
+      editorMessage: null,
     });
   },
+
+  goToEditor: () =>
+    set({
+      step: "editor",
+      editorMode: "select",
+      editorPhase: "plan",
+    }),
+
+  clearEditorMessage: () => set({ editorMessage: null }),
 
   setShowHeatmap: (value) => set({ showHeatmap: value }),
 

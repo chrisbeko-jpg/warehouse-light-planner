@@ -35,7 +35,7 @@ export async function advanceRoom(page: Page, roomId = "open_kantoor") {
 }
 
 export async function advanceAtmosphere(page: Page) {
-  await page.getByRole("button", { name: "Helder & functioneel" }).click();
+  await page.getByTestId("atmosphere-option-neutraal").click();
   await page.getByTestId("wizard-next-button").click();
 }
 

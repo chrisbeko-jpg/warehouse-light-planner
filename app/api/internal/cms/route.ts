@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadCmsSite, saveCmsSite, saveUploadedImage } from "@/lib/cms/content-store";
 import { verifyInternalToken } from "@/lib/public-wizard/lead-storage";
-import type { CmsPage, CmsSiteContent } from "@/types/cms";
+import type { CmsPage, CmsSiteContent, CmsWizardContent } from "@/types/cms";
 
 export const runtime = "nodejs";
 
@@ -17,7 +17,13 @@ export async function PUT(request: Request) {
   if (!verifyInternalToken(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const body = (await request.json()) as { site?: CmsSiteContent; homepage?: CmsPage; pageSlug?: string; page?: CmsPage };
+  const body = (await request.json()) as {
+    site?: CmsSiteContent;
+    homepage?: CmsPage;
+    pageSlug?: string;
+    page?: CmsPage;
+    wizard?: CmsSiteContent["wizard"];
+  };
   const site = await loadCmsSite();
 
   if (body.site) {
@@ -31,6 +37,11 @@ export async function PUT(request: Request) {
   }
   if (body.pageSlug && body.page) {
     site.pages[body.pageSlug.replace(/^\//, "")] = body.page;
+    await saveCmsSite(site);
+    return NextResponse.json({ ok: true });
+  }
+  if (body.wizard) {
+    site.wizard = body.wizard;
     await saveCmsSite(site);
     return NextResponse.json({ ok: true });
   }
