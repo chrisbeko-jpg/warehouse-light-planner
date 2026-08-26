@@ -1,71 +1,15 @@
 import { test, expect } from "@playwright/test";
-import path from "path";
-import fs from "fs";
-
-const FIXTURE_PNG = path.join(__dirname, "fixtures", "office-floor.png");
-
-function createTestPng(): Buffer {
-  return Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAA/klEQVR42u3RAQ0AAAgDINc/9K3hYwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPBrBqoAAfR7o0AAAAAASUVORK5CYII=",
-    "base64",
-  );
-}
-
-test.beforeAll(() => {
-  const dir = path.join(__dirname, "fixtures");
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(FIXTURE_PNG, createTestPng());
-});
-
-async function startWizard(page: import("@playwright/test").Page) {
-  await page.goto("/lichtadvies");
-  await expect(page.getByText("Welke ruimte wilt u verlichten?")).toBeVisible();
-}
-
-async function advanceRoom(page: import("@playwright/test").Page) {
-  await startWizard(page);
-  await page.getByTestId("room-option-open_kantoor").click();
-  await expect(page.getByTestId("wizard-next-button")).toBeEnabled({ timeout: 10000 });
-  await page.getByTestId("wizard-next-button").click();
-}
-
-async function advanceAtmosphere(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "Helder & functioneel" }).click();
-  await page.getByTestId("wizard-next-button").click();
-}
-
-async function uploadFloorPlan(page: import("@playwright/test").Page) {
-  await page.setInputFiles('input[type="file"]', FIXTURE_PNG);
-  await page.getByRole("button", { name: "Plattegrond gebruiken" }).click();
-  await expect(page.getByTestId("floor-plan-editor")).toBeVisible();
-}
-
-async function setupEditor(page: import("@playwright/test").Page) {
-  const stage = page.locator("canvas").first();
-  await expect(stage).toBeVisible();
-  const box = await stage.boundingBox();
-  if (!box) throw new Error("Stage not found");
-
-  await stage.click({ position: { x: box.width * 0.3, y: box.height * 0.5 }, force: true });
-  await stage.click({ position: { x: box.width * 0.7, y: box.height * 0.5 }, force: true });
-  await expect(page.getByPlaceholder("4,80 m")).toBeVisible({ timeout: 10000 });
-  await page.getByPlaceholder("4,80 m").fill("5");
-  await page.getByTestId("apply-scale-button").click();
-
-  await page.getByRole("button", { name: "Ruimte tekenen" }).click();
-  await stage.click({ position: { x: box.width * 0.15, y: box.height * 0.15 } });
-  await stage.click({ position: { x: box.width * 0.85, y: box.height * 0.15 } });
-  await stage.click({ position: { x: box.width * 0.85, y: box.height * 0.85 } });
-  await stage.click({ position: { x: box.width * 0.15, y: box.height * 0.85 } });
-  await page.getByRole("button", { name: "Ruimte afronden" }).click();
-}
-
-async function generateAndOpenResult(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "Genereer mijn lichtplan" }).click();
-  await expect(page.getByRole("button", { name: "Bekijk lichtverdeling" })).toBeVisible();
-  await page.getByTestId("wizard-next-button").click();
-  await expect(page.getByText("Indicatief resultaat")).toBeVisible();
-}
+import {
+  advanceAtmosphere,
+  advanceRoom,
+  drawRoomPolygon,
+  generateAndOpenResult,
+  setupEditor,
+  startWizard,
+  uploadFloorPlan,
+  calibrateScale,
+  selectRoom,
+} from "./helpers/wizard";
 
 test.describe("Public LED site & wizard", () => {
   test("homepage shows AI Lichtadvies proposition", async ({ page }) => {
@@ -76,7 +20,7 @@ test.describe("Public LED site & wizard", () => {
 
   test("room function selection", async ({ page }) => {
     await startWizard(page);
-    await page.getByTestId("room-option-gang").click();
+    await selectRoom(page, "gang");
     await expect(page.locator('input[type="number"]').nth(1)).toHaveValue("100");
   });
 

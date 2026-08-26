@@ -80,7 +80,7 @@ export function StepGenerate() {
       const pos = stage.getPointerPosition();
       if (!pos) return;
 
-      if (editorMode === "placeDownlight") {
+      if (editorMode === "place-downlight") {
         addDownlightAtPoint(pos.x, pos.y);
         return;
       }
@@ -139,7 +139,7 @@ export function StepGenerate() {
               <button
                 type="button"
                 className="btn-secondary text-sm"
-                onClick={() => setEditorMode("placeDownlight")}
+                onClick={() => setEditorMode("place-downlight")}
               >
                 Downlight toevoegen
               </button>

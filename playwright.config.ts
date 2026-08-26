@@ -10,14 +10,15 @@ export default defineConfig({
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000",
     trace: "on-first-retry",
+    viewport: { width: 1440, height: 900 },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: "npm run build && npm run start",
+        command: "npm run build && npx next start -p 3000",
         url: "http://127.0.0.1:3000/home",
-        reuseExistingServer: true,
+        reuseExistingServer: !process.env.CI,
         timeout: 180000,
       },
 });

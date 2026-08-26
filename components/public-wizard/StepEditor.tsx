@@ -1,17 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage } from "react-konva";
+import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import type Konva from "konva";
 import { formatScaleLabel } from "@/lib/floor-plan-scale";
 import { clampPointToBackground, getImagePointerPosition } from "@/lib/floor-plan-pointer";
 import { attemptRoomRecognition } from "@/lib/public-wizard/ai-room-detect";
 import {
-  computePublicHeatmap,
-  HEATMAP_LEVEL_COLORS,
+  computeHeatmapGradients,
+  HEATMAP_GRADIENT_STOPS,
   PUBLIC_HEATMAP_DISCLAIMER,
 } from "@/lib/public-wizard/heatmap";
+import { CEILING_GRID_M, snapPointToGridPx } from "@/lib/public-wizard/grid";
 import { getPublicProduct } from "@/lib/public-wizard/products";
 import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
@@ -24,6 +25,7 @@ import {
 } from "@/lib/public-wizard/viewport";
 import { useKonvaImage } from "@/components/floor-plan/useKonvaImage";
 import type { Point2D } from "@/types/floor-plan";
+import type { EditorPhase, PublicEditorMode } from "@/lib/public-wizard/store";
 
 const SIDE_PANEL_WIDTH = 320;
 const HIT_RADIUS = 14;
@@ -46,9 +48,11 @@ export function StepEditor() {
   const calibrationDistanceMm = usePublicWizardStore((s) => s.calibrationDistanceMm);
   const polygonDraft = usePublicWizardStore((s) => s.polygonDraft);
   const roomVertices = usePublicWizardStore((s) => s.roomVertices);
+  const roomAreaM2 = usePublicWizardStore((s) => s.roomAreaM2);
   const fixtures = usePublicWizardStore((s) => s.fixtures);
   const selectedFixtureId = usePublicWizardStore((s) => s.selectedFixtureId);
   const showHeatmap = usePublicWizardStore((s) => s.showHeatmap);
+  const lightingPlanGenerated = usePublicWizardStore((s) => s.lightingPlanGenerated);
   const viewState = usePublicWizardStore((s) => s.viewState);
   const aiRecognitionFailed = usePublicWizardStore((s) => s.aiRecognitionFailed);
   const aiRecognitionAttempted = usePublicWizardStore((s) => s.aiRecognitionAttempted);
@@ -59,7 +63,6 @@ export function StepEditor() {
   const setEditorMode = usePublicWizardStore((s) => s.setEditorMode);
   const setEditorPhase = usePublicWizardStore((s) => s.setEditorPhase);
   const setSidePanelCollapsed = usePublicWizardStore((s) => s.setSidePanelCollapsed);
-  const setScaleStepCollapsed = usePublicWizardStore((s) => s.setScaleStepCollapsed);
   const setCalibrationDistanceMm = usePublicWizardStore((s) => s.setCalibrationDistanceMm);
   const resetCalibrationDraft = usePublicWizardStore((s) => s.resetCalibrationDraft);
   const addCalibrationPoint = usePublicWizardStore((s) => s.addCalibrationPoint);
@@ -71,10 +74,15 @@ export function StepEditor() {
   const setAiRecognitionState = usePublicWizardStore((s) => s.setAiRecognitionState);
   const generateLightingPlan = usePublicWizardStore((s) => s.generateLightingPlan);
   const selectFixture = usePublicWizardStore((s) => s.selectFixture);
-  const moveFixtureById = usePublicWizardStore((s) => s.moveFixtureById);
+  const moveFixtureByIdWithHistory = usePublicWizardStore((s) => s.moveFixtureByIdWithHistory);
   const deleteSelectedFixture = usePublicWizardStore((s) => s.deleteSelectedFixture);
+  const duplicateSelectedFixture = usePublicWizardStore((s) => s.duplicateSelectedFixture);
   const addDownlightAtPoint = usePublicWizardStore((s) => s.addDownlightAtPoint);
+  const addPanelAtPoint = usePublicWizardStore((s) => s.addPanelAtPoint);
   const setShowHeatmap = usePublicWizardStore((s) => s.setShowHeatmap);
+  const reopenScaleCalibration = usePublicWizardStore((s) => s.reopenScaleCalibration);
+  const reopenRoomDrawing = usePublicWizardStore((s) => s.reopenRoomDrawing);
+  const getIndicativeResult = usePublicWizardStore((s) => s.getIndicativeResult);
   const undo = usePublicWizardStore((s) => s.undo);
   const redo = usePublicWizardStore((s) => s.redo);
   const updateViewState = usePublicWizardStore((s) => s.updateViewState);
@@ -83,26 +91,31 @@ export function StepEditor() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
-  const [generated, setGenerated] = useState(fixtures.length > 0);
   const [recognizing, setRecognizing] = useState(false);
   const [showScaleDialog, setShowScaleDialog] = useState(false);
   const [spacePanning, setSpacePanning] = useState(false);
   const [pointerImage, setPointerImage] = useState<Point2D | null>(null);
+  const [snapPreview, setSnapPreview] = useState<Point2D | null>(null);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(true);
   const image = useKonvaImage(backgroundDataUrl ?? undefined);
 
   const roomMeta = roomFunction ? getRoomFunction(roomFunction) : null;
   const atmosphereMeta = atmosphere ? getAtmosphere(atmosphere) : null;
+  const scaleComplete = Boolean(pixelsPerMeter);
+  const roomComplete = roomVertices.length >= 3 && editorPhase === "plan";
   const roomReady = roomVertices.length >= 3 && Boolean(pixelsPerMeter);
   const panelWidth = sidePanelCollapsed ? 0 : SIDE_PANEL_WIDTH;
+  const indicativeResult = getIndicativeResult();
 
   useEffect(() => {
-    setEditorMode("calibrate");
-    setEditorPhase("scale");
-  }, [setEditorMode, setEditorPhase]);
+    if (!pixelsPerMeter) {
+      setEditorMode("calibrate-scale");
+      setEditorPhase("scale");
+    }
+  }, [pixelsPerMeter, setEditorMode, setEditorPhase]);
 
   useEffect(() => {
-    if (calibrationDraft.length === 2 && editorMode === "calibrate") {
+    if (calibrationDraft.length === 2 && editorMode === "calibrate-scale") {
       setShowScaleDialog(true);
     }
   }, [calibrationDraft.length, editorMode]);
@@ -156,21 +169,30 @@ export function StepEditor() {
     setAiRecognitionState(true, result.failed);
     if (result.vertices && result.vertices.length >= 3) {
       setRoomVertices(result.vertices);
-      setEditorPhase("review");
+      setEditorPhase("plan");
+      setEditorMode("select");
     }
     setRecognizing(false);
-  }, [backgroundDataUrl, pixelsPerMeter, setAiRecognitionState, setRoomVertices, setEditorPhase]);
+  }, [backgroundDataUrl, pixelsPerMeter, setAiRecognitionState, setRoomVertices, setEditorPhase, setEditorMode]);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.localStorage.getItem("skip-ai-room") === "1") return;
     if (pixelsPerMeter && backgroundDataUrl && !aiRecognitionAttempted) void runRecognition();
   }, [pixelsPerMeter, backgroundDataUrl, aiRecognitionAttempted, runRecognition]);
 
-  const heatmapCells = useMemo(() => {
+  const heatmapSpots = useMemo(() => {
     if (!showHeatmap || !pixelsPerMeter || fixtures.length === 0) return [];
-    return computePublicHeatmap(fixtures, roomVertices, pixelsPerMeter, ceilingHeightM, targetLux);
+    return computeHeatmapGradients(
+      fixtures,
+      roomVertices,
+      pixelsPerMeter,
+      ceilingHeightM,
+      targetLux,
+    );
   }, [showHeatmap, pixelsPerMeter, fixtures, roomVertices, ceilingHeightM, targetLux]);
 
   const isPanning = editorMode === "pan" || spacePanning;
+  const gridStepPx = (pixelsPerMeter ?? 50) * CEILING_GRID_M;
 
   const handleWheel = useCallback(
     (event: KonvaEventObject<WheelEvent>) => {
@@ -187,6 +209,7 @@ export function StepEditor() {
 
   const handleStageDragEnd = useCallback(
     (event: KonvaEventObject<DragEvent>) => {
+      if (event.target !== event.target.getStage()) return;
       updateViewState({
         positionX: event.target.x(),
         positionY: event.target.y(),
@@ -195,15 +218,12 @@ export function StepEditor() {
     [updateViewState],
   );
 
-  const handleStageMouseMove = useCallback(
-    (event: KonvaEventObject<MouseEvent>) => {
-      const stage = stageRef.current;
-      if (!stage) return;
-      const pos = getImagePointerPosition(stage, event);
-      setPointerImage(pos);
-    },
-    [],
-  );
+  const handleStageMouseMove = useCallback((event: KonvaEventObject<MouseEvent>) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const pos = getImagePointerPosition(stage, event);
+    setPointerImage(pos);
+  }, []);
 
   const handleStageClick = useCallback(
     (event: KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -214,13 +234,13 @@ export function StepEditor() {
       if (!pos) return;
       const clamped = clampPointToBackground(pos, backgroundWidth, backgroundHeight);
 
-      if (editorMode === "calibrate") {
+      if (editorMode === "calibrate-scale") {
         if (calibrationDraft.length >= 2) return;
         addCalibrationPoint(clamped);
         return;
       }
 
-      if (editorMode === "drawRoom") {
+      if (editorMode === "draw-room") {
         if (polygonDraft.length >= 3 && pointNear(clamped, polygonDraft[0]!, HIT_RADIUS / viewState.scale)) {
           finishPolygonDraft();
           return;
@@ -230,10 +250,18 @@ export function StepEditor() {
       }
 
       if (!pixelsPerMeter) return;
-      if (editorMode === "placeDownlight") {
+
+      if (editorMode === "place-downlight") {
         addDownlightAtPoint(clamped.x, clamped.y);
         return;
       }
+
+      if (editorMode === "place-panel") {
+        addPanelAtPoint(clamped.x, clamped.y);
+        return;
+      }
+
+      if (editorMode !== "select") return;
 
       const clicked = fixtures.find((f) => {
         const product = getPublicProduct(f.productId);
@@ -262,21 +290,43 @@ export function StepEditor() {
       addPolygonDraftPoint,
       finishPolygonDraft,
       addDownlightAtPoint,
+      addPanelAtPoint,
       selectFixture,
     ],
   );
 
-  const handleDragEnd = useCallback(
-    (id: string, productWidthM: number, event: KonvaEventObject<DragEvent>) => {
+  const syncFixtureNode = useCallback((node: Konva.Rect, centerX: number, centerY: number) => {
+    node.position({
+      x: centerX - node.width() / 2,
+      y: centerY - node.height() / 2,
+    });
+  }, []);
+
+  const handleFixtureDragMove = useCallback(
+    (event: KonvaEventObject<DragEvent>) => {
       if (!pixelsPerMeter) return;
-      const node = event.target;
-      moveFixtureById(
-        id,
-        node.x() + (productWidthM * pixelsPerMeter) / 2,
-        node.y() + (productWidthM * pixelsPerMeter) / 2,
-      );
+      event.cancelBubble = true;
+      const node = event.target as Konva.Rect;
+      const centerX = node.x() + node.width() / 2;
+      const centerY = node.y() + node.height() / 2;
+      setSnapPreview(snapPointToGridPx({ x: centerX, y: centerY }, pixelsPerMeter));
     },
-    [moveFixtureById, pixelsPerMeter],
+    [pixelsPerMeter],
+  );
+
+  const handleFixtureDragEnd = useCallback(
+    (id: string, event: KonvaEventObject<DragEvent>) => {
+      event.cancelBubble = true;
+      if (!pixelsPerMeter) return;
+      const node = event.target as Konva.Rect;
+      const centerX = node.x() + node.width() / 2;
+      const centerY = node.y() + node.height() / 2;
+      moveFixtureByIdWithHistory(id, centerX, centerY);
+      const updated = usePublicWizardStore.getState().fixtures.find((f) => f.id === id);
+      if (updated) syncFixtureNode(node, updated.x, updated.y);
+      setSnapPreview(null);
+    },
+    [moveFixtureByIdWithHistory, pixelsPerMeter, syncFixtureNode],
   );
 
   const zoomBy = (direction: 1 | -1) => {
@@ -298,11 +348,13 @@ export function StepEditor() {
   const zoomPercent = Math.round(viewState.scale * 100);
 
   const scaleInstruction =
-    calibrationDraft.length === 0
-      ? "Klik twee punten aan waarvan u de werkelijke afstand kent."
-      : calibrationDraft.length === 1
-        ? "Selecteer nu het tweede punt."
-        : null;
+    editorMode === "calibrate-scale" && !scaleComplete
+      ? calibrationDraft.length === 0
+        ? "Selecteer 2 punten waarvan u de werkelijke afstand kent."
+        : calibrationDraft.length === 1
+          ? "Selecteer nu het tweede punt."
+          : null
+      : null;
 
   const subtitle = [
     roomMeta?.name,
@@ -312,6 +364,19 @@ export function StepEditor() {
   ]
     .filter(Boolean)
     .join(" · ");
+
+  const roomClipFunc = useCallback(
+    (ctx: Konva.Context) => {
+      if (roomVertices.length < 3) return;
+      ctx.beginPath();
+      roomVertices.forEach((v, i) => {
+        if (i === 0) ctx.moveTo(v.x, v.y);
+        else ctx.lineTo(v.x, v.y);
+      });
+      ctx.closePath();
+    },
+    [roomVertices],
+  );
 
   return (
     <div
@@ -327,18 +392,39 @@ export function StepEditor() {
           <p className="truncate text-xs text-[var(--lp-text-secondary)]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
-          <button type="button" className="hidden rounded-lg border px-2 py-1 text-xs sm:inline" title="Pan (Space + slepen)" onClick={() => setEditorMode(editorMode === "pan" ? "select" : "pan")}>
+          <button
+            type="button"
+            className="hidden rounded-lg border px-2 py-1 text-xs sm:inline"
+            title="Pan (Space + slepen)"
+            onClick={() => setEditorMode(editorMode === "pan" ? "select" : "pan")}
+          >
             Pan
           </button>
-          <button type="button" className="rounded-lg border px-2 py-1 text-sm" onClick={() => zoomBy(-1)} aria-label="Zoom uit">−</button>
+          <button type="button" className="rounded-lg border px-2 py-1 text-sm" onClick={() => zoomBy(-1)} aria-label="Zoom uit">
+            −
+          </button>
           <span className="min-w-[3rem] text-center text-xs font-semibold">{zoomPercent}%</span>
-          <button type="button" className="rounded-lg border px-2 py-1 text-sm" onClick={() => zoomBy(1)} aria-label="Zoom in">+</button>
-          <button type="button" className="hidden rounded-lg border px-2 py-1 text-xs lg:inline" onClick={fitToScreen}>Passend</button>
-          <button type="button" className="hidden rounded-lg border px-2 py-1 text-xs lg:inline" onClick={() => updateViewState({ scale: 1, positionX: 40, positionY: 40 })}>100%</button>
+          <button type="button" className="rounded-lg border px-2 py-1 text-sm" onClick={() => zoomBy(1)} aria-label="Zoom in">
+            +
+          </button>
+          <button type="button" className="hidden rounded-lg border px-2 py-1 text-xs lg:inline" onClick={fitToScreen}>
+            Passend
+          </button>
+          <button
+            type="button"
+            className="hidden rounded-lg border px-2 py-1 text-xs lg:inline"
+            onClick={() => updateViewState({ scale: 1, positionX: 40, positionY: 40 })}
+          >
+            100%
+          </button>
           <button type="button" className="rounded-lg border px-2 py-1 text-xs lg:hidden" onClick={() => setMobilePanelOpen((v) => !v)}>
             Stappen
           </button>
-          <button type="button" className="hidden rounded-lg border px-2 py-1 text-xs xl:inline" onClick={() => setSidePanelCollapsed(!sidePanelCollapsed)}>
+          <button
+            type="button"
+            className="hidden rounded-lg border px-2 py-1 text-xs xl:inline"
+            onClick={() => setSidePanelCollapsed(!sidePanelCollapsed)}
+          >
             {sidePanelCollapsed ? "Paneel" : "Inklappen"}
           </button>
         </div>
@@ -353,45 +439,69 @@ export function StepEditor() {
         >
           <SidePanel
             editorPhase={editorPhase}
-            scaleStepCollapsed={scaleStepCollapsed}
+            editorMode={editorMode}
+            scaleComplete={scaleComplete}
+            roomComplete={roomComplete}
+            roomAreaM2={roomAreaM2}
             pixelsPerMeter={pixelsPerMeter}
-            calibrationDraft={calibrationDraft}
-            roomReady={roomReady}
-            generated={generated}
             recognizing={recognizing}
             aiRecognitionFailed={aiRecognitionFailed}
             showHeatmap={showHeatmap}
+            lightingPlanGenerated={lightingPlanGenerated}
             fixturesCount={fixtures.length}
-            onStartScale={() => { resetCalibrationDraft(); setEditorMode("calibrate"); setEditorPhase("scale"); setShowScaleDialog(false); }}
-            onStartRoom={() => { setEditorMode("drawRoom"); setEditorPhase("room"); }}
-            onFinishRoom={() => finishPolygonDraft()}
-            onCancelRoom={() => cancelPolygonDraft()}
-            onGenerate={() => { if (generateLightingPlan()) setGenerated(true); }}
+            indicativeResult={indicativeResult}
+            hasSelection={Boolean(selectedFixtureId)}
+            onReopenScale={() => {
+              reopenScaleCalibration();
+              setShowScaleDialog(false);
+            }}
+            onReopenRoom={() => reopenRoomDrawing()}
+            onGenerate={() => generateLightingPlan()}
             onUndo={undo}
             onRedo={redo}
             onDelete={deleteSelectedFixture}
-            onAddDownlight={() => setEditorMode("placeDownlight")}
+            onDuplicate={duplicateSelectedFixture}
+            onAddPanel={() => setEditorMode("place-panel")}
+            onAddDownlight={() => setEditorMode("place-downlight")}
             onToggleHeatmap={() => setShowHeatmap(!showHeatmap)}
-            onContinue={() => { if (fixtures.length > 0) nextStep(); }}
+            onContinue={() => {
+              if (fixtures.length > 0) nextStep();
+            }}
           />
         </aside>
 
-        <div ref={canvasRef} className="relative min-w-0 flex-1 bg-[var(--lp-editor-bg)]">
+        <div ref={canvasRef} data-testid="editor-canvas-area" className="relative min-w-0 flex-1 bg-[var(--lp-editor-bg)]">
           {scaleInstruction && (
-            <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-sm text-white">
+            <div
+              className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-sm text-white"
+              data-testid="scale-instruction"
+            >
               {scaleInstruction}
             </div>
           )}
-          {editorMode === "drawRoom" && polygonDraft.length >= 3 && (
-            <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-xs text-white">
+          {scaleComplete && editorMode !== "calibrate-scale" && (
+            <div className="pointer-events-none absolute left-1/2 top-3 z-10 hidden -translate-x-1/2 rounded-lg bg-[var(--lp-green-dark)]/90 px-4 py-2 text-sm text-white sm:block">
+              Schaal ingesteld ✓
+            </div>
+          )}
+          {editorMode === "draw-room" && polygonDraft.length >= 3 && (
+            <div className="pointer-events-none absolute left-1/2 top-12 z-10 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-xs text-white">
               Klik opnieuw op het eerste punt om de ruimte af te sluiten.
+            </div>
+          )}
+          {showHeatmap && (
+            <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-slate-800/90 px-3 py-2 text-xs text-white">
+              <p className="mb-1 font-semibold">Indicatieve lichtverdeling</p>
+              <div className="flex flex-wrap gap-3">
+                <span><span className="inline-block h-2 w-2 rounded-full bg-purple-400" /> Paars = hoog</span>
+                <span><span className="inline-block h-2 w-2 rounded-full bg-orange-400" /> Oranje = gemiddeld</span>
+                <span><span className="inline-block h-2 w-2 rounded-full bg-red-500" /> Rood = laag</span>
+                <span>Geen kleur = weinig dekking</span>
+              </div>
             </div>
           )}
           <p className="pointer-events-none absolute bottom-3 left-3 z-10 hidden rounded bg-black/50 px-2 py-1 text-xs text-white md:block">
             Scroll/trackpad zoom · Space + slepen om te verschuiven
-          </p>
-          <p className="pointer-events-none absolute bottom-3 right-3 z-10 rounded bg-black/50 px-2 py-1 text-xs text-white lg:hidden">
-            Voor nauwkeurig intekenen werkt een groter scherm het prettigst.
           </p>
 
           {backgroundDataUrl && (
@@ -411,22 +521,40 @@ export function StepEditor() {
               onTap={handleStageClick}
               className="ls-canvas-interactive"
             >
-              <Layer>
+              <Layer listening={false}>
                 {image && (
-                  <KonvaImage image={image} width={backgroundWidth} height={backgroundHeight} listening={false} />
+                  <KonvaImage image={image} width={backgroundWidth} height={backgroundHeight} />
                 )}
-                {showHeatmap &&
-                  heatmapCells.map((cell, i) => (
-                    <Rect
-                      key={i}
-                      x={cell.x}
-                      y={cell.y}
-                      width={Math.max(4, 0.35 * (pixelsPerMeter ?? 50))}
-                      height={Math.max(4, 0.35 * (pixelsPerMeter ?? 50))}
-                      fill={HEATMAP_LEVEL_COLORS[cell.level]}
-                      listening={false}
-                    />
-                  ))}
+              </Layer>
+
+              <Layer listening={false}>
+                {showHeatmap && roomVertices.length >= 3 && (
+                  <Group clipFunc={roomClipFunc}>
+                    {heatmapSpots.map((spot) => {
+                      const stops = HEATMAP_GRADIENT_STOPS[spot.level];
+                      return (
+                        <Circle
+                          key={spot.fixtureId}
+                          x={spot.x}
+                          y={spot.y}
+                          radius={spot.radiusPx}
+                          fillRadialGradientStartPoint={{ x: 0, y: 0 }}
+                          fillRadialGradientStartRadius={0}
+                          fillRadialGradientEndPoint={{ x: 0, y: 0 }}
+                          fillRadialGradientEndRadius={spot.radiusPx}
+                          fillRadialGradientColorStops={[
+                            0,
+                            stops.inner,
+                            0.45,
+                            stops.mid,
+                            1,
+                            stops.outer,
+                          ]}
+                        />
+                      );
+                    })}
+                  </Group>
+                )}
                 {roomVertices.length >= 3 && (
                   <Line
                     points={flattenVertices(roomVertices)}
@@ -434,9 +562,11 @@ export function StepEditor() {
                     fill="rgba(24,166,106,0.12)"
                     stroke="#18A66A"
                     strokeWidth={2 / viewState.scale}
-                    listening={false}
                   />
                 )}
+              </Layer>
+
+              <Layer>
                 {polygonDraft.length > 0 && (
                   <>
                     <Line
@@ -446,7 +576,7 @@ export function StepEditor() {
                       dash={[8, 4]}
                       listening={false}
                     />
-                    {pointerImage && polygonDraft.length > 0 && (
+                    {pointerImage && (
                       <Line
                         points={[
                           polygonDraft[polygonDraft.length - 1]!.x,
@@ -471,7 +601,16 @@ export function StepEditor() {
                   />
                 )}
                 {calibrationDraft.map((p, i) => (
-                  <Circle key={`cal-${i}`} x={p.x} y={p.y} radius={HIT_RADIUS / viewState.scale} fill="#18A66A" stroke="#fff" strokeWidth={2 / viewState.scale} />
+                  <Circle
+                    key={`cal-${i}`}
+                    x={p.x}
+                    y={p.y}
+                    radius={HIT_RADIUS / viewState.scale}
+                    fill="#18A66A"
+                    stroke="#fff"
+                    strokeWidth={2 / viewState.scale}
+                    listening={false}
+                  />
                 ))}
                 {polygonDraft.map((p, i) => (
                   <Circle
@@ -485,10 +624,37 @@ export function StepEditor() {
                     listening={false}
                   />
                 ))}
+                {snapPreview && (
+                  <>
+                    <Circle
+                      x={snapPreview.x}
+                      y={snapPreview.y}
+                      radius={6 / viewState.scale}
+                      stroke="#18A66A"
+                      strokeWidth={2 / viewState.scale}
+                      dash={[4, 4]}
+                      listening={false}
+                    />
+                    <Line
+                      points={[snapPreview.x - gridStepPx / 4, snapPreview.y, snapPreview.x + gridStepPx / 4, snapPreview.y]}
+                      stroke="rgba(24,166,106,0.5)"
+                      strokeWidth={1 / viewState.scale}
+                      listening={false}
+                    />
+                    <Line
+                      points={[snapPreview.x, snapPreview.y - gridStepPx / 4, snapPreview.x, snapPreview.y + gridStepPx / 4]}
+                      stroke="rgba(24,166,106,0.5)"
+                      strokeWidth={1 / viewState.scale}
+                      listening={false}
+                    />
+                  </>
+                )}
                 {fixtures.map((fixture) => {
                   const product = getPublicProduct(fixture.productId);
-                  const sizePx = product.widthM * (pixelsPerMeter ?? 50);
+                  const ppm = pixelsPerMeter ?? 50;
+                  const sizePx = product.widthM * ppm;
                   const isSelected = fixture.id === selectedFixtureId;
+                  const canDrag = !isPanning && editorMode === "select";
                   return (
                     <Rect
                       key={fixture.id}
@@ -500,11 +666,15 @@ export function StepEditor() {
                       stroke={isSelected ? "#ffffff" : "#087A4C"}
                       strokeWidth={(isSelected ? 3 : 1) / viewState.scale}
                       cornerRadius={product.category === "downlight" ? sizePx / 2 : 4}
-                      draggable={!isPanning && editorMode === "select"}
-                      onDragEnd={(e) => handleDragEnd(fixture.id, product.widthM, e)}
+                      draggable={canDrag}
+                      onDragStart={(e) => {
+                        e.cancelBubble = true;
+                      }}
+                      onDragMove={handleFixtureDragMove}
+                      onDragEnd={(e) => handleFixtureDragEnd(fixture.id, e)}
                       onClick={(e) => {
                         e.cancelBubble = true;
-                        if (!isPanning) selectFixture(fixture.id);
+                        if (!isPanning && editorMode === "select") selectFixture(fixture.id);
                       }}
                     />
                   );
@@ -538,7 +708,6 @@ export function StepEditor() {
                 onClick={() => {
                   if (applyCalibration()) {
                     setShowScaleDialog(false);
-                    setEditorMode("drawRoom");
                   } else {
                     window.alert("Vul een geldige afstand in, bijvoorbeeld 4,80 m.");
                   }
@@ -556,105 +725,188 @@ export function StepEditor() {
 
 function SidePanel({
   editorPhase,
-  scaleStepCollapsed,
+  editorMode,
+  scaleComplete,
+  roomComplete,
+  roomAreaM2,
   pixelsPerMeter,
-  calibrationDraft,
-  roomReady,
-  generated,
   recognizing,
   aiRecognitionFailed,
   showHeatmap,
+  lightingPlanGenerated,
   fixturesCount,
-  onStartScale,
-  onStartRoom,
-  onFinishRoom,
-  onCancelRoom,
+  indicativeResult,
+  hasSelection,
+  onReopenScale,
+  onReopenRoom,
   onGenerate,
   onUndo,
   onRedo,
   onDelete,
+  onDuplicate,
+  onAddPanel,
   onAddDownlight,
   onToggleHeatmap,
   onContinue,
 }: {
-  editorPhase: string;
-  scaleStepCollapsed: boolean;
+  editorPhase: EditorPhase;
+  editorMode: PublicEditorMode;
+  scaleComplete: boolean;
+  roomComplete: boolean;
+  roomAreaM2: number | null;
   pixelsPerMeter: number | null;
-  calibrationDraft: Point2D[];
-  roomReady: boolean;
-  generated: boolean;
   recognizing: boolean;
   aiRecognitionFailed: boolean;
   showHeatmap: boolean;
+  lightingPlanGenerated: boolean;
   fixturesCount: number;
-  onStartScale: () => void;
-  onStartRoom: () => void;
-  onFinishRoom: () => void;
-  onCancelRoom: () => void;
+  indicativeResult: ReturnType<ReturnType<typeof usePublicWizardStore.getState>["getIndicativeResult"]>;
+  hasSelection: boolean;
+  onReopenScale: () => void;
+  onReopenRoom: () => void;
   onGenerate: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onDelete: () => void;
+  onDuplicate: () => void;
+  onAddPanel: () => void;
   onAddDownlight: () => void;
   onToggleHeatmap: () => void;
   onContinue: () => void;
 }) {
   return (
-    <div className="space-y-3 p-4 text-sm">
+    <div className="space-y-3 p-4 text-sm" data-testid="editor-steps-panel">
       <StepBlock
         number={1}
-        title="Schaal bepalen"
-        collapsed={scaleStepCollapsed}
-        active={editorPhase === "scale"}
-        done={Boolean(pixelsPerMeter)}
+        title="Schaal"
+        active={editorPhase === "scale" || editorMode === "calibrate-scale"}
+        done={scaleComplete}
+        statusLabel={scaleComplete ? "Schaal ingesteld ✓" : undefined}
       >
-        <p className="text-xs text-[var(--lp-text-secondary)]">Klik twee bekende punten op de plattegrond.</p>
-        <p className="text-xs">Punten: {calibrationDraft.length}/2</p>
-        {pixelsPerMeter && <p className="text-xs font-medium text-[var(--lp-green-dark)]">{formatScaleLabel(pixelsPerMeter)}</p>}
-        <button type="button" className="lp-btn-secondary w-full text-sm" onClick={onStartScale}>
-          Schaal instellen
-        </button>
-      </StepBlock>
-
-      <StepBlock number={2} title="Ruimte aangeven" active={editorPhase === "room"} done={roomReady} disabled={!pixelsPerMeter}>
-        <button type="button" className="lp-btn-secondary w-full text-sm" disabled={!pixelsPerMeter} onClick={onStartRoom}>
-          Ruimte tekenen
-        </button>
-        <button type="button" className="lp-btn-primary w-full text-sm" disabled={!pixelsPerMeter} onClick={onFinishRoom}>
-          Ruimte afronden
-        </button>
-        <button type="button" className="lp-btn-secondary w-full text-sm" onClick={onCancelRoom}>
-          Annuleren
-        </button>
-        {recognizing && <p className="text-xs">Ruimteherkenning…</p>}
-        {aiRecognitionFailed && (
-          <p className="rounded-lg bg-[var(--lp-green-soft)] p-2 text-xs text-[var(--lp-green-dark)]">
-            Teken de ruimte eenvoudig zelf op de plattegrond.
+        {!scaleComplete && (
+          <p className="text-xs text-[var(--lp-text-secondary)]">
+            Klik twee bekende punten op de plattegrond en voer de afstand in.
           </p>
         )}
-      </StepBlock>
-
-      <StepBlock number={3} title="Controle" active={editorPhase === "review"} done={fixturesCount > 0} disabled={!roomReady}>
-        {!generated && roomReady && (
-          <button type="button" className="lp-btn-primary w-full py-3 font-bold" onClick={onGenerate}>
-            Genereer mijn lichtplan
+        {scaleComplete && pixelsPerMeter && (
+          <p className="text-xs font-medium text-[var(--lp-green-dark)]">{formatScaleLabel(pixelsPerMeter)}</p>
+        )}
+        {scaleComplete && (
+          <button type="button" className="lp-btn-secondary w-full text-sm" onClick={onReopenScale}>
+            Schaal aanpassen
           </button>
         )}
-        {generated && (
+      </StepBlock>
+
+      <StepBlock
+        number={2}
+        title="Ruimte"
+        active={editorPhase === "room" || editorMode === "draw-room"}
+        done={roomComplete}
+        disabled={!scaleComplete}
+        statusLabel={roomComplete ? "Ruimte ingesteld ✓" : undefined}
+      >
+        {roomComplete && roomAreaM2 != null && (
+          <p className="text-xs font-medium text-[var(--lp-green-dark)]">
+            Oppervlakte: {roomAreaM2.toFixed(1).replace(".", ",")} m²
+          </p>
+        )}
+        {roomComplete ? (
+          <button type="button" className="lp-btn-secondary w-full text-sm" onClick={onReopenRoom}>
+            Ruimte aanpassen
+          </button>
+        ) : (
+          <>
+            {recognizing && <p className="text-xs">Ruimteherkenning…</p>}
+            {aiRecognitionFailed && (
+              <p className="rounded-lg bg-[var(--lp-green-soft)] p-2 text-xs text-[var(--lp-green-dark)]">
+                Teken de ruimte eenvoudig zelf op de plattegrond.
+              </p>
+            )}
+            {editorMode === "draw-room" && (
+              <p className="text-xs text-[var(--lp-text-secondary)]">Tekenmodus actief — klik punten op de plattegrond.</p>
+            )}
+          </>
+        )}
+      </StepBlock>
+
+      <StepBlock
+        number={3}
+        title="Lichtplan"
+        active={editorPhase === "plan" && roomComplete}
+        done={fixturesCount > 0}
+        disabled={!roomComplete}
+      >
+        {!lightingPlanGenerated && roomComplete && (
+          <button
+            type="button"
+            data-testid="generate-light-plan-button"
+            className="lp-btn-primary w-full py-3 font-bold"
+            onClick={onGenerate}
+          >
+            Genereer lichtplan
+          </button>
+        )}
+        {roomComplete && (
           <div className="space-y-2">
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="lp-btn-secondary text-xs" onClick={onUndo}>Ongedaan maken</button>
-              <button type="button" className="lp-btn-secondary text-xs" onClick={onRedo}>Opnieuw</button>
-              <button type="button" className="lp-btn-secondary text-xs" onClick={onDelete}>Verwijder selectie</button>
-            </div>
-            <button type="button" className="lp-btn-secondary w-full text-sm" onClick={onAddDownlight}>Downlight toevoegen</button>
-            <button type="button" className={`w-full text-sm ${showHeatmap ? "lp-btn-primary" : "lp-btn-secondary"}`} onClick={onToggleHeatmap}>
-              Bekijk lichtverdeling
-            </button>
-            <p className="text-xs text-[var(--lp-text-secondary)]">{PUBLIC_HEATMAP_DISCLAIMER}</p>
-            <button type="button" data-testid="wizard-next-button" className="lp-btn-primary w-full py-3 font-bold" disabled={fixturesCount === 0} onClick={onContinue}>
-              Naar resultaat
-            </button>
+            {lightingPlanGenerated && (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="lp-btn-secondary text-xs" onClick={onUndo}>
+                    Ongedaan maken
+                  </button>
+                  <button type="button" className="lp-btn-secondary text-xs" onClick={onRedo}>
+                    Opnieuw
+                  </button>
+                  <button type="button" className="lp-btn-secondary text-xs" disabled={!hasSelection} onClick={onDelete}>
+                    Verwijder selectie
+                  </button>
+                  <button type="button" className="lp-btn-secondary text-xs" disabled={!hasSelection} onClick={onDuplicate}>
+                    Dupliceren
+                  </button>
+                </div>
+                <button type="button" className="lp-btn-secondary w-full text-sm" onClick={onAddPanel}>
+                  LED-paneel toevoegen
+                </button>
+                <button type="button" className="lp-btn-secondary w-full text-sm" onClick={onAddDownlight}>
+                  Downlight toevoegen
+                </button>
+              </>
+            )}
+            {fixturesCount > 0 && (
+              <button
+                type="button"
+                data-testid="toggle-heatmap-button"
+                className={`w-full text-sm ${showHeatmap ? "lp-btn-primary" : "lp-btn-secondary"}`}
+                onClick={onToggleHeatmap}
+              >
+                Lichtverdeling
+              </button>
+            )}
+            {showHeatmap && (
+              <p className="text-xs text-[var(--lp-text-secondary)]">{PUBLIC_HEATMAP_DISCLAIMER}</p>
+            )}
+            {indicativeResult && fixturesCount > 0 && (
+              <div className="rounded-lg border border-[var(--lp-border)] bg-[var(--lp-bg)] p-2 text-xs">
+                <p>Doel-lux: {indicativeResult.targetLux}</p>
+                <p>Indicatief gemiddelde lux: {indicativeResult.indicativeAverageLux}</p>
+                <p>Armaturen: {indicativeResult.fixtureCount}</p>
+                <p>Totaal wattage: {indicativeResult.totalWattage} W</p>
+                <p className={indicativeResult.meetsTarget ? "text-[var(--lp-green-dark)]" : "text-orange-600"}>
+                  Voldoet: {indicativeResult.meetsTarget ? "ja" : "nee"}
+                </p>
+              </div>
+            )}
+            {fixturesCount > 0 && (
+              <button
+                type="button"
+                data-testid="editor-continue-button"
+                className="lp-btn-primary w-full py-3 font-bold"
+                onClick={onContinue}
+              >
+                Naar resultaat
+              </button>
+            )}
           </div>
         )}
       </StepBlock>
@@ -668,28 +920,27 @@ function StepBlock({
   children,
   active,
   done,
-  collapsed,
   disabled,
+  statusLabel,
 }: {
   number: number;
   title: string;
   children: React.ReactNode;
   active?: boolean;
   done?: boolean;
-  collapsed?: boolean;
   disabled?: boolean;
+  statusLabel?: string;
 }) {
-  if (collapsed && done) {
-    return (
-      <div className="rounded-lg border border-[var(--lp-border)] bg-white px-3 py-2 text-xs text-[var(--lp-text-secondary)]">
-        ✓ {number}. {title}
-      </div>
-    );
-  }
   return (
-    <div className={`rounded-xl border bg-white p-3 ${active ? "border-[var(--lp-green)] ring-1 ring-[var(--lp-green)]" : "border-[var(--lp-border)]"} ${disabled ? "opacity-60" : ""}`}>
+    <div
+      className={`rounded-xl border bg-white p-3 ${active ? "border-[var(--lp-green)] ring-1 ring-[var(--lp-green)]" : "border-[var(--lp-border)]"} ${disabled ? "opacity-60" : ""}`}
+      data-testid={`editor-step-${number}`}
+      data-step-done={done ? "true" : "false"}
+    >
       <p className="mb-2 font-semibold">
-        {done ? "✓ " : ""}{number}. {title}
+        {done ? "✓ " : ""}
+        {number}. {title}
+        {statusLabel ? ` — ${statusLabel}` : ""}
       </p>
       {children}
     </div>

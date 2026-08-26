@@ -28,6 +28,7 @@ export function StepRoom() {
             type="button"
             data-testid={`room-option-${room.id}`}
             onClick={() => selectRoomFunction(room.id as RoomFunctionId)}
+            aria-pressed={roomFunction === room.id}
             className={`overflow-hidden rounded-xl border-2 text-left transition ${
               roomFunction === room.id
                 ? "border-[var(--lp-green)] ring-2 ring-[var(--lp-green)]"

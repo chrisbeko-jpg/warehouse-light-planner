@@ -1,14 +1,26 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { LedpaneelLogo } from "@/components/ledpaneel/LedpaneelLogo";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardProgress } from "@/components/public-wizard/WizardShell";
 import { StepRoom } from "@/components/public-wizard/StepRoom";
 import { StepAtmosphere } from "@/components/public-wizard/StepAtmosphere";
 import { StepFloorPlanUpload } from "@/components/public-wizard/StepFloorPlanUpload";
-import { StepEditor } from "@/components/public-wizard/StepEditor";
 import { StepResult } from "@/components/public-wizard/StepResult";
 import { StepRequest } from "@/components/public-wizard/StepRequest";
+
+const StepEditor = dynamic(
+  () => import("@/components/public-wizard/StepEditor").then((m) => m.StepEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--lp-bg)]">
+        <p className="text-sm text-[var(--lp-text-secondary)]">Editor laden…</p>
+      </div>
+    ),
+  },
+);
 
 export function PublicWizard() {
   const step = usePublicWizardStore((s) => s.step);

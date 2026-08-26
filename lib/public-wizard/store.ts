@@ -7,10 +7,13 @@ import {
 import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
 import {
   addDownlightAt,
+  addFixtureAt,
   createRoomPolygon,
+  duplicateFixture,
   moveFixture,
   placeFixturesInPolygon,
   removeFixture,
+  snapFixtureCenter,
 } from "@/lib/public-wizard/placement";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import type { Point2D } from "@/types/floor-plan";
@@ -24,8 +27,15 @@ import type {
 } from "@/types/public-wizard";
 import { computeFitView, parseDistanceMeters, type EditorViewState } from "@/lib/public-wizard/viewport";
 
-export type PublicEditorMode = "select" | "calibrate" | "drawRoom" | "placeDownlight" | "pan";
-export type EditorPhase = "scale" | "room" | "review";
+export type PublicEditorMode =
+  | "select"
+  | "calibrate-scale"
+  | "draw-room"
+  | "place-panel"
+  | "place-downlight"
+  | "pan";
+
+export type EditorPhase = "scale" | "room" | "plan";
 
 const WIZARD_STEPS: WizardStepId[] = [
   "room",
@@ -68,6 +78,8 @@ export interface PublicWizardStore {
   sidePanelCollapsed: boolean;
   scaleStepCollapsed: boolean;
   calibrationLine: Point2D[];
+  roomAreaM2: number | null;
+  lightingPlanGenerated: boolean;
 
   setStep: (step: WizardStepId) => void;
   nextStep: () => boolean;
@@ -94,8 +106,11 @@ export interface PublicWizardStore {
   selectFixture: (id: string | null) => void;
   moveSelectedFixture: (x: number, y: number) => void;
   moveFixtureById: (id: string, x: number, y: number) => void;
+  moveFixtureByIdWithHistory: (id: string, x: number, y: number) => void;
   deleteSelectedFixture: () => void;
   addDownlightAtPoint: (x: number, y: number) => void;
+  addPanelAtPoint: (x: number, y: number) => void;
+  duplicateSelectedFixture: () => void;
   setShowHeatmap: (value: boolean) => void;
   setDownlightProductId: (id: PublicProductId) => void;
   setViewState: (view: EditorViewState) => void;
@@ -105,6 +120,8 @@ export interface PublicWizardStore {
   setSidePanelCollapsed: (value: boolean) => void;
   setScaleStepCollapsed: (value: boolean) => void;
   setCalibrationLine: (points: Point2D[]) => void;
+  reopenScaleCalibration: () => void;
+  reopenRoomDrawing: () => void;
   getIndicativeResult: () => ReturnType<typeof calculateIndicativeResult> | null;
   setSubmitResult: (reference: string, email: string) => void;
   resetWizard: () => void;
@@ -144,6 +161,8 @@ const initialState = {
   sidePanelCollapsed: false,
   scaleStepCollapsed: false,
   calibrationLine: [] as Point2D[],
+  roomAreaM2: null as number | null,
+  lightingPlanGenerated: false,
 };
 
 function cloneFixtures(fixtures: PlacedPublicFixture[]): PlacedPublicFixture[] {
@@ -196,13 +215,21 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       calibrationDraft: [],
       polygonDraft: [],
       pixelsPerMeter: null,
+      roomVertices: [],
+      roomAreaM2: null,
+      fixtures: [],
+      lightingPlanGenerated: false,
+      editorPhase: "scale",
+      editorMode: "calibrate-scale",
+      calibrationLine: [],
+      showHeatmap: false,
     }),
 
   setEditorMode: (mode) =>
     set({
       editorMode: mode,
-      polygonDraft: mode === "drawRoom" ? get().polygonDraft : [],
-      calibrationDraft: mode === "calibrate" ? get().calibrationDraft : [],
+      polygonDraft: mode === "draw-room" ? get().polygonDraft : [],
+      calibrationDraft: mode === "calibrate-scale" ? get().calibrationDraft : [],
     }),
 
   setCalibrationDistanceMm: (value) => set({ calibrationDistanceMm: value }),
@@ -223,11 +250,12 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     if (!ppm || ppm <= 0) return false;
     set({
       pixelsPerMeter: ppm,
-      editorMode: "drawRoom",
+      editorMode: "draw-room",
       editorPhase: "room",
       scaleStepCollapsed: true,
       calibrationDraft: [],
       calibrationLine: calibrationDraft,
+      calibrationDistanceMm: "",
     });
     return true;
   },
@@ -239,11 +267,13 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   finishPolygonDraft: () => {
     const { polygonDraft, pixelsPerMeter } = get();
     if (polygonDraft.length < 3 || !pixelsPerMeter) return false;
+    const areaM2 = createRoomPolygon(polygonDraft, pixelsPerMeter).areaM2;
     set({
       roomVertices: polygonDraft,
       polygonDraft: [],
       editorMode: "select",
-      editorPhase: "review",
+      editorPhase: "plan",
+      roomAreaM2: areaM2,
     });
     return true;
   },
@@ -253,7 +283,19 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   setAiRecognitionState: (attempted, failed) =>
     set({ aiRecognitionAttempted: attempted, aiRecognitionFailed: failed }),
 
-  setRoomVertices: (vertices) => set({ roomVertices: vertices }),
+  setRoomVertices: (vertices) => {
+    const { pixelsPerMeter } = get();
+    const areaM2 =
+      vertices.length >= 3 && pixelsPerMeter
+        ? createRoomPolygon(vertices, pixelsPerMeter).areaM2
+        : null;
+    set({
+      roomVertices: vertices,
+      roomAreaM2: areaM2,
+      editorPhase: vertices.length >= 3 ? "plan" : get().editorPhase,
+      editorMode: "select",
+    });
+  },
 
   generateLightingPlan: () => {
     const {
@@ -282,6 +324,9 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       historyPast: [],
       historyFuture: [],
       selectedFixtureId: null,
+      lightingPlanGenerated: true,
+      editorMode: "select",
+      editorPhase: "plan",
     });
     return true;
   },
@@ -328,8 +373,25 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   },
 
   moveFixtureById: (id, x, y) => {
+    const { fixtures, pixelsPerMeter, roomVertices, backgroundWidth, backgroundHeight } = get();
+    if (!pixelsPerMeter) return;
+    const snapped = snapFixtureCenter(
+      x,
+      y,
+      pixelsPerMeter,
+      roomVertices,
+      backgroundWidth,
+      backgroundHeight,
+    );
+    set({
+      fixtures: moveFixture(fixtures, id, snapped.x, snapped.y),
+      selectedFixtureId: id,
+    });
+  },
+
+  moveFixtureByIdWithHistory: (id, x, y) => {
     get().pushHistory();
-    set({ fixtures: moveFixture(get().fixtures, id, x, y), selectedFixtureId: id });
+    get().moveFixtureById(id, x, y);
   },
 
   deleteSelectedFixture: () => {
@@ -343,11 +405,50 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   },
 
   addDownlightAtPoint: (x, y) => {
-    const { fixtures, downlightProductId } = get();
+    const { fixtures, downlightProductId, pixelsPerMeter, roomVertices, backgroundWidth, backgroundHeight } =
+      get();
+    if (!pixelsPerMeter) return;
+    get().pushHistory();
+    const snapped = snapFixtureCenter(
+      x,
+      y,
+      pixelsPerMeter,
+      roomVertices,
+      backgroundWidth,
+      backgroundHeight,
+    );
+    set({
+      fixtures: addDownlightAt(fixtures, snapped.x, snapped.y, downlightProductId),
+      editorMode: "select",
+    });
+  },
+
+  addPanelAtPoint: (x, y) => {
+    const { fixtures, preferredProductId, pixelsPerMeter, roomVertices, backgroundWidth, backgroundHeight } =
+      get();
+    if (!pixelsPerMeter) return;
+    get().pushHistory();
+    const snapped = snapFixtureCenter(
+      x,
+      y,
+      pixelsPerMeter,
+      roomVertices,
+      backgroundWidth,
+      backgroundHeight,
+    );
+    set({
+      fixtures: addFixtureAt(fixtures, snapped.x, snapped.y, preferredProductId),
+      editorMode: "select",
+    });
+  },
+
+  duplicateSelectedFixture: () => {
+    const { selectedFixtureId, fixtures, pixelsPerMeter } = get();
+    if (!selectedFixtureId || !pixelsPerMeter) return;
     get().pushHistory();
     set({
-      fixtures: addDownlightAt(fixtures, x, y, downlightProductId),
-      editorMode: "select",
+      fixtures: duplicateFixture(fixtures, selectedFixtureId, pixelsPerMeter),
+      selectedFixtureId: null,
     });
   },
 
@@ -375,6 +476,25 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   setScaleStepCollapsed: (value) => set({ scaleStepCollapsed: value }),
 
   setCalibrationLine: (points) => set({ calibrationLine: points }),
+
+  reopenScaleCalibration: () =>
+    set({
+      editorMode: "calibrate-scale",
+      editorPhase: "scale",
+      calibrationDraft: [],
+      scaleStepCollapsed: false,
+    }),
+
+  reopenRoomDrawing: () =>
+    set({
+      editorMode: "draw-room",
+      editorPhase: "room",
+      polygonDraft: get().roomVertices.length >= 3 ? [...get().roomVertices] : [],
+      fixtures: [],
+      lightingPlanGenerated: false,
+      showHeatmap: false,
+      selectedFixtureId: null,
+    }),
 
   getIndicativeResult: () => {
     const { roomVertices, pixelsPerMeter, targetLux, ceilingHeightM, fixtures } = get();

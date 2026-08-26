@@ -94,8 +94,8 @@ export function StepFloorPlan() {
     const pos = stage.getPointerPosition();
     if (!pos) return;
     const point = { x: pos.x, y: pos.y };
-    if (editorMode === "calibrate") addCalibrationPoint(point);
-    if (editorMode === "drawRoom") addPolygonDraftPoint(point);
+    if (editorMode === "calibrate-scale") addCalibrationPoint(point);
+    if (editorMode === "draw-room") addPolygonDraftPoint(point);
   };
 
   const canContinue = Boolean(backgroundDataUrl && pixelsPerMeter && roomVertices.length >= 3);
@@ -126,7 +126,7 @@ export function StepFloorPlan() {
             disabled={!backgroundDataUrl}
             onClick={() => {
               resetCalibrationDraft();
-              setEditorMode("calibrate");
+              setEditorMode("calibrate-scale");
             }}
           >
             Schaal instellen
@@ -135,7 +135,7 @@ export function StepFloorPlan() {
             type="button"
             className="btn-secondary text-sm"
             disabled={!pixelsPerMeter}
-            onClick={() => setEditorMode("drawRoom")}
+            onClick={() => setEditorMode("draw-room")}
           >
             Ruimte tekenen
           </button>
@@ -143,7 +143,7 @@ export function StepFloorPlan() {
 
         <p className="text-xs font-medium">{formatScaleLabel(pixelsPerMeter)}</p>
 
-        {editorMode === "calibrate" && (
+        {editorMode === "calibrate-scale" && (
           <div className="space-y-2 rounded-lg border p-3">
             <p className="text-xs">Punten: {calibrationDraft.length}/2</p>
             <input
@@ -167,7 +167,7 @@ export function StepFloorPlan() {
           </div>
         )}
 
-        {editorMode === "drawRoom" && (
+        {editorMode === "draw-room" && (
           <div className="flex gap-2">
             <button type="button" className="btn-primary text-sm" onClick={() => finishPolygonDraft()}>
               Ruimte afronden
