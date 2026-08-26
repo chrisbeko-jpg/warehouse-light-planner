@@ -98,13 +98,27 @@ function mergeHomepage(stored?: Partial<CmsPage>): CmsPage {
 }
 
 function mergeSitePayloadDefaults(stored?: Partial<CmsSitePayload>): CmsSitePayload {
-  return {
+  const payload = {
     homepage: mergeHomepage(stored?.homepage),
     pages: { ...DEFAULT_CMS_SITE.pages, ...stored?.pages },
     images: { ...DEFAULT_CMS_SITE.images, ...stored?.images },
     wizard: mergeWizardContent(stored?.wizard),
     navigation: stored?.navigation ?? DEFAULT_CMS_SITE.navigation,
   };
+
+  payload.images = Object.fromEntries(
+    Object.entries(payload.images).map(([id, record]) => [
+      id,
+      {
+        ...record,
+        storageKey: record.storageKey ?? record.filename,
+        originalFilename: record.originalFilename ?? record.filename,
+        updatedAt: record.updatedAt ?? record.createdAt,
+      },
+    ]),
+  );
+
+  return payload;
 }
 export function payloadToPublicContent(
   payload: CmsSitePayload,

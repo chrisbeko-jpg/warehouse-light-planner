@@ -191,12 +191,18 @@ export interface CmsPage {
 
 export interface CmsImageRecord {
   id: string;
+  storageKey: string;
+  url?: string;
   filename: string;
+  originalFilename?: string;
   mimeType: string;
   alt: string;
   title?: string;
   fileSizeBytes?: number;
+  width?: number;
+  height?: number;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export type WizardAtmosphereFlow = "standard" | "kantoorverlichting";

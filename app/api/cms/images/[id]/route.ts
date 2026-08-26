@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readImageFile, getImageRecord } from "@/lib/cms/content-store";
+import { getImageRecord, readImageFile } from "@/lib/cms/content-store";
 
 export const runtime = "nodejs";
 
@@ -12,7 +12,12 @@ export async function GET(
   if (!record) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const buffer = await readImageFile(record.filename);
+
+  if (record.url?.startsWith("http")) {
+    return NextResponse.redirect(record.url, 302);
+  }
+
+  const buffer = await readImageFile(record);
   if (!buffer) {
     return NextResponse.json({ error: "File missing" }, { status: 404 });
   }

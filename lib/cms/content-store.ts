@@ -1,37 +1,82 @@
-import { promises as fs } from "fs";
 import path from "path";
+import type { CmsImageRecord } from "@/types/cms";
+import {
+  deleteMediaBinary,
+  getStorageConfigurationError,
+  readMediaBinary,
+  readSiteStorage,
+  uploadMediaBinary,
+  writeSiteStorage,
+} from "@/lib/cms/blob-storage";
+import {
+  inferMimeType,
+  isSafeSvg,
+  readImageDimensions,
+  validateMediaUpload,
+} from "@/lib/cms/media-upload";
 import { DEFAULT_CMS_SITE } from "@/lib/cms/defaults";
 import {
   mergeSitePayload,
-  normalizeStorage,
   payloadToPublicContent,
 } from "@/lib/cms/merge";
 import { imagePublicUrl } from "@/lib/cms/image-url";
-import { getCmsDir, getUploadsDir } from "@/lib/storage/data-dir";
 import type {
-  CmsImageRecord,
   CmsPage,
   CmsSiteContent,
   CmsSitePayload,
   CmsSiteStorage,
 } from "@/types/cms";
 
-const SITE_FILE = "site.json";
+export interface CmsMediaApiRecord {
+  id: string;
+  url: string;
+  filename: string;
+  originalFilename: string;
+  mimeType: string;
+  size: number;
+  width?: number;
+  height?: number;
+  title: string;
+  altText: string;
+  storageKey: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function normalizeImageRecord(record: CmsImageRecord): CmsImageRecord {
+  return {
+    ...record,
+    storageKey: record.storageKey ?? record.filename,
+    originalFilename: record.originalFilename ?? record.filename,
+    updatedAt: record.updatedAt ?? record.createdAt,
+  };
+}
+
+export function toMediaApiRecord(record: CmsImageRecord): CmsMediaApiRecord {
+  const normalized = normalizeImageRecord(record);
+  return {
+    id: normalized.id,
+    url: normalized.url ?? imagePublicUrl(normalized.id),
+    filename: normalized.filename,
+    originalFilename: normalized.originalFilename ?? normalized.filename,
+    mimeType: normalized.mimeType,
+    size: normalized.fileSizeBytes ?? 0,
+    width: normalized.width,
+    height: normalized.height,
+    title: normalized.title ?? normalized.alt,
+    altText: normalized.alt,
+    storageKey: normalized.storageKey,
+    createdAt: normalized.createdAt,
+    updatedAt: normalized.updatedAt ?? normalized.createdAt,
+  };
+}
 
 async function readStorage(): Promise<CmsSiteStorage> {
-  const filePath = path.join(getCmsDir(), SITE_FILE);
-  try {
-    const raw = await fs.readFile(filePath, "utf8");
-    return normalizeStorage(JSON.parse(raw));
-  } catch {
-    return normalizeStorage(undefined);
-  }
+  return readSiteStorage();
 }
 
 async function writeStorage(storage: CmsSiteStorage): Promise<void> {
-  const dir = getCmsDir();
-  await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(path.join(dir, SITE_FILE), JSON.stringify(storage, null, 2), "utf8");
+  await writeSiteStorage(storage);
 }
 
 /** Public published CMS content. */
@@ -129,26 +174,50 @@ export async function saveUploadedImage(
   alt: string,
   title?: string,
 ): Promise<CmsImageRecord> {
-  const storage = await readStorage();
+  const storageError = getStorageConfigurationError();
+  if (storageError) throw new Error(storageError);
+
+  const validationError = validateMediaUpload({
+    filename,
+    mimeType,
+    size: buffer.length,
+  });
+  if (validationError) throw new Error(validationError);
+
+  const resolvedMime = inferMimeType(filename, mimeType);
+  if (!resolvedMime) throw new Error("Dit bestandstype wordt niet ondersteund.");
+  if (resolvedMime === "image/svg+xml" && !isSafeSvg(buffer)) {
+    throw new Error("SVG niet toegestaan (onveilige inhoud)");
+  }
+
   const id = `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const ext = path.extname(filename) || ".jpg";
   const storedName = `${id}${ext}`;
-  const uploadsDir = getUploadsDir();
-  await fs.mkdir(uploadsDir, { recursive: true });
-  await fs.writeFile(path.join(uploadsDir, storedName), buffer);
+  const storageKey = `cms/media/${storedName}`;
+  const uploaded = await uploadMediaBinary(storageKey, buffer, resolvedMime);
+  const dimensions = readImageDimensions(buffer, resolvedMime);
+  const now = new Date().toISOString();
 
   const record: CmsImageRecord = {
     id,
+    storageKey: uploaded.storageKey,
+    url: uploaded.url.startsWith("http") ? uploaded.url : undefined,
     filename: storedName,
-    mimeType,
+    originalFilename: filename,
+    mimeType: resolvedMime,
     alt,
     title: title || alt || filename,
     fileSizeBytes: buffer.length,
-    createdAt: new Date().toISOString(),
+    width: dimensions.width,
+    height: dimensions.height,
+    createdAt: now,
+    updatedAt: now,
   };
+
+  const storage = await readStorage();
   storage.draft.images[id] = record;
   storage.published.images[id] = record;
-  storage.draftUpdatedAt = new Date().toISOString();
+  storage.draftUpdatedAt = now;
   await writeStorage(storage);
   return record;
 }
@@ -160,7 +229,11 @@ export async function updateImageRecord(
   const storage = await readStorage();
   const record = storage.draft.images[id] ?? storage.published.images[id];
   if (!record) return null;
-  const next = { ...record, ...patch };
+  const next = normalizeImageRecord({
+    ...record,
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  });
   storage.draft.images[id] = next;
   storage.published.images[id] = next;
   storage.draftUpdatedAt = new Date().toISOString();
@@ -177,20 +250,38 @@ export async function replaceImageFile(
   const storage = await readStorage();
   const record = storage.draft.images[id];
   if (!record) return null;
-  try {
-    await fs.unlink(path.join(getUploadsDir(), record.filename));
-  } catch {
-    /* ignore */
+
+  const validationError = validateMediaUpload({
+    filename,
+    mimeType,
+    size: buffer.length,
+  });
+  if (validationError) throw new Error(validationError);
+
+  const resolvedMime = inferMimeType(filename, mimeType);
+  if (!resolvedMime) throw new Error("Dit bestandstype wordt niet ondersteund.");
+  if (resolvedMime === "image/svg+xml" && !isSafeSvg(buffer)) {
+    throw new Error("SVG niet toegestaan (onveilige inhoud)");
   }
+
+  await deleteMediaBinary(record);
   const ext = path.extname(filename) || path.extname(record.filename) || ".jpg";
   const storedName = `${id}${ext}`;
-  await fs.writeFile(path.join(getUploadsDir(), storedName), buffer);
-  const next: CmsImageRecord = {
+  const storageKey = `cms/media/${storedName}`;
+  const uploaded = await uploadMediaBinary(storageKey, buffer, resolvedMime);
+  const dimensions = readImageDimensions(buffer, resolvedMime);
+  const next = normalizeImageRecord({
     ...record,
+    storageKey: uploaded.storageKey,
+    url: uploaded.url.startsWith("http") ? uploaded.url : undefined,
     filename: storedName,
-    mimeType,
+    originalFilename: filename,
+    mimeType: resolvedMime,
     fileSizeBytes: buffer.length,
-  };
+    width: dimensions.width,
+    height: dimensions.height,
+    updatedAt: new Date().toISOString(),
+  });
   storage.draft.images[id] = next;
   storage.published.images[id] = next;
   storage.draftUpdatedAt = new Date().toISOString();
@@ -200,18 +291,15 @@ export async function replaceImageFile(
 
 export async function getImageRecord(id: string): Promise<CmsImageRecord | null> {
   const site = await loadCmsSite();
-  return site.images[id] ?? null;
+  const record = site.images[id];
+  return record ? normalizeImageRecord(record) : null;
 }
 
 export async function deleteImage(id: string): Promise<boolean> {
   const storage = await readStorage();
   const record = storage.draft.images[id];
   if (!record) return false;
-  try {
-    await fs.unlink(path.join(getUploadsDir(), record.filename));
-  } catch {
-    /* file may already be gone */
-  }
+  await deleteMediaBinary(record);
   delete storage.draft.images[id];
   delete storage.published.images[id];
   storage.draftUpdatedAt = new Date().toISOString();
@@ -219,12 +307,8 @@ export async function deleteImage(id: string): Promise<boolean> {
   return true;
 }
 
-export async function readImageFile(filename: string): Promise<Buffer | null> {
-  try {
-    return await fs.readFile(path.join(getUploadsDir(), filename));
-  } catch {
-    return null;
-  }
+export async function readImageFile(record: CmsImageRecord): Promise<Buffer | null> {
+  return readMediaBinary(normalizeImageRecord(record));
 }
 
-export { imagePublicUrl, DEFAULT_CMS_SITE };
+export { imagePublicUrl, DEFAULT_CMS_SITE, getStorageConfigurationError };

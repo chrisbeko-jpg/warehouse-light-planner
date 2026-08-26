@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import {
+  getStorageConfigurationError,
   loadCmsDraft,
   loadCmsSite,
   saveCmsDraft,
   saveCmsDraftPage,
   saveUploadedImage,
+  toMediaApiRecord,
 } from "@/lib/cms/content-store";
 import { verifyInternalToken } from "@/lib/public-wizard/lead-storage";
 import type { CmsNavigation, CmsPage, CmsSiteContent } from "@/types/cms";
@@ -56,30 +58,38 @@ export async function PUT(request: Request) {
   return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
 }
 
-function isSafeSvg(buffer: Buffer): boolean {
-  const text = buffer.toString("utf8").toLowerCase();
-  return !text.includes("<script") && !text.includes("onload=") && !text.includes("onclick=");
-}
-
 export async function POST(request: Request) {
   if (!verifyInternalToken(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+  const storageError = getStorageConfigurationError();
+  if (storageError) {
+    return NextResponse.json({ success: false, message: storageError }, { status: 503 });
   }
   const form = await request.formData();
   const file = form.get("file");
   const alt = String(form.get("alt") ?? "");
   const title = String(form.get("title") ?? "") || undefined;
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "No file" }, { status: 400 });
+    return NextResponse.json({ success: false, message: "Geen bestand geselecteerd." }, { status: 400 });
   }
-  const allowed = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
-  if (!allowed.includes(file.type)) {
-    return NextResponse.json({ error: "Invalid file type" }, { status: 400 });
+  try {
+    const record = await saveUploadedImage(
+      Buffer.from(await file.arrayBuffer()),
+      file.name,
+      file.type,
+      alt,
+      title,
+    );
+    return NextResponse.json({
+      success: true,
+      message: "Afbeelding opgeslagen in mediabibliotheek",
+      image: record,
+      media: toMediaApiRecord(record),
+      url: `/api/cms/images/${record.id}`,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Upload mislukt.";
+    return NextResponse.json({ success: false, message }, { status: 400 });
   }
-  const buffer = Buffer.from(await file.arrayBuffer());
-  if (file.type === "image/svg+xml" && !isSafeSvg(buffer)) {
-    return NextResponse.json({ error: "SVG niet toegestaan (onveilige inhoud)" }, { status: 400 });
-  }
-  const record = await saveUploadedImage(buffer, file.name, file.type, alt, title);
-  return NextResponse.json({ image: record, url: `/api/cms/images/${record.id}` });
 }
