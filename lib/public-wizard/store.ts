@@ -385,6 +385,8 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       roomVertices,
       fixture.productId,
       previous,
+      fixtures,
+      id,
     );
     if (!snapped) {
       set({ editorMessage: "Geen geldige rasterpositie. Armatuur teruggezet." });

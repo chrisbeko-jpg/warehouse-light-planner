@@ -134,8 +134,19 @@ export function snapFixtureCenter(
   vertices: Point2D[],
   productId: PublicProductId,
   previous?: Point2D,
+  fixtures: PlacedPublicFixture[] = [],
+  excludeId?: string,
 ): Point2D | null {
-  return snapFixtureToGrid(x, y, pixelsPerMeter, vertices, productId, previous);
+  return snapFixtureToGrid(
+    x,
+    y,
+    pixelsPerMeter,
+    vertices,
+    productId,
+    previous,
+    fixtures,
+    excludeId,
+  );
 }
 
 export function findFreeGridPosition(

@@ -152,7 +152,26 @@ export function StepEditor() {
       if (e.code === "Space") {
         e.preventDefault();
         setSpacePanning(true);
+        return;
       }
+
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      const { selectedFixtureId, step, editorMode } = usePublicWizardStore.getState();
+      if (step !== "editor" || editorMode !== "select" || !selectedFixtureId) return;
+
+      e.preventDefault();
+      deleteSelectedFixture();
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === "Space") setSpacePanning(false);
@@ -163,7 +182,7 @@ export function StepEditor() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, []);
+  }, [deleteSelectedFixture]);
 
   const runRecognition = useCallback(async () => {
     if (!backgroundDataUrl || !pixelsPerMeter) return;
@@ -662,6 +681,7 @@ export function StepEditor() {
                   return (
                     <Rect
                       key={fixture.id}
+                      data-testid={`fixture-${fixture.id}`}
                       x={fixture.x - sizePx / 2}
                       y={fixture.y - sizePx / 2}
                       width={sizePx}
@@ -876,8 +896,8 @@ function SidePanel({
                   <button type="button" className="lp-btn-secondary text-xs" onClick={onRedo}>
                     Opnieuw
                   </button>
-                  <button type="button" className="lp-btn-secondary text-xs" disabled={!hasSelection} onClick={onDelete}>
-                    Verwijder selectie
+                  <button type="button" className="lp-btn-secondary text-xs" disabled={!hasSelection} onClick={onDelete} data-testid="delete-fixture-button">
+                    Verwijderen
                   </button>
                   <button type="button" className="lp-btn-secondary text-xs" disabled={!hasSelection} onClick={onDuplicate}>
                     Dupliceren
