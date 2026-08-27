@@ -138,6 +138,7 @@ export const KANTOORVERLICHTING_SEED: CmsPage = {
       type: "example",
       heading: "Voorbeeld lichtontwerp",
       body: "Een lichtontwerp maakt zichtbaar hoe techniek en sfeer samenkomen voordat de verlichting wordt besteld. Upload later zelf plattegrond, 2D lichtplan, 3D visualisatie of projectfoto's via het CMS.",
+      resultExamples: Array.from({ length: 4 }, () => ({ mediaId: null })),
       imageIds: [],
     },
     {

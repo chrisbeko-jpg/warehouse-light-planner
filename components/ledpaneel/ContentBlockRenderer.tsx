@@ -1,57 +1,11 @@
 import Link from "next/link";
-import type { ContentBlock, CmsImageRecord, CmsSiteContent } from "@/types/cms";
-import { resolveCmsImageAlt, resolveCmsImageUrl } from "@/lib/cms/resolve-image-url";
+import type { ContentBlock, CmsSiteContent } from "@/types/cms";
+import { CmsImage } from "@/components/cms/CmsImage";
+import { resolveMediaFromSource } from "@/lib/cms/media";
+import { getExampleImageSlots } from "@/lib/cms/normalize-media";
 import { RichTextContent } from "@/components/cms/RichTextContent";
 import { sanitizeRichHtml } from "@/lib/cms/sanitize";
 import { AiCalculatorForm } from "@/components/ledpaneel/AiCalculatorForm";
-
-function BlockImage({
-  imageId,
-  alt,
-  className = "",
-  images,
-  testId,
-}: {
-  imageId?: string;
-  alt?: string;
-  className?: string;
-  images?: Record<string, CmsImageRecord>;
-  testId?: string;
-}) {
-  if (!imageId) {
-    return (
-      <div
-        className={`flex aspect-[4/3] items-center justify-center rounded-2xl border border-dashed border-[var(--lp-border)] bg-[var(--lp-bg-secondary)] text-sm text-[var(--lp-text-secondary)] ${className}`}
-      >
-        Afbeelding
-      </div>
-    );
-  }
-
-  const src = images ? resolveCmsImageUrl(images, imageId) : null;
-  const resolvedAlt = images ? resolveCmsImageAlt(images, imageId, alt ?? "") : alt ?? "";
-
-  if (!src) {
-    return (
-      <div
-        className={`flex aspect-[4/3] items-center justify-center rounded-2xl border border-dashed border-[var(--lp-border)] bg-[var(--lp-bg-secondary)] text-sm text-[var(--lp-text-secondary)] ${className}`}
-        data-testid={testId}
-      >
-        Afbeelding niet gevonden
-      </div>
-    );
-  }
-
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={resolvedAlt}
-      className={`aspect-[4/3] w-full rounded-2xl border border-[var(--lp-border)] object-cover ${className}`}
-      data-testid={testId}
-    />
-  );
-}
 
 function BodyContent({ body, html }: { body?: string; html?: string }) {
   if (html?.trim()) return <RichTextContent html={html} className="cms-rich-text lp-body mt-4" />;
@@ -86,10 +40,12 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
                 )}
               </div>
             </div>
-            <BlockImage
-              imageId={block.imageId}
-              alt={block.imageAlt ?? block.headline}
-              images={images}
+            <CmsImage
+              media={resolveMediaFromSource(images, block, {
+                altFallback: block.headline,
+                altOverride: block.altTextOverride ?? block.imageAlt,
+                context: "hero",
+              })}
               testId="homepage-hero-image"
             />
           </div>
@@ -132,7 +88,14 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
       return (
         <section className="lp-section">
           <div className="lp-container">
-            <BlockImage imageId={block.imageId} alt={block.alt} className="aspect-[21/9]" images={images} />
+            <CmsImage
+              media={resolveMediaFromSource(images, block, {
+                altFallback: block.alt,
+                context: block.id,
+              })}
+              alt={block.alt}
+              aspectClassName="aspect-[21/9]"
+            />
             {block.caption && (
               <p className="mt-2 text-center text-sm text-[var(--lp-text-secondary)]">{block.caption}</p>
             )}
@@ -181,14 +144,22 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
       );
     case "products":
       return (
-        <section className="lp-section">
+        <section className="lp-section" data-testid="products-block">
           <div className="lp-container">
             <h2 className="lp-heading-2">{block.heading}</h2>
             <p className="lp-body mt-3 max-w-2xl">{block.intro}</p>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {block.items.map((item) => (
+              {block.items.map((item, index) => (
                 <article key={item.name} className="lp-card overflow-hidden">
-                  <BlockImage imageId={item.imageId} alt={item.name} images={images} />
+                  <CmsImage
+                    media={resolveMediaFromSource(images, item, {
+                      altFallback: item.name,
+                      altOverride: item.altTextOverride,
+                      context: `product-${index}`,
+                    })}
+                    alt={item.altTextOverride ?? item.name}
+                    testId={`product-image-${index}`}
+                  />
                   <div className="p-4">
                     <h3 className="text-sm font-bold">{item.name}</h3>
                     <p className="lp-body mt-1 text-sm">{item.description}</p>
@@ -201,18 +172,32 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
       );
     case "example":
       return (
-        <section className="lp-section lp-section-alt">
+        <section className="lp-section lp-section-alt" data-testid="example-block">
           <div className="lp-container grid gap-8 lg:grid-cols-2">
             <div>
               <h2 className="lp-heading-2">{block.heading}</h2>
               <p className="lp-body mt-4">{block.body}</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {(block.imageIds.length > 0 ? block.imageIds : [undefined, undefined, undefined, undefined]).map(
-                (id, i) => (
-                  <BlockImage key={id ?? i} imageId={id} alt={`Voorbeeld ${i + 1}`} images={images} />
-                ),
-              )}
+              {getExampleImageSlots(block)
+                .map((ref, index) => ({
+                  ref,
+                  index,
+                  media: resolveMediaFromSource(images, ref, {
+                    altFallback: ref.title ?? `Voorbeeld ${index + 1}`,
+                    altOverride: ref.altTextOverride,
+                    context: `example-${index}`,
+                  }),
+                }))
+                .filter((entry) => entry.media)
+                .map(({ ref, index, media }) => (
+                  <CmsImage
+                    key={`example-${index}`}
+                    media={media}
+                    alt={ref.altTextOverride ?? ref.title ?? `Voorbeeld ${index + 1}`}
+                    testId={`example-image-${index}`}
+                  />
+                ))}
             </div>
           </div>
         </section>
@@ -240,7 +225,13 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
               <BodyContent body={block.body} html={block.html} />
             </div>
             <div className={block.type === "image-text" ? "lg:[direction:ltr]" : ""}>
-              <BlockImage imageId={block.imageId} alt={block.imageAlt ?? block.heading} images={images} />
+              <CmsImage
+                media={resolveMediaFromSource(images, block, {
+                  altFallback: block.heading,
+                  altOverride: block.altTextOverride ?? block.imageAlt,
+                  context: block.id,
+                })}
+              />
             </div>
           </div>
         </section>

@@ -1,21 +1,34 @@
-import type { CmsPage, CmsSitePayload, ContentBlock } from "@/types/cms";
+import { readMediaId } from "@/lib/cms/media";
+import type { CmsPage, CmsSitePayload, ContentBlock, ExampleImageRef } from "@/types/cms";
+
+function collectMediaId(id: string | null | undefined, ids: Set<string>): void {
+  const mediaId = readMediaId({ mediaId: id, imageId: id });
+  if (mediaId) ids.add(mediaId);
+}
 
 function collectFromBlock(block: ContentBlock, ids: Set<string>): void {
-  if ("imageId" in block && block.imageId) ids.add(block.imageId);
+  if ("mediaId" in block || "imageId" in block) {
+    collectMediaId(readMediaId(block as { mediaId?: string | null; imageId?: string | null }), ids);
+  }
+
   if (block.type === "example") {
-    for (const id of block.imageIds) {
-      if (id) ids.add(id);
+    for (const item of block.resultExamples ?? []) {
+      collectMediaId(readMediaId(item), ids);
+    }
+    for (const legacyId of block.imageIds ?? []) {
+      collectMediaId(legacyId, ids);
     }
   }
+
   if (block.type === "products") {
     for (const item of block.items) {
-      if (item.imageId) ids.add(item.imageId);
+      collectMediaId(readMediaId(item), ids);
     }
   }
 }
 
 function collectFromPage(page: CmsPage, ids: Set<string>): void {
-  if (page.seo.ogImageId) ids.add(page.seo.ogImageId);
+  collectMediaId(readMediaId({ mediaId: page.seo.ogMediaId, imageId: page.seo.ogImageId }), ids);
   for (const block of page.blocks) collectFromBlock(block, ids);
 }
 
@@ -24,10 +37,14 @@ export function collectReferencedImageIds(payload: CmsSitePayload): string[] {
   collectFromPage(payload.homepage, ids);
   for (const page of Object.values(payload.pages)) collectFromPage(page, ids);
   for (const choice of payload.wizard.roomChoices) {
-    if (choice.imageId) ids.add(choice.imageId);
+    collectMediaId(readMediaId(choice), ids);
   }
   for (const choice of payload.wizard.atmosphereChoices) {
-    if (choice.imageId) ids.add(choice.imageId);
+    collectMediaId(readMediaId(choice), ids);
   }
   return [...ids];
+}
+
+export function collectExampleMediaIds(examples: ExampleImageRef[] | undefined): string[] {
+  return (examples ?? []).map((item) => readMediaId(item)).filter((id): id is string => Boolean(id));
 }

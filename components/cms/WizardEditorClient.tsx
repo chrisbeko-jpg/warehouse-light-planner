@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { CmsSiteContent, CmsWizardContent, WizardAtmosphereChoiceCms, WizardRoomChoiceCms } from "@/types/cms";
 import { PublishBar } from "@/components/cms/PublishBar";
-import { ImageSelect } from "@/components/cms/ImageSelect";
+import { MediaPicker } from "@/components/cms/MediaPicker";
+import { applyMediaId, readMediaId } from "@/lib/cms/media";
 import { cmsFetch } from "@/lib/cms/admin-client";
 
 export function WizardRoomsEditor() {
@@ -135,6 +136,7 @@ function WizardEditor({
             key={choice.id}
             choice={choice}
             images={images}
+            onImagesChange={setImages}
             onChange={(next) => {
               const roomChoices = [...wizard.roomChoices];
               roomChoices[index] = next;
@@ -149,6 +151,7 @@ function WizardEditor({
             key={choice.id}
             choice={choice}
             images={images}
+            onImagesChange={setImages}
             onChange={(next) => {
               const atmosphereChoices = [...wizard.atmosphereChoices];
               atmosphereChoices[index] = next;
@@ -172,10 +175,12 @@ function WizardEditor({
 function RoomChoiceForm({
   choice,
   images,
+  onImagesChange,
   onChange,
 }: {
   choice: WizardRoomChoiceCms;
   images: CmsSiteContent["images"];
+  onImagesChange?: (images: CmsSiteContent["images"]) => void;
   onChange: (choice: WizardRoomChoiceCms) => void;
 }) {
   return (
@@ -208,10 +213,11 @@ function RoomChoiceForm({
             onChange={(e) => onChange({ ...choice, description: e.target.value })}
           />
         </label>
-        <ImageSelect
+        <MediaPicker
           images={images}
-          value={choice.imageId}
-          onChange={(imageId) => onChange({ ...choice, imageId })}
+          onImagesChange={onImagesChange}
+          value={readMediaId(choice)}
+          onChange={(mediaId) => onChange(applyMediaId(choice, mediaId))}
           label="Afbeelding (mediaId)"
         />
         <label className="text-sm">
@@ -247,10 +253,12 @@ function RoomChoiceForm({
 function AtmosphereChoiceForm({
   choice,
   images,
+  onImagesChange,
   onChange,
 }: {
   choice: WizardAtmosphereChoiceCms;
   images: CmsSiteContent["images"];
+  onImagesChange?: (images: CmsSiteContent["images"]) => void;
   onChange: (choice: WizardAtmosphereChoiceCms) => void;
 }) {
   const isPremium = choice.id === "premium_architectural";
@@ -288,10 +296,11 @@ function AtmosphereChoiceForm({
             onChange={(e) => onChange({ ...choice, description: e.target.value })}
           />
         </label>
-        <ImageSelect
+        <MediaPicker
           images={images}
-          value={choice.imageId}
-          onChange={(imageId) => onChange({ ...choice, imageId })}
+          onImagesChange={onImagesChange}
+          value={readMediaId(choice)}
+          onChange={(mediaId) => onChange(applyMediaId(choice, mediaId))}
           label="Afbeelding (mediaId)"
         />
         <label className="text-sm">

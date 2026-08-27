@@ -1,4 +1,6 @@
 import { DEFAULT_CMS_SITE } from "@/lib/cms/defaults";
+import { normalizeSiteMediaPayload } from "@/lib/cms/normalize-media";
+import { EXAMPLE_IMAGE_SLOT_COUNT } from "@/lib/cms/media";
 import { KANTOORVERLICHTING_SEED } from "@/lib/cms/seeds/kantoorverlichting";
 import type {
   CmsImageRecord,
@@ -68,13 +70,13 @@ function mergeKantoorPage(stored?: CmsPage): CmsPage {
 
 export function mergeSitePayload(stored?: Partial<CmsSitePayload>): CmsSitePayload {
   const defaults = mergeSitePayloadDefaults(stored);
-  return {
+  return normalizeSiteMediaPayload({
     ...defaults,
     pages: {
       ...defaults.pages,
       kantoorverlichting: mergeKantoorPage(stored?.pages?.kantoorverlichting),
     },
-  };
+  });
 }
 
 function mergePageBlocks(defaultBlocks: ContentBlock[], storedBlocks?: ContentBlock[]): ContentBlock[] {
@@ -281,7 +283,13 @@ export function createDefaultBlock(type: import("@/types/cms").ContentBlock["typ
         items: [{ question: "Vraag?", answer: "Antwoord." }],
       };
     case "example":
-      return { id, type: "example", heading: "Voorbeeld", body: "Tekst", imageIds: [] };
+      return {
+        id,
+        type: "example",
+        heading: "Voorbeeld",
+        body: "Tekst",
+        resultExamples: Array.from({ length: EXAMPLE_IMAGE_SLOT_COUNT }, () => ({ mediaId: null })),
+      };
     case "quote":
       return { id, type: "quote", quote: "Quote", author: "Auteur" };
     case "ai-calculator-cta":

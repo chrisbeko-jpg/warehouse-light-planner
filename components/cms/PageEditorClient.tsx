@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { ContentBlock, ContentBlockType, CmsPage, CmsSiteContent } from "@/types/cms";
 import { CMS_BLOCK_LABELS } from "@/types/cms";
 import { BlockEditor } from "@/components/cms/BlockEditor";
+import { MediaPicker } from "@/components/cms/MediaPicker";
 import { PublishBar } from "@/components/cms/PublishBar";
 import { cmsFetch } from "@/lib/cms/admin-client";
+import { readMediaId } from "@/lib/cms/media";
 import { createDefaultBlock } from "@/lib/cms/merge";
 
 export function PageEditorClient({
@@ -161,15 +163,22 @@ export function PageEditorClient({
             Canonical
             <input className="mt-1 w-full rounded border px-3 py-2" value={page.seo.canonical ?? ""} onChange={(e) => setPage({ ...page, seo: { ...page.seo, canonical: e.target.value } })} />
           </label>
-          <label className="block text-sm">
-            Open Graph image
-            <select className="mt-1 w-full rounded border px-3 py-2" value={page.seo.ogImageId ?? ""} onChange={(e) => setPage({ ...page, seo: { ...page.seo, ogImageId: e.target.value || undefined } })}>
-              <option value="">Geen</option>
-              {Object.values(images).map((img) => (
-                <option key={img.id} value={img.id}>{img.title ?? img.filename}</option>
-              ))}
-            </select>
-          </label>
+          <MediaPicker
+            images={images}
+            onImagesChange={setImages}
+            value={readMediaId({ mediaId: page.seo.ogMediaId, imageId: page.seo.ogImageId })}
+            onChange={(mediaId) =>
+              setPage({
+                ...page,
+                seo: {
+                  ...page.seo,
+                  ogMediaId: mediaId ?? null,
+                  ogImageId: mediaId,
+                },
+              })
+            }
+            label="Open Graph image"
+          />
           <label className="flex items-center gap-2 text-sm md:col-span-2">
             <input type="checkbox" checked={page.seo.noindex ?? false} onChange={(e) => setPage({ ...page, seo: { ...page.seo, noindex: e.target.checked } })} />
             Noindex (niet indexeren)
@@ -207,7 +216,7 @@ export function PageEditorClient({
                 <button type="button" className="rounded border px-2 py-1 text-xs text-red-600" onClick={() => setPage((p) => ({ ...p, blocks: p.blocks.filter((_, i) => i !== index) }))}>Verwijderen</button>
               </div>
             </div>
-            <BlockEditor block={block} images={images} onChange={(next) => updateBlock(index, next)} />
+            <BlockEditor block={block} images={images} onImagesChange={setImages} onChange={(next) => updateBlock(index, next)} />
           </article>
         ))}
       </section>

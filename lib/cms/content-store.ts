@@ -76,6 +76,17 @@ async function readStorage(): Promise<CmsSiteStorage> {
   return readSiteStorage();
 }
 
+let storageMutationQueue: Promise<unknown> = Promise.resolve();
+
+async function withStorageMutation<T>(mutate: () => Promise<T>): Promise<T> {
+  const run = storageMutationQueue.then(mutate, mutate);
+  storageMutationQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 async function writeStorage(storage: CmsSiteStorage): Promise<void> {
   await writeSiteStorage(storage);
 }
@@ -123,42 +134,55 @@ export async function getCmsStorageMeta(): Promise<{
 }
 
 export async function saveCmsDraft(payload: Partial<CmsSitePayload>): Promise<CmsSiteContent> {
-  const storage = await readStorage();
-  storage.draft = mergeSitePayload({ ...storage.draft, ...payload });
-  storage.draftUpdatedAt = new Date().toISOString();
-  await writeStorage(storage);
-  return loadCmsDraft();
+  return withStorageMutation(async () => {
+    const storage = await readStorage();
+    const preservedImages = { ...storage.published.images, ...storage.draft.images };
+    storage.draft = mergeSitePayload({ ...storage.draft, ...payload });
+    storage.draft.images = { ...preservedImages, ...storage.draft.images, ...payload.images };
+    storage.draftUpdatedAt = new Date().toISOString();
+    await writeStorage(storage);
+    return loadCmsDraft();
+  });
 }
 
 export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<CmsSiteContent> {
-  const storage = await readStorage();
-  const key = slug.replace(/^\//, "");
-  const pageWithTimestamp = { ...page, updatedAt: new Date().toISOString() };
-  if (key === "" || slug === "/" || key === "homepage") {
-    storage.draft = mergeSitePayload({
-      ...storage.draft,
-      homepage: pageWithTimestamp,
-    });
-  } else {
-    storage.draft = mergeSitePayload({
-      ...storage.draft,
-      pages: { ...storage.draft.pages, [key]: pageWithTimestamp },
-    });
-  }
-  storage.draftUpdatedAt = new Date().toISOString();
-  await writeStorage(storage);
-  return loadCmsDraft();
+  return withStorageMutation(async () => {
+    const storage = await readStorage();
+    const preservedImages = { ...storage.published.images, ...storage.draft.images };
+    const key = slug.replace(/^\//, "");
+    const pageWithTimestamp = { ...page, updatedAt: new Date().toISOString() };
+    if (key === "" || slug === "/" || key === "homepage") {
+      storage.draft = mergeSitePayload({
+        ...storage.draft,
+        homepage: pageWithTimestamp,
+      });
+    } else {
+      storage.draft = mergeSitePayload({
+        ...storage.draft,
+        pages: { ...storage.draft.pages, [key]: pageWithTimestamp },
+      });
+    }
+    storage.draft.images = { ...preservedImages, ...storage.draft.images };
+    storage.draftUpdatedAt = new Date().toISOString();
+    await writeStorage(storage);
+    return loadCmsDraft();
+  });
 }
 
 export async function publishCmsDraft(): Promise<CmsSiteContent> {
-  const storage = await readStorage();
-  const now = new Date().toISOString();
-  storage.published = structuredClone(storage.draft);
-  syncReferencedImages(storage.published, storage.draft.images);
-  storage.publishedAt = now;
-  storage.draftUpdatedAt = now;
-  await writeStorage(storage);
-  return loadCmsSite();
+  return withStorageMutation(async () => {
+    const storage = await readStorage();
+    const now = new Date().toISOString();
+    const mergedImages = { ...storage.published.images, ...storage.draft.images };
+    storage.draft.images = mergedImages;
+    storage.published = structuredClone(storage.draft);
+    syncReferencedImages(storage.published, mergedImages);
+    storage.published.images = { ...mergedImages, ...storage.published.images };
+    storage.publishedAt = now;
+    storage.draftUpdatedAt = now;
+    await writeStorage(storage);
+    return loadCmsSite();
+  });
 }
 
 export async function revertCmsDraft(): Promise<CmsSiteContent> {
@@ -237,11 +261,14 @@ export async function saveUploadedImage(
     updatedAt: now,
   };
 
-  const storage = await readStorage();
-  storage.draft.images[id] = record;
-  storage.published.images[id] = record;
-  storage.draftUpdatedAt = now;
-  await writeStorage(storage);
+  await withStorageMutation(async () => {
+    const storage = await readStorage();
+    storage.draft.images = { ...storage.draft.images, [id]: record };
+    storage.published.images = { ...storage.published.images, [id]: record };
+    storage.draftUpdatedAt = now;
+    await writeStorage(storage);
+  });
+
   return record;
 }
 

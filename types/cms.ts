@@ -29,8 +29,19 @@ export interface CmsSeo {
   canonical?: string;
   ogTitle?: string;
   ogDescription?: string;
+  ogMediaId?: string | null;
+  /** @deprecated use ogMediaId */
   ogImageId?: string;
   noindex?: boolean;
+}
+
+export interface MediaReference {
+  mediaId: string | null;
+  altTextOverride?: string;
+}
+
+export interface ExampleImageRef extends MediaReference {
+  title?: string;
 }
 
 export interface ContentBlockBase {
@@ -47,7 +58,11 @@ export interface HeroBlock extends ContentBlockBase {
   primaryCtaHref: string;
   secondaryCta: string;
   secondaryCtaHref: string;
+  mediaId?: string | null;
+  altTextOverride?: string;
+  /** @deprecated use mediaId */
   imageId?: string;
+  /** @deprecated use altTextOverride */
   imageAlt?: string;
 }
 
@@ -69,12 +84,18 @@ export interface TextImageBlock extends ContentBlockBase {
   heading: string;
   body: string;
   html?: string;
+  mediaId?: string | null;
+  altTextOverride?: string;
+  /** @deprecated use mediaId */
   imageId?: string;
+  /** @deprecated use altTextOverride */
   imageAlt?: string;
 }
 
 export interface WideImageBlock extends ContentBlockBase {
   type: "wide-image";
+  mediaId?: string | null;
+  /** @deprecated use mediaId */
   imageId?: string;
   alt: string;
   caption?: string;
@@ -110,7 +131,14 @@ export interface ProductsBlock extends ContentBlockBase {
   type: "products";
   heading: string;
   intro: string;
-  items: { name: string; description: string; imageId?: string }[];
+  items: {
+    name: string;
+    description: string;
+    mediaId?: string | null;
+    altTextOverride?: string;
+    /** @deprecated use mediaId */
+    imageId?: string;
+  }[];
 }
 
 export interface CtaBlock extends ContentBlockBase {
@@ -133,7 +161,9 @@ export interface ExampleBlock extends ContentBlockBase {
   type: "example";
   heading: string;
   body: string;
-  imageIds: string[];
+  resultExamples: ExampleImageRef[];
+  /** @deprecated migrated to resultExamples */
+  imageIds?: string[];
 }
 
 export interface QuoteBlock extends ContentBlockBase {
@@ -212,7 +242,11 @@ export interface WizardRoomChoiceCms {
   title: string;
   description: string;
   suggestedLux: number;
+  mediaId?: string | null;
+  altTextOverride?: string;
+  /** @deprecated use mediaId */
   imageId?: string;
+  /** @deprecated use altTextOverride */
   imageAlt: string;
   sortOrder: number;
   active: boolean;
@@ -223,7 +257,11 @@ export interface WizardAtmosphereChoiceCms {
   title: string;
   subtitle: string;
   description: string;
+  mediaId?: string | null;
+  altTextOverride?: string;
+  /** @deprecated use mediaId */
   imageId?: string;
+  /** @deprecated use altTextOverride */
   imageAlt: string;
   sortOrder: number;
   active: boolean;

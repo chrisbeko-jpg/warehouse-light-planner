@@ -31,7 +31,7 @@ async function publishHomepageHeroImage(
   const homepage = {
     ...draft.site.homepage,
     blocks: draft.site.homepage.blocks.map((block) =>
-      block.id === "hero" && block.type === "hero" ? { ...block, imageId } : block,
+      block.id === "hero" && block.type === "hero" ? { ...block, mediaId: imageId, imageId } : block,
     ),
   };
 

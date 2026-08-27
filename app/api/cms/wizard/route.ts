@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadCmsSite } from "@/lib/cms/content-store";
-import { resolveCmsImageAlt, resolveCmsImageUrl } from "@/lib/cms/resolve-image-url";
+import { readMediaId, resolveMedia } from "@/lib/cms/media";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,24 +10,38 @@ function mapRoomChoices(site: Awaited<ReturnType<typeof loadCmsSite>>) {
   return site.wizard.roomChoices
     .filter((choice) => choice.active)
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((choice) => ({
-      ...choice,
-      imageMediaId: choice.imageId ?? null,
-      imageUrl: resolveCmsImageUrl(site.images, choice.imageId, choice.id),
-      imageAlt: resolveCmsImageAlt(site.images, choice.imageId, choice.imageAlt || choice.title),
-    }));
+    .map((choice) => {
+      const mediaId = readMediaId(choice);
+      return {
+        ...choice,
+        imageMediaId: mediaId,
+        imageUrl: resolveMedia(site.images, mediaId, {
+          altFallback: choice.title,
+          altOverride: choice.altTextOverride ?? choice.imageAlt,
+          context: choice.id,
+        })?.url ?? null,
+        imageAlt: choice.altTextOverride ?? choice.imageAlt ?? choice.title,
+      };
+    });
 }
 
 function mapAtmosphereChoices(site: Awaited<ReturnType<typeof loadCmsSite>>) {
   return site.wizard.atmosphereChoices
     .filter((choice) => choice.active)
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((choice) => ({
-      ...choice,
-      imageMediaId: choice.imageId ?? null,
-      imageUrl: resolveCmsImageUrl(site.images, choice.imageId, choice.id),
-      imageAlt: resolveCmsImageAlt(site.images, choice.imageId, choice.imageAlt || choice.title),
-    }));
+    .map((choice) => {
+      const mediaId = readMediaId(choice);
+      return {
+        ...choice,
+        imageMediaId: mediaId,
+        imageUrl: resolveMedia(site.images, mediaId, {
+          altFallback: choice.title,
+          altOverride: choice.altTextOverride ?? choice.imageAlt,
+          context: choice.id,
+        })?.url ?? null,
+        imageAlt: choice.altTextOverride ?? choice.imageAlt ?? choice.title,
+      };
+    });
 }
 
 export async function GET() {

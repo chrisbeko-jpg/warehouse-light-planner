@@ -61,6 +61,7 @@ const DEFAULT_HOMEPAGE: CmsPage = {
       heading: "Voorbeeld van uw resultaat",
       body: "U ziet vooraf hoe de verlichting over de ruimte wordt verdeeld en krijgt direct inzicht in het benodigde aantal armaturen.",
       imageIds: [],
+      resultExamples: Array.from({ length: 4 }, () => ({ mediaId: null })),
     },
     {
       id: "benefits",

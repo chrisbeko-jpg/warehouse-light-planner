@@ -2,7 +2,9 @@
 
 import type { ContentBlock, CmsImageRecord } from "@/types/cms";
 import { RichTextEditor } from "@/components/cms/RichTextEditor";
-import { ImageSelect } from "@/components/cms/ImageSelect";
+import { MediaPicker } from "@/components/cms/MediaPicker";
+import { applyMediaId, readMediaId, EXAMPLE_IMAGE_SLOT_COUNT } from "@/lib/cms/media";
+import { getExampleImageSlots } from "@/lib/cms/normalize-media";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -21,11 +23,14 @@ export function BlockEditor({
   block,
   images,
   onChange,
+  onImagesChange,
 }: {
   block: ContentBlock;
   images: Record<string, CmsImageRecord>;
   onChange: (block: ContentBlock) => void;
+  onImagesChange?: (images: Record<string, CmsImageRecord>) => void;
 }) {
+  const pickerProps = { images, onImagesChange };
   switch (block.type) {
     case "hero":
       return (
@@ -33,8 +38,13 @@ export function BlockEditor({
           <Field label="Tagline"><input className={inputClass()} value={block.tagline ?? ""} onChange={(e) => onChange({ ...block, tagline: e.target.value })} /></Field>
           <Field label="Kop (H1)"><input className={inputClass()} value={block.headline} onChange={(e) => onChange({ ...block, headline: e.target.value })} /></Field>
           <Field label="Subtitel"><textarea className={inputClass()} rows={3} value={block.subheadline} onChange={(e) => onChange({ ...block, subheadline: e.target.value })} /></Field>
-          <ImageSelect images={images} value={block.imageId} onChange={(imageId) => onChange({ ...block, imageId })} label="Hero afbeelding" />
-          <Field label="Alt-tekst hero"><input className={inputClass()} value={block.imageAlt ?? ""} onChange={(e) => onChange({ ...block, imageAlt: e.target.value })} /></Field>
+          <MediaPicker
+            {...pickerProps}
+            value={readMediaId(block)}
+            onChange={(mediaId) => onChange(applyMediaId(block, mediaId))}
+            label="Hero afbeelding"
+          />
+          <Field label="Alt-tekst hero"><input className={inputClass()} value={block.altTextOverride ?? block.imageAlt ?? ""} onChange={(e) => onChange({ ...block, altTextOverride: e.target.value, imageAlt: e.target.value })} /></Field>
           <Field label="Primaire CTA"><input className={inputClass()} value={block.primaryCta} onChange={(e) => onChange({ ...block, primaryCta: e.target.value })} /></Field>
           <Field label="Primaire link"><input className={inputClass()} value={block.primaryCtaHref} onChange={(e) => onChange({ ...block, primaryCtaHref: e.target.value })} /></Field>
           <Field label="Secundaire CTA"><input className={inputClass()} value={block.secondaryCta} onChange={(e) => onChange({ ...block, secondaryCta: e.target.value })} /></Field>
@@ -61,8 +71,12 @@ export function BlockEditor({
       return (
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Kop"><input className={inputClass()} value={block.heading} onChange={(e) => onChange({ ...block, heading: e.target.value })} /></Field>
-          <ImageSelect images={images} value={block.imageId} onChange={(imageId) => onChange({ ...block, imageId })} />
-          <Field label="Alt-tekst"><input className={inputClass()} value={block.imageAlt ?? ""} onChange={(e) => onChange({ ...block, imageAlt: e.target.value })} /></Field>
+          <MediaPicker
+            {...pickerProps}
+            value={readMediaId(block)}
+            onChange={(mediaId) => onChange(applyMediaId(block, mediaId))}
+          />
+          <Field label="Alt-tekst"><input className={inputClass()} value={block.altTextOverride ?? block.imageAlt ?? ""} onChange={(e) => onChange({ ...block, altTextOverride: e.target.value, imageAlt: e.target.value })} /></Field>
           <div className="md:col-span-2">
             <RichTextEditor value={block.html ?? `<p>${block.body}</p>`} onChange={(html) => onChange({ ...block, html, body: block.body })} />
           </div>
@@ -71,7 +85,11 @@ export function BlockEditor({
     case "wide-image":
       return (
         <div className="grid gap-3 md:grid-cols-2">
-          <ImageSelect images={images} value={block.imageId} onChange={(imageId) => onChange({ ...block, imageId })} />
+          <MediaPicker
+            {...pickerProps}
+            value={readMediaId(block)}
+            onChange={(mediaId) => onChange(applyMediaId(block, mediaId))}
+          />
           <Field label="Alt-tekst"><input className={inputClass()} value={block.alt} onChange={(e) => onChange({ ...block, alt: e.target.value })} /></Field>
           <Field label="Bijschrift"><input className={inputClass()} value={block.caption ?? ""} onChange={(e) => onChange({ ...block, caption: e.target.value })} /></Field>
         </div>
@@ -136,7 +154,15 @@ export function BlockEditor({
           {block.items.map((item, i) => (
             <div key={i} className="grid gap-2 rounded border p-3 md:grid-cols-2">
               <Field label="Naam"><input className={inputClass()} value={item.name} onChange={(e) => { const items = [...block.items]; items[i] = { ...item, name: e.target.value }; onChange({ ...block, items }); }} /></Field>
-              <ImageSelect images={images} value={item.imageId} onChange={(imageId) => { const items = [...block.items]; items[i] = { ...item, imageId }; onChange({ ...block, items }); }} />
+              <MediaPicker
+                {...pickerProps}
+                value={readMediaId(item)}
+                onChange={(mediaId) => {
+                  const items = [...block.items];
+                  items[i] = applyMediaId(item, mediaId);
+                  onChange({ ...block, items });
+                }}
+              />
               <div className="md:col-span-2"><Field label="Omschrijving"><textarea className={inputClass()} rows={2} value={item.description} onChange={(e) => { const items = [...block.items]; items[i] = { ...item, description: e.target.value }; onChange({ ...block, items }); }} /></Field></div>
             </div>
           ))}
@@ -174,21 +200,34 @@ export function BlockEditor({
         <>
           <Field label="Kop"><input className={inputClass()} value={block.heading} onChange={(e) => onChange({ ...block, heading: e.target.value })} /></Field>
           <Field label="Tekst"><textarea className={inputClass()} rows={3} value={block.body} onChange={(e) => onChange({ ...block, body: e.target.value })} /></Field>
-          <p className="text-xs text-[var(--lp-text-secondary)]">Afbeeldingen (max. 4)</p>
-          {[0, 1, 2, 3].map((slot) => (
-            <ImageSelect
-              key={slot}
-              images={images}
-              value={block.imageIds[slot]}
-              onChange={(imageId) => {
-                const imageIds = [...block.imageIds];
-                if (imageId) imageIds[slot] = imageId;
-                else imageIds.splice(slot, 1);
-                onChange({ ...block, imageIds: imageIds.filter(Boolean) });
-              }}
-              label={`Afbeelding ${slot + 1}`}
-            />
-          ))}
+          <p className="text-xs text-[var(--lp-text-secondary)]">Afbeeldingen (4 vaste slots)</p>
+          {Array.from({ length: EXAMPLE_IMAGE_SLOT_COUNT }, (_, slot) => {
+            const slots = getExampleImageSlots(block);
+            const current = slots[slot] ?? { mediaId: null };
+            return (
+              <MediaPicker
+                key={slot}
+                {...pickerProps}
+                value={readMediaId(current)}
+                onChange={(mediaId) => {
+                  const nextSlots = [...getExampleImageSlots(block)];
+                  nextSlots[slot] = mediaId
+                    ? {
+                        mediaId,
+                        title: current.title ?? `Voorbeeld ${slot + 1}`,
+                        altTextOverride: current.altTextOverride,
+                      }
+                    : { mediaId: null };
+                  onChange({
+                    ...block,
+                    resultExamples: nextSlots,
+                    imageIds: nextSlots.map((item) => readMediaId(item)).filter((id): id is string => Boolean(id)),
+                  });
+                }}
+                label={`Voorbeeld ${slot + 1}`}
+              />
+            );
+          })}
         </>
       );
     case "quote":
