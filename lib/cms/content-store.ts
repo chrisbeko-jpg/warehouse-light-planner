@@ -5,6 +5,7 @@ import {
   getStorageConfigurationError,
   readMediaBinary,
   readSiteStorage,
+  readSiteStorageAtVersion,
   uploadMediaBinary,
   writeSiteStorage,
 } from "@/lib/cms/blob-storage";
@@ -20,7 +21,16 @@ import {
   payloadToPublicContent,
 } from "@/lib/cms/merge";
 import { normalizePage, normalizeWizard } from "@/lib/cms/normalize-media";
+import {
+  assertMediaReferencesPreserved,
+  logMediaReferenceStage,
+  MediaPersistenceError,
+  snapshotPageMediaReferences,
+  snapshotSiteMediaReferences,
+  type MediaReferenceSnapshot,
+} from "@/lib/cms/media-reference-audit";
 import { syncReferencedImages } from "@/lib/cms/sync-referenced-images";
+import { revalidateCmsPublicRoutes } from "@/lib/cms/revalidate-cms";
 import { imagePublicUrl } from "@/lib/cms/image-url";
 import type {
   CmsPage,
@@ -28,6 +38,12 @@ import type {
   CmsSitePayload,
   CmsSiteStorage,
 } from "@/types/cms";
+
+export interface CmsSaveResult {
+  site: CmsSiteContent;
+  debugMediaReferences?: MediaReferenceSnapshot;
+  versionPath?: string;
+}
 
 export interface CmsMediaApiRecord {
   id: string;
@@ -44,6 +60,8 @@ export interface CmsMediaApiRecord {
   createdAt: string;
   updatedAt: string;
 }
+
+const AUDIT_ENABLED = process.env.CMS_MEDIA_AUDIT === "1";
 
 function normalizeImageRecord(record: CmsImageRecord): CmsImageRecord {
   return {
@@ -88,18 +106,74 @@ async function withStorageMutation<T>(mutate: () => Promise<T>): Promise<T> {
   return run;
 }
 
-async function writeStorage(storage: CmsSiteStorage): Promise<void> {
-  await writeSiteStorage(storage);
+function draftContentFromStorage(storage: CmsSiteStorage): CmsSiteContent {
+  return payloadToPublicContent(storage.draft, {
+    publishedAt: storage.publishedAt,
+    draftUpdatedAt: storage.draftUpdatedAt,
+  });
+}
+
+function publishedContentFromStorage(storage: CmsSiteStorage): CmsSiteContent {
+  return payloadToPublicContent(storage.published, {
+    publishedAt: storage.publishedAt,
+    draftUpdatedAt: storage.draftUpdatedAt,
+  });
+}
+
+function buildSaveResult(storage: CmsSiteStorage, versionPath?: string): CmsSaveResult {
+  const site = draftContentFromStorage(storage);
+  const result: CmsSaveResult = { site, versionPath };
+  if (process.env.NODE_ENV !== "production" || AUDIT_ENABLED) {
+    result.debugMediaReferences = snapshotSiteMediaReferences(storage.draft);
+  }
+  return result;
+}
+
+function auditStage(stage: string, payload: CmsSitePayload): void {
+  if (!AUDIT_ENABLED) return;
+  logMediaReferenceStage(stage, snapshotSiteMediaReferences(payload));
+}
+
+async function verifyPersistedDraftMatchesMemory(
+  storage: CmsSiteStorage,
+  expected: MediaReferenceSnapshot,
+  context: string,
+): Promise<string> {
+  auditStage("BEFORE WRITE mediaIds", storage.draft);
+  const versionPath = await writeSiteStorage(storage);
+  auditStage("AFTER WRITE mediaIds (memory)", storage.draft);
+
+  const persistedAtVersion = await readSiteStorageAtVersion(versionPath);
+  if (!persistedAtVersion) {
+    throw new MediaPersistenceError(
+      "Afbeelding kon niet worden opgeslagen. De wijziging is niet toegepast (persisted read failed).",
+      ["persisted version unreadable"],
+    );
+  }
+  auditStage("AFTER READ mediaIds (written version)", persistedAtVersion.draft);
+
+  const normalizedRead = await readStorage();
+  auditStage("AFTER NORMALIZE mediaIds (readSiteStorage)", normalizedRead.draft);
+
+  assertMediaReferencesPreserved(
+    expected,
+    snapshotSiteMediaReferences(persistedAtVersion.draft),
+    `${context}/written-version`,
+  );
+  assertMediaReferencesPreserved(
+    expected,
+    snapshotSiteMediaReferences(normalizedRead.draft),
+    `${context}/normalized-read`,
+  );
+
+  return versionPath;
 }
 
 /** Public published CMS content. Never throws; falls back to defaults. */
 export async function loadCmsSite(): Promise<CmsSiteContent> {
   try {
     const storage = await readStorage();
-    return payloadToPublicContent(storage.published, {
-      publishedAt: storage.publishedAt,
-      draftUpdatedAt: storage.draftUpdatedAt,
-    });
+    return publishedContentFromStorage(storage);
   } catch (error) {
     console.error("Failed to load published CMS content, using defaults:", error);
     return payloadToPublicContent(mergeSitePayload(), {
@@ -113,10 +187,7 @@ export async function loadCmsSite(): Promise<CmsSiteContent> {
 export async function loadCmsDraft(): Promise<CmsSiteContent> {
   try {
     const storage = await readStorage();
-    return payloadToPublicContent(storage.draft, {
-      publishedAt: storage.publishedAt,
-      draftUpdatedAt: storage.draftUpdatedAt,
-    });
+    return draftContentFromStorage(storage);
   } catch (error) {
     console.error("Failed to load draft CMS content, using published/default fallback:", error);
     return loadCmsSite();
@@ -134,7 +205,7 @@ export async function getCmsStorageMeta(): Promise<{
   };
 }
 
-export async function saveCmsDraft(payload: Partial<CmsSitePayload>): Promise<CmsSiteContent> {
+export async function saveCmsDraft(payload: Partial<CmsSitePayload>): Promise<CmsSaveResult> {
   return withStorageMutation(async () => {
     const storage = await readStorage();
     const preservedImages = { ...storage.published.images, ...storage.draft.images };
@@ -155,14 +226,18 @@ export async function saveCmsDraft(payload: Partial<CmsSitePayload>): Promise<Cm
     }
     syncReferencedImages(mergedDraft, preservedImages);
     mergedDraft.images = { ...preservedImages, ...mergedDraft.images, ...payload.images };
+
+    const expected = snapshotSiteMediaReferences(mergedDraft);
     storage.draft = mergedDraft;
     storage.draftUpdatedAt = new Date().toISOString();
-    await writeStorage(storage);
-    return loadCmsDraft();
+
+    assertMediaReferencesPreserved(expected, snapshotSiteMediaReferences(storage.draft), "saveCmsDraft/memory");
+    const versionPath = await verifyPersistedDraftMatchesMemory(storage, expected, "saveCmsDraft");
+    return buildSaveResult(storage, versionPath);
   });
 }
 
-export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<CmsSiteContent> {
+export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<CmsSaveResult> {
   return withStorageMutation(async () => {
     const storage = await readStorage();
     const preservedImages = { ...storage.published.images, ...storage.draft.images };
@@ -176,17 +251,30 @@ export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<Cms
     }
     syncReferencedImages(mergedDraft, preservedImages);
     mergedDraft.images = { ...preservedImages, ...mergedDraft.images };
+
+    const expectedFromPage = snapshotPageMediaReferences(normalizedPage);
+    const expected: MediaReferenceSnapshot = {
+      ...snapshotSiteMediaReferences(mergedDraft),
+      homepageHero: expectedFromPage.homepageHero ?? null,
+      exampleSlots: expectedFromPage.exampleSlots ?? [],
+      productItems: expectedFromPage.productItems ?? [],
+      ogMediaId: expectedFromPage.ogMediaId ?? null,
+    };
+
     storage.draft = mergedDraft;
     storage.draftUpdatedAt = new Date().toISOString();
-    await writeStorage(storage);
-    return loadCmsDraft();
+
+    assertMediaReferencesPreserved(expected, snapshotSiteMediaReferences(storage.draft), "saveCmsDraftPage/memory");
+    const versionPath = await verifyPersistedDraftMatchesMemory(storage, expected, "saveCmsDraftPage");
+    return buildSaveResult(storage, versionPath);
   });
 }
 
-export async function publishCmsDraft(): Promise<CmsSiteContent> {
+export async function publishCmsDraft(): Promise<CmsSaveResult> {
   return withStorageMutation(async () => {
     const storage = await readStorage();
     const now = new Date().toISOString();
+    const expected = snapshotSiteMediaReferences(storage.draft);
     const mergedImages = { ...storage.published.images, ...storage.draft.images };
     storage.draft.images = mergedImages;
     storage.published = structuredClone(storage.draft);
@@ -194,17 +282,26 @@ export async function publishCmsDraft(): Promise<CmsSiteContent> {
     storage.published.images = { ...mergedImages, ...storage.published.images };
     storage.publishedAt = now;
     storage.draftUpdatedAt = now;
-    await writeStorage(storage);
-    return loadCmsSite();
+
+    assertMediaReferencesPreserved(expected, snapshotSiteMediaReferences(storage.published), "publish/memory");
+    const versionPath = await verifyPersistedDraftMatchesMemory(storage, expected, "publish");
+
+    revalidateCmsPublicRoutes();
+    return {
+      ...buildSaveResult(storage, versionPath),
+      site: publishedContentFromStorage(storage),
+    };
   });
 }
 
-export async function revertCmsDraft(): Promise<CmsSiteContent> {
-  const storage = await readStorage();
-  storage.draft = structuredClone(storage.published);
-  storage.draftUpdatedAt = new Date().toISOString();
-  await writeStorage(storage);
-  return loadCmsDraft();
+export async function revertCmsDraft(): Promise<CmsSaveResult> {
+  return withStorageMutation(async () => {
+    const storage = await readStorage();
+    storage.draft = structuredClone(storage.published);
+    storage.draftUpdatedAt = new Date().toISOString();
+    await writeSiteStorage(storage);
+    return buildSaveResult(storage);
+  });
 }
 
 /** @deprecated use saveCmsDraft */
@@ -214,7 +311,7 @@ export async function saveCmsSite(content: CmsSiteContent): Promise<void> {
   storage.draftUpdatedAt = new Date().toISOString();
   storage.published = mergeSitePayload(content);
   storage.publishedAt = new Date().toISOString();
-  await writeStorage(storage);
+  await writeSiteStorage(storage);
 }
 
 export async function getCmsPage(slug: string, options?: { draft?: boolean }): Promise<CmsPage | null> {
@@ -224,7 +321,7 @@ export async function getCmsPage(slug: string, options?: { draft?: boolean }): P
   return site.pages[key] ?? null;
 }
 
-export async function saveCmsPage(slug: string, page: CmsPage): Promise<CmsSiteContent> {
+export async function saveCmsPage(slug: string, page: CmsPage): Promise<CmsSaveResult> {
   return saveCmsDraftPage(slug, page);
 }
 
@@ -280,7 +377,7 @@ export async function saveUploadedImage(
     storage.draft.images = { ...storage.draft.images, [id]: record };
     storage.published.images = { ...storage.published.images, [id]: record };
     storage.draftUpdatedAt = now;
-    await writeStorage(storage);
+    await writeSiteStorage(storage);
   });
 
   return record;
@@ -301,7 +398,7 @@ export async function updateImageRecord(
   storage.draft.images[id] = next;
   storage.published.images[id] = next;
   storage.draftUpdatedAt = new Date().toISOString();
-  await writeStorage(storage);
+  await writeSiteStorage(storage);
   return next;
 }
 
@@ -349,7 +446,7 @@ export async function replaceImageFile(
   storage.draft.images[id] = next;
   storage.published.images[id] = next;
   storage.draftUpdatedAt = new Date().toISOString();
-  await writeStorage(storage);
+  await writeSiteStorage(storage);
   return next;
 }
 
@@ -367,7 +464,7 @@ export async function deleteImage(id: string): Promise<boolean> {
   delete storage.draft.images[id];
   delete storage.published.images[id];
   storage.draftUpdatedAt = new Date().toISOString();
-  await writeStorage(storage);
+  await writeSiteStorage(storage);
   return true;
 }
 
@@ -375,4 +472,9 @@ export async function readImageFile(record: CmsImageRecord): Promise<Buffer | nu
   return readMediaBinary(normalizeImageRecord(record));
 }
 
-export { imagePublicUrl, DEFAULT_CMS_SITE, getStorageConfigurationError };
+export {
+  imagePublicUrl,
+  DEFAULT_CMS_SITE,
+  getStorageConfigurationError,
+  MediaPersistenceError,
+};

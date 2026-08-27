@@ -111,7 +111,7 @@ export function MediaPicker({
   };
 
   return (
-    <div className="space-y-2" data-testid="media-picker" data-selected-media-id={mediaId ?? ""}>
+    <div className="space-y-2">
       <label className="block text-sm">
         {label}
         <select
@@ -121,7 +121,6 @@ export function MediaPicker({
           data-testid="media-picker-select"
         >
           <option value="">Geen afbeelding</option>
-          {mediaId && !selected && <option value={mediaId}>{mediaId}</option>}
           {Object.values(images).map((img) => (
             <option key={img.id} value={img.id}>
               {img.title ?? img.filename} — {img.alt}
@@ -164,7 +163,7 @@ export function MediaPicker({
         }}
       />
 
-      {selected ? (
+      {selected && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={resolveCmsImageUrl(images, selected.id) ?? imagePublicUrl(selected.id)}
@@ -172,11 +171,7 @@ export function MediaPicker({
           className="h-24 w-auto rounded-lg border border-[var(--lp-border)] object-cover"
           data-testid="media-picker-preview"
         />
-      ) : mediaId ? (
-        <p className="text-xs text-[var(--lp-text-secondary)]" data-testid="media-picker-selected-id">
-          Geselecteerd: {mediaId}
-        </p>
-      ) : null}
+      )}
 
       {message && <p className="text-xs text-[var(--lp-green-dark)]">{message}</p>}
       {error && <p className="text-xs text-red-600">{error}</p>}

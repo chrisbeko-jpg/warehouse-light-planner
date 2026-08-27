@@ -3,22 +3,36 @@ import {
   getStorageConfigurationError,
   loadCmsDraft,
   loadCmsSite,
+  MediaPersistenceError,
   saveCmsDraft,
   saveCmsDraftPage,
   saveUploadedImage,
   toMediaApiRecord,
+  type CmsSaveResult,
 } from "@/lib/cms/content-store";
 import { verifyInternalToken } from "@/lib/public-wizard/lead-storage";
 import type { CmsNavigation, CmsPage, CmsSiteContent } from "@/types/cms";
 
 export const runtime = "nodejs";
 
-async function saveDraftResponse(action: () => Promise<CmsSiteContent>) {
+async function saveDraftResponse(action: () => Promise<CmsSaveResult>) {
   try {
-    const site = await action();
-    return NextResponse.json({ ok: true, site, draftUpdatedAt: site.draftUpdatedAt });
+    const result = await action();
+    return NextResponse.json({
+      ok: true,
+      site: result.site,
+      draftUpdatedAt: result.site.draftUpdatedAt,
+      debugMediaReferences: result.debugMediaReferences,
+      versionPath: result.versionPath,
+    });
   } catch (error) {
     console.error("cms save error:", error);
+    if (error instanceof MediaPersistenceError) {
+      return NextResponse.json(
+        { ok: false, message: error.message, lostReferences: error.lostReferences },
+        { status: 422 },
+      );
+    }
     const message = error instanceof Error ? error.message : "Opslaan is niet gelukt.";
     return NextResponse.json({ ok: false, message }, { status: 500 });
   }
@@ -47,7 +61,16 @@ export async function PUT(request: Request) {
   };
 
   if (body.site) {
-    return saveDraftResponse(() => saveCmsDraft(body.site!));
+    return saveDraftResponse(async () => {
+      const payload = body.site!;
+      return saveCmsDraft({
+        homepage: payload.homepage,
+        pages: payload.pages,
+        wizard: payload.wizard,
+        navigation: payload.navigation,
+        images: payload.images,
+      });
+    });
   }
   if (body.homepage) {
     return saveDraftResponse(() => saveCmsDraftPage("homepage", body.homepage!));

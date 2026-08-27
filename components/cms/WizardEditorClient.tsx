@@ -37,12 +37,7 @@ function WizardEditor({
   previewHref: string;
   publishSuccessMessage: string;
 }) {
-  const [wizard, setWizardState] = useState<CmsWizardContent | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
-  const setWizard = (value: CmsWizardContent | ((prev: CmsWizardContent | null) => CmsWizardContent | null)) => {
-    setIsDirty(true);
-    setWizardState(value);
-  };
+  const [wizard, setWizard] = useState<CmsWizardContent | null>(null);
   const [images, setImages] = useState<CmsSiteContent["images"]>({});
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error">("success");
@@ -51,11 +46,10 @@ function WizardEditor({
 
   const load = useCallback(async () => {
     const data = await cmsFetch<{ site: CmsSiteContent }>("/api/internal/cms?draft=1");
-    setWizardState(data.site.wizard);
+    setWizard(data.site.wizard);
     setImages(data.site.images);
     setDraftUpdatedAt(data.site.draftUpdatedAt ?? null);
     setPublishedAt(data.site.publishedAt ?? null);
-    setIsDirty(false);
   }, []);
 
   useEffect(() => {
@@ -77,10 +71,9 @@ function WizardEditor({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ wizard }),
     });
-    setWizardState(data.site.wizard);
+    setWizard(data.site.wizard);
     setImages(data.site.images);
     setDraftUpdatedAt(data.draftUpdatedAt ?? data.site.draftUpdatedAt ?? null);
-    setIsDirty(false);
   };
 
   const publish = async () => {
@@ -89,11 +82,10 @@ function WizardEditor({
       "/api/internal/cms/publish",
       { method: "POST" },
     );
-    setWizardState(data.site.wizard);
+    setWizard(data.site.wizard);
     setImages(data.site.images);
     setPublishedAt(data.publishedAt ?? data.site.publishedAt ?? null);
     setDraftUpdatedAt(data.site.draftUpdatedAt ?? null);
-    setIsDirty(false);
   };
 
   if (!wizard) return <p>Laden…</p>;
@@ -120,7 +112,6 @@ function WizardEditor({
           previewHref={previewHref}
           onSave={save}
           onPublish={publish}
-          saveDisabled={!isDirty}
           publishSuccessMessage={publishSuccessMessage}
           onSaved={(text, type) => notify(text, type ?? "success")}
         />
@@ -145,10 +136,7 @@ function WizardEditor({
             key={choice.id}
             choice={choice}
             images={images}
-            onImagesChange={(next) => {
-              setIsDirty(true);
-              setImages(next);
-            }}
+            onImagesChange={setImages}
             onChange={(next) => {
               const roomChoices = [...wizard.roomChoices];
               roomChoices[index] = next;
@@ -163,10 +151,7 @@ function WizardEditor({
             key={choice.id}
             choice={choice}
             images={images}
-            onImagesChange={(next) => {
-              setIsDirty(true);
-              setImages(next);
-            }}
+            onImagesChange={setImages}
             onChange={(next) => {
               const atmosphereChoices = [...wizard.atmosphereChoices];
               atmosphereChoices[index] = next;

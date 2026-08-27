@@ -8,6 +8,6 @@ export async function POST(request: Request) {
   if (!verifyInternalToken(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const site = await revertCmsDraft();
-  return NextResponse.json({ ok: true, draftUpdatedAt: site.draftUpdatedAt });
+  const result = await revertCmsDraft();
+  return NextResponse.json({ ok: true, draftUpdatedAt: result.site.draftUpdatedAt });
 }
