@@ -1,4 +1,4 @@
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtml from "sanitize-html";
 
 const ALLOWED_TAGS = [
   "p",
@@ -19,15 +19,32 @@ const ALLOWED_TAGS = [
   "img",
 ];
 
-const ALLOWED_ATTR = ["href", "target", "rel", "class", "src", "alt", "title"];
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: ALLOWED_TAGS,
+  allowedAttributes: {
+    a: ["href", "target", "rel", "class"],
+    img: ["src", "alt", "title", "class"],
+    span: ["class"],
+    p: ["class"],
+    h2: ["class"],
+    h3: ["class"],
+    ul: ["class"],
+    ol: ["class"],
+    li: ["class"],
+    blockquote: ["class"],
+  },
+  allowedSchemes: ["http", "https", "mailto"],
+  allowProtocolRelative: false,
+};
 
 export function sanitizeRichHtml(html: string): string {
   if (!html?.trim()) return "";
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    ALLOW_DATA_ATTR: false,
-  });
+  try {
+    return sanitizeHtml(html, SANITIZE_OPTIONS);
+  } catch (error) {
+    console.error("Failed to sanitize rich HTML:", error);
+    return "";
+  }
 }
 
 export function richTextToPlainText(html: string): string {

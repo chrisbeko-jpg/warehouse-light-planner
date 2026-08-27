@@ -80,22 +80,35 @@ async function writeStorage(storage: CmsSiteStorage): Promise<void> {
   await writeSiteStorage(storage);
 }
 
-/** Public published CMS content. */
+/** Public published CMS content. Never throws; falls back to defaults. */
 export async function loadCmsSite(): Promise<CmsSiteContent> {
-  const storage = await readStorage();
-  return payloadToPublicContent(storage.published, {
-    publishedAt: storage.publishedAt,
-    draftUpdatedAt: storage.draftUpdatedAt,
-  });
+  try {
+    const storage = await readStorage();
+    return payloadToPublicContent(storage.published, {
+      publishedAt: storage.publishedAt,
+      draftUpdatedAt: storage.draftUpdatedAt,
+    });
+  } catch (error) {
+    console.error("Failed to load published CMS content, using defaults:", error);
+    return payloadToPublicContent(mergeSitePayload(), {
+      publishedAt: null,
+      draftUpdatedAt: null,
+    });
+  }
 }
 
-/** Draft content for internal admin. */
+/** Draft content for internal admin. Falls back to published/default content. */
 export async function loadCmsDraft(): Promise<CmsSiteContent> {
-  const storage = await readStorage();
-  return payloadToPublicContent(storage.draft, {
-    publishedAt: storage.publishedAt,
-    draftUpdatedAt: storage.draftUpdatedAt,
-  });
+  try {
+    const storage = await readStorage();
+    return payloadToPublicContent(storage.draft, {
+      publishedAt: storage.publishedAt,
+      draftUpdatedAt: storage.draftUpdatedAt,
+    });
+  } catch (error) {
+    console.error("Failed to load draft CMS content, using published/default fallback:", error);
+    return loadCmsSite();
+  }
 }
 
 export async function getCmsStorageMeta(): Promise<{

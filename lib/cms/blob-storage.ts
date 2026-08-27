@@ -71,18 +71,17 @@ async function writeBlobSiteStorage(storage: CmsSiteStorage): Promise<void> {
 }
 
 export async function readSiteStorage(): Promise<CmsSiteStorage> {
-  const configError = getStorageConfigurationError();
-  if (configError) {
-    throw new Error(configError);
-  }
+  try {
+    if (isBlobStorageConfigured()) {
+      const blobStorage = await readBlobSiteStorage();
+      if (blobStorage) return blobStorage;
+    }
 
-  if (isBlobStorageConfigured()) {
-    const blobStorage = await readBlobSiteStorage();
-    if (blobStorage) return blobStorage;
+    const localStorage = await readLocalSiteStorage();
+    if (localStorage) return localStorage;
+  } catch (error) {
+    console.error("Failed to read CMS storage, using defaults:", error);
   }
-
-  const localStorage = await readLocalSiteStorage();
-  if (localStorage) return localStorage;
 
   return normalizeStorage(undefined);
 }
