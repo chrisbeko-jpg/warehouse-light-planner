@@ -13,6 +13,17 @@ import type { CmsNavigation, CmsPage, CmsSiteContent } from "@/types/cms";
 
 export const runtime = "nodejs";
 
+async function saveDraftResponse(action: () => Promise<CmsSiteContent>) {
+  try {
+    const site = await action();
+    return NextResponse.json({ ok: true, site, draftUpdatedAt: site.draftUpdatedAt });
+  } catch (error) {
+    console.error("cms save error:", error);
+    const message = error instanceof Error ? error.message : "Opslaan is niet gelukt.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
+}
+
 export async function GET(request: Request) {
   if (!verifyInternalToken(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -36,30 +47,19 @@ export async function PUT(request: Request) {
   };
 
   if (body.site) {
-    await saveCmsDraft(body.site);
-    return NextResponse.json({ ok: true });
+    return saveDraftResponse(() => saveCmsDraft(body.site!));
   }
   if (body.homepage) {
-    await saveCmsDraftPage("homepage", body.homepage);
-    return NextResponse.json({ ok: true });
+    return saveDraftResponse(() => saveCmsDraftPage("homepage", body.homepage!));
   }
   if (body.pageSlug && body.page) {
-    await saveCmsDraftPage(body.pageSlug, body.page);
-    return NextResponse.json({ ok: true });
+    return saveDraftResponse(() => saveCmsDraftPage(body.pageSlug!, body.page!));
   }
   if (body.wizard) {
-    try {
-      const site = await saveCmsDraft({ wizard: body.wizard });
-      return NextResponse.json({ ok: true, site, draftUpdatedAt: site.draftUpdatedAt });
-    } catch (error) {
-      console.error("cms wizard save error:", error);
-      const message = error instanceof Error ? error.message : "Opslaan is niet gelukt.";
-      return NextResponse.json({ ok: false, message }, { status: 500 });
-    }
+    return saveDraftResponse(() => saveCmsDraft({ wizard: body.wizard }));
   }
   if (body.navigation) {
-    await saveCmsDraft({ navigation: body.navigation });
-    return NextResponse.json({ ok: true });
+    return saveDraftResponse(() => saveCmsDraft({ navigation: body.navigation }));
   }
   return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
 }
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       message: "Afbeelding opgeslagen in mediabibliotheek",
       image: record,
       media: toMediaApiRecord(record),
-      url: `/api/cms/images/${record.id}`,
+      url: record.url?.startsWith("http") ? record.url : `/api/cms/images/${record.id}`,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upload mislukt.";

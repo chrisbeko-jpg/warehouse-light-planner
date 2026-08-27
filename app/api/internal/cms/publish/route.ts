@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { publishCmsDraft } from "@/lib/cms/content-store";
+import { revalidateCmsPublicRoutes } from "@/lib/cms/revalidate-cms";
+import { findMissingReferencedImages } from "@/lib/cms/sync-referenced-images";
 import { verifyInternalToken } from "@/lib/public-wizard/lead-storage";
 
 export const runtime = "nodejs";
-
-function revalidatePublicCmsRoutes() {
-  revalidatePath("/lichtadvies");
-  revalidatePath("/api/cms/wizard");
-  revalidatePath("/home");
-  revalidatePath("/kantoorverlichting");
-}
 
 export async function POST(request: Request) {
   if (!verifyInternalToken(request)) {
@@ -18,8 +12,12 @@ export async function POST(request: Request) {
   }
   try {
     const site = await publishCmsDraft();
-    revalidatePublicCmsRoutes();
-    return NextResponse.json({ ok: true, publishedAt: site.publishedAt, site });
+    const missingImages = findMissingReferencedImages(site);
+    if (missingImages.length > 0) {
+      console.warn("Published CMS references missing images:", missingImages.join(", "));
+    }
+    revalidateCmsPublicRoutes();
+    return NextResponse.json({ ok: true, publishedAt: site.publishedAt, site, missingImages });
   } catch (error) {
     console.error("cms publish error:", error);
     const message = error instanceof Error ? error.message : "Publiceren is niet gelukt.";

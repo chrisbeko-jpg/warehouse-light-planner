@@ -19,6 +19,7 @@ import {
   mergeSitePayload,
   payloadToPublicContent,
 } from "@/lib/cms/merge";
+import { syncReferencedImages } from "@/lib/cms/sync-referenced-images";
 import { imagePublicUrl } from "@/lib/cms/image-url";
 import type {
   CmsPage,
@@ -116,22 +117,31 @@ export async function saveCmsDraft(payload: Partial<CmsSitePayload>): Promise<Cm
   return loadCmsDraft();
 }
 
-export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<void> {
+export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<CmsSiteContent> {
   const storage = await readStorage();
   const key = slug.replace(/^\//, "");
+  const pageWithTimestamp = { ...page, updatedAt: new Date().toISOString() };
   if (key === "" || slug === "/" || key === "homepage") {
-    storage.draft.homepage = { ...page, updatedAt: new Date().toISOString() };
+    storage.draft = mergeSitePayload({
+      ...storage.draft,
+      homepage: pageWithTimestamp,
+    });
   } else {
-    storage.draft.pages[key] = { ...page, updatedAt: new Date().toISOString() };
+    storage.draft = mergeSitePayload({
+      ...storage.draft,
+      pages: { ...storage.draft.pages, [key]: pageWithTimestamp },
+    });
   }
   storage.draftUpdatedAt = new Date().toISOString();
   await writeStorage(storage);
+  return loadCmsDraft();
 }
 
 export async function publishCmsDraft(): Promise<CmsSiteContent> {
   const storage = await readStorage();
   const now = new Date().toISOString();
   storage.published = structuredClone(storage.draft);
+  syncReferencedImages(storage.published, storage.draft.images);
   storage.publishedAt = now;
   storage.draftUpdatedAt = now;
   await writeStorage(storage);
@@ -163,8 +173,8 @@ export async function getCmsPage(slug: string, options?: { draft?: boolean }): P
   return site.pages[key] ?? null;
 }
 
-export async function saveCmsPage(slug: string, page: CmsPage): Promise<void> {
-  await saveCmsDraftPage(slug, page);
+export async function saveCmsPage(slug: string, page: CmsPage): Promise<CmsSiteContent> {
+  return saveCmsDraftPage(slug, page);
 }
 
 export async function saveUploadedImage(

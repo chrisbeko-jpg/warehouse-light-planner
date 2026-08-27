@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import { ContentBlockRenderer } from "@/components/ledpaneel/ContentBlockRenderer";
-import { loadCmsSite, imagePublicUrl } from "@/lib/cms/content-store";
+import { loadCmsSite } from "@/lib/cms/content-store";
+import { resolveCmsImageUrl } from "@/lib/cms/resolve-image-url";
 import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
   const site = await loadCmsSite();
   const seo = site.homepage.seo;
-  const ogImage = seo.ogImageId ? imagePublicUrl(seo.ogImageId) : undefined;
+  const ogImage = seo.ogImageId ? resolveCmsImageUrl(site.images, seo.ogImageId) : undefined;
   return {
     title: seo.title,
     description: seo.description,

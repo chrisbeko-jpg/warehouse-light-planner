@@ -20,32 +20,58 @@ export function PageEditorClient({
   const [page, setPage] = useState(initialPage);
   const [images, setImages] = useState<CmsSiteContent["images"]>({});
   const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<"success" | "error">("success");
+  const [draftUpdatedAt, setDraftUpdatedAt] = useState<string | null>(null);
+  const [publishedAt, setPublishedAt] = useState<string | null>(null);
 
   const loadImages = useCallback(async () => {
     const data = await cmsFetch<{ site: CmsSiteContent }>("/api/internal/cms?draft=1");
     setImages(data.site.images);
+    setDraftUpdatedAt(data.site.draftUpdatedAt ?? null);
+    setPublishedAt(data.site.publishedAt ?? null);
   }, []);
 
   useEffect(() => {
-    void loadImages();
+    void loadImages().catch((err) => {
+      setMessage(err instanceof Error ? err.message : "Laden mislukt.");
+      setMessageType("error");
+    });
   }, [loadImages]);
 
+  const applySavedPage = (site: CmsSiteContent) => {
+    const key = slug.replace(/^\//, "");
+    const savedPage =
+      key === "" || slug === "/" || key === "homepage" ? site.homepage : site.pages[key];
+    if (savedPage) setPage(savedPage);
+    setImages(site.images);
+    setDraftUpdatedAt(site.draftUpdatedAt ?? null);
+    setPublishedAt(site.publishedAt ?? null);
+  };
+
+  const notify = (text: string, type: "success" | "error" = "success") => {
+    setMessage(text);
+    setMessageType(type);
+  };
+
   const saveDraft = async () => {
-    await cmsFetch("/api/internal/cms", {
+    const data = await cmsFetch<{ site: CmsSiteContent; draftUpdatedAt?: string }>("/api/internal/cms", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pageSlug: slug, page: { ...page, status: "draft" } }),
     });
+    applySavedPage(data.site);
+    if (data.draftUpdatedAt) setDraftUpdatedAt(data.draftUpdatedAt);
   };
 
   const publish = async () => {
-    await cmsFetch("/api/internal/cms", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pageSlug: slug, page: { ...page, status: "published" } }),
-    });
-    await cmsFetch("/api/internal/cms/publish", { method: "POST" });
-    setPage((p) => ({ ...p, status: "published" }));
+    await saveDraft();
+    const data = await cmsFetch<{ site: CmsSiteContent; publishedAt?: string | null }>(
+      "/api/internal/cms/publish",
+      { method: "POST" },
+    );
+    applySavedPage(data.site);
+    setPublishedAt(data.publishedAt ?? data.site.publishedAt ?? null);
+    setPage((current) => ({ ...current, status: "published" }));
   };
 
   const updateBlock = (index: number, block: ContentBlock) => {
@@ -74,16 +100,35 @@ export function PageEditorClient({
           <p className="text-sm text-[var(--lp-text-secondary)]">
             {slug === "homepage" ? "/" : `/${slug}`}
           </p>
+          <p className="mt-1 text-xs text-[var(--lp-text-secondary)]">
+            Laatst opgeslagen:{" "}
+            {draftUpdatedAt ? new Date(draftUpdatedAt).toLocaleString("nl-NL") : "—"}
+            {" · "}
+            Laatst gepubliceerd: {publishedAt ? new Date(publishedAt).toLocaleString("nl-NL") : "—"}
+          </p>
         </div>
         <PublishBar
           previewHref={`/internal/preview/${previewSlug}`}
           onSave={saveDraft}
           onPublish={publish}
-          onSaved={setMessage}
+          saveSuccessMessage="Pagina opgeslagen als concept"
+          publishSuccessMessage="Pagina gepubliceerd"
+          onSaved={(text, type) => notify(text, type ?? "success")}
         />
       </div>
 
-      {message && <p className="rounded-lg bg-[var(--lp-green-soft)] p-3 text-sm">{message}</p>}
+      {message && (
+        <p
+          className={`rounded-lg p-3 text-sm ${
+            messageType === "error"
+              ? "border border-red-200 bg-red-50 text-red-700"
+              : "bg-[var(--lp-green-soft)]"
+          }`}
+          data-testid="page-editor-message"
+        >
+          {message}
+        </p>
+      )}
 
       <section className="lp-card grid gap-4 p-6">
         <h3 className="font-bold">Basis & SEO</h3>

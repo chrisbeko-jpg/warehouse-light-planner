@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getImageRecord, readImageFile } from "@/lib/cms/content-store";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(
   _request: Request,

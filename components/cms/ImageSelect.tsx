@@ -2,6 +2,7 @@
 
 import type { CmsImageRecord } from "@/types/cms";
 import { imagePublicUrl } from "@/lib/cms/image-url";
+import { resolveCmsImageUrl } from "@/lib/cms/resolve-image-url";
 
 export function ImageSelect({
   images,
@@ -33,7 +34,7 @@ export function ImageSelect({
       {selected && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={imagePublicUrl(selected.id)}
+          src={resolveCmsImageUrl(images, selected.id) ?? imagePublicUrl(selected.id)}
           alt={selected.alt}
           className="mt-2 h-24 w-auto rounded-lg border border-[var(--lp-border)] object-cover"
         />

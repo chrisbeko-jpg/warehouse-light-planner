@@ -23,6 +23,7 @@ export default defineConfig({
         env: {
           ...process.env,
           INTERNAL_ADMIN_TOKEN: "playwright-test-token",
+          NEXT_PUBLIC_SITE_MODE: "ledpaneel",
         },
       },
 });

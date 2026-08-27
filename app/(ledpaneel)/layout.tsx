@@ -4,6 +4,9 @@ import { LedpaneelHeader } from "@/components/ledpaneel/LedpaneelHeader";
 import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
 import "./ledpaneel.css";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_LINKS.siteUrl),
   title: {

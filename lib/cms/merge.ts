@@ -7,6 +7,7 @@ import type {
   CmsSitePayload,
   CmsSiteStorage,
   CmsWizardContent,
+  ContentBlock,
 } from "@/types/cms";
 
 function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardContent {
@@ -76,13 +77,29 @@ export function mergeSitePayload(stored?: Partial<CmsSitePayload>): CmsSitePaylo
   };
 }
 
+function mergePageBlocks(defaultBlocks: ContentBlock[], storedBlocks?: ContentBlock[]): ContentBlock[] {
+  if (!storedBlocks?.length) return [...defaultBlocks];
+  const storedById = new Map(storedBlocks.map((block) => [block.id, block]));
+  const merged: ContentBlock[] = defaultBlocks.map((defaultBlock) => {
+    const stored = storedById.get(defaultBlock.id);
+    if (!stored || stored.type !== defaultBlock.type) return defaultBlock;
+    return { ...defaultBlock, ...stored, id: defaultBlock.id, type: defaultBlock.type } as ContentBlock;
+  });
+  for (const stored of storedBlocks) {
+    if (!defaultBlocks.some((block) => block.id === stored.id)) {
+      merged.push(stored);
+    }
+  }
+  return merged;
+}
+
 function mergeHomepage(stored?: Partial<CmsPage>): CmsPage {
   const defaults = DEFAULT_CMS_SITE.homepage;
   const merged: CmsPage = {
     ...defaults,
     ...stored,
     seo: { ...defaults.seo, ...stored?.seo },
-    blocks: stored?.blocks?.length ? [...stored.blocks] : [...defaults.blocks],
+    blocks: mergePageBlocks(defaults.blocks, stored?.blocks),
   };
 
   if (!merged.blocks.some((block) => block.id === "ai-calculator-cta")) {

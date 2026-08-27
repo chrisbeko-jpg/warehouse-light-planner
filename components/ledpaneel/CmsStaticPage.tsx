@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { faqStructuredData, PageBlocks } from "@/components/ledpaneel/ContentBlockRenderer";
-import { getCmsPage, loadCmsSite, imagePublicUrl } from "@/lib/cms/content-store";
+import { getCmsPage, loadCmsSite } from "@/lib/cms/content-store";
+import { resolveCmsImageUrl } from "@/lib/cms/resolve-image-url";
 import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
 
 export async function generateMetadata({ slug }: { slug: string }): Promise<Metadata> {
+  const site = await loadCmsSite();
   const page = await getCmsPage(`/${slug}`);
   if (!page) return {};
   const seo = page.seo;
+  const ogImage = seo.ogImageId ? resolveCmsImageUrl(site.images, seo.ogImageId) : undefined;
   return {
     title: seo.title,
     description: seo.description,
@@ -17,7 +20,7 @@ export async function generateMetadata({ slug }: { slug: string }): Promise<Meta
       title: seo.ogTitle ?? seo.title,
       description: seo.ogDescription ?? seo.description,
       url: `${SITE_LINKS.siteUrl}/${slug}`,
-      images: seo.ogImageId ? [{ url: imagePublicUrl(seo.ogImageId) }] : undefined,
+      images: ogImage ? [{ url: ogImage }] : undefined,
     },
   };
 }
