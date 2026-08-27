@@ -135,7 +135,7 @@ export function MediaLibraryClient() {
         method: "POST",
         body: form,
       });
-      setMessage(data.message || "Afbeelding opgeslagen in mediabibliotheek");
+      setMessage(data.message || "Afbeelding opgeslagen");
       resetSelection();
       await load();
     } catch (err) {
@@ -203,17 +203,40 @@ export function MediaLibraryClient() {
           onChange={(e) => handleFileChosen(e.target.files?.[0])}
         />
 
-        {!selectedFile ? (
-          <button
-            type="button"
-            className="lp-btn-secondary"
-            data-testid="media-choose-file"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Kies bestand
-          </button>
-        ) : (
-          <div className="space-y-4" data-testid="media-upload-panel">
+        <label className="block text-sm font-medium">
+          Titel
+          <input
+            type="text"
+            placeholder="Titel"
+            value={uploadTitle}
+            onChange={(e) => setUploadTitle(e.target.value)}
+            className="mt-1 w-full rounded border px-3 py-2 text-sm"
+            data-testid="media-upload-title"
+          />
+        </label>
+        <label className="block text-sm font-medium">
+          Alt-tekst
+          <input
+            type="text"
+            placeholder="Alt-tekst"
+            value={uploadAlt}
+            onChange={(e) => setUploadAlt(e.target.value)}
+            className="mt-1 w-full rounded border px-3 py-2 text-sm"
+            data-testid="media-upload-alt"
+          />
+        </label>
+
+        <button
+          type="button"
+          className="lp-btn-secondary"
+          data-testid="media-choose-file"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {selectedFile ? selectedFile.name : "Browse"}
+        </button>
+
+        {selectedFile && (
+          <div className="space-y-4 border-t border-[var(--lp-border)] pt-4" data-testid="media-upload-panel">
             {previewUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -234,47 +257,48 @@ export function MediaLibraryClient() {
                 <span className="font-semibold">Type:</span> {selectedFile.type || "—"}
               </p>
             </div>
-            <input
-              type="text"
-              placeholder="Titel"
-              value={uploadTitle}
-              onChange={(e) => setUploadTitle(e.target.value)}
-              className="w-full rounded border px-3 py-2 text-sm"
-              data-testid="media-upload-title"
-            />
-            <input
-              type="text"
-              placeholder="Alt-tekst"
-              value={uploadAlt}
-              onChange={(e) => setUploadAlt(e.target.value)}
-              className="w-full rounded border px-3 py-2 text-sm"
-              data-testid="media-upload-alt"
-            />
+
             {selectedValidationError && (
               <p className="text-sm text-red-600" data-testid="media-upload-validation">
                 {selectedValidationError}
               </p>
             )}
-            <div className="flex flex-wrap gap-3">
-              <button type="button" className="lp-btn-secondary" onClick={resetSelection}>
-                Annuleren
-              </button>
-              <button
-                type="button"
-                className="lp-btn-primary"
-                data-testid="media-upload-submit"
-                disabled={!storageReady || uploading || Boolean(selectedValidationError)}
-                onClick={() => void uploadSelected()}
-              >
-                {uploading ? "Uploaden..." : "Uploaden naar mediabibliotheek"}
-              </button>
-            </div>
+
+            <button
+              type="button"
+              className="lp-btn-primary w-full py-3 text-base font-bold"
+              data-testid="media-upload-submit"
+              disabled={!storageReady || uploading || Boolean(selectedValidationError)}
+              aria-disabled={!storageReady || uploading || Boolean(selectedValidationError)}
+              onClick={() => void uploadSelected()}
+            >
+              {uploading ? "Uploaden..." : "Uploaden naar mediabibliotheek"}
+            </button>
+
+            {!storageReady && (
+              <p className="text-sm text-red-600">
+                {storageMessage ?? STORAGE_NOT_CONFIGURED_MESSAGE}
+              </p>
+            )}
+
+            <button type="button" className="lp-btn-secondary w-full" onClick={resetSelection}>
+              Annuleren
+            </button>
           </div>
         )}
 
         <p className="text-xs text-[var(--lp-text-secondary)]">
           JPG, PNG, WebP (max. 10 MB). SVG alleen indien veilig (geen scripts).
         </p>
+      </section>
+
+      <section className="space-y-4">
+        <h3 className="text-lg font-bold">Mediabibliotheek</h3>
+        {images.length === 0 && (
+          <p className="text-sm text-[var(--lp-text-secondary)]" data-testid="media-library-empty">
+            Nog geen afbeeldingen. Upload een bestand om te beginnen.
+          </p>
+        )}
       </section>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="media-library-grid">

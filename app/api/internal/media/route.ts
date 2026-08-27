@@ -65,7 +65,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Afbeelding opgeslagen in mediabibliotheek",
+      message: "Afbeelding opgeslagen",
       media: toMediaApiRecord(record),
     });
   } catch (error) {

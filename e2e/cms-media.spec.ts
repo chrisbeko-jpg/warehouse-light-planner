@@ -61,6 +61,7 @@ test.describe("CMS media library UI", () => {
   test("upload button disabled without selected file", async ({ page }) => {
     await loginAsAdmin(page);
     await expect(page.getByTestId("media-upload-submit")).toHaveCount(0);
+    await expect(page.getByTestId("media-choose-file")).toHaveText("Browse");
   });
 
   test("uploads image and shows it in media grid", async ({ page }) => {
@@ -74,7 +75,7 @@ test.describe("CMS media library UI", () => {
     await page.getByTestId("media-upload-alt").fill("Test alt tekst");
     await page.getByTestId("media-upload-submit").click();
 
-    await expect(page.getByText("Afbeelding opgeslagen in mediabibliotheek")).toBeVisible();
+    await expect(page.getByText("Afbeelding opgeslagen")).toBeVisible();
     await expect(page.getByTestId("media-library-grid").locator("article")).not.toHaveCount(0);
 
     await page.reload();
