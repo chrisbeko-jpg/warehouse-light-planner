@@ -13,11 +13,13 @@ export function PublishBar({
   publishLabel = "Publiceren",
   saveSuccessMessage = "Wijzigingen opgeslagen",
   publishSuccessMessage = "Gepubliceerd",
+  saveDisabled = false,
 }: {
   previewHref: string;
   onSaved?: (message: string, type?: "success" | "error") => void;
   onSave: () => Promise<void>;
   onPublish: () => Promise<void>;
+  saveDisabled?: boolean;
   saveLabel?: string;
   publishLabel?: string;
   saveSuccessMessage?: string;
@@ -69,7 +71,7 @@ export function PublishBar({
       <button
         type="button"
         className="lp-btn-secondary"
-        disabled={saving || publishing}
+        disabled={saving || publishing || saveDisabled}
         onClick={() => void handleSave()}
       >
         {saving ? "Opslaan..." : saveLabel}

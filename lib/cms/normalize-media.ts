@@ -14,34 +14,21 @@ import type {
   WizardRoomChoiceCms,
 } from "@/types/cms";
 
-function normalizeExampleBlock(block: ExampleBlock): ExampleBlock {
-  const slots: ExampleImageRef[] = [];
-
-  if (block.resultExamples?.length) {
-    for (const item of block.resultExamples) {
-      const mediaId = readMediaId(item);
-      if (mediaId) {
-        slots.push({
-          mediaId,
-          title: item.title,
-          altTextOverride: item.altTextOverride,
-        });
-      }
-    }
-  } else if (block.imageIds?.length) {
-    for (const legacyId of block.imageIds) {
-      const mediaId = readMediaId({ imageId: legacyId });
-      if (mediaId) slots.push({ mediaId });
-    }
-  }
-
-  while (slots.length < EXAMPLE_IMAGE_SLOT_COUNT) {
-    slots.push({ mediaId: null });
-  }
+export function normalizeExampleBlock(block: ExampleBlock): ExampleBlock {
+  const slots: ExampleImageRef[] = Array.from({ length: EXAMPLE_IMAGE_SLOT_COUNT }, (_, index) => {
+    const fromResult = block.resultExamples?.[index];
+    const fromLegacy = block.imageIds?.[index];
+    const mediaId = readMediaId(fromResult) ?? readMediaId({ imageId: fromLegacy });
+    return {
+      mediaId,
+      title: fromResult?.title ?? (mediaId ? `Voorbeeld ${index + 1}` : undefined),
+      altTextOverride: fromResult?.altTextOverride,
+    };
+  });
 
   return {
     ...block,
-    resultExamples: slots.slice(0, EXAMPLE_IMAGE_SLOT_COUNT),
+    resultExamples: slots,
     imageIds: slots.map((item) => readMediaId(item)).filter((id): id is string => Boolean(id)),
   };
 }
@@ -103,7 +90,7 @@ export function normalizeContentBlock(block: ContentBlock): ContentBlock {
   }
 }
 
-function normalizePage(page: CmsPage): CmsPage {
+export function normalizePage(page: CmsPage): CmsPage {
   const ogMediaId = readMediaId({ mediaId: page.seo.ogMediaId, imageId: page.seo.ogImageId });
   return {
     ...page,
@@ -125,7 +112,7 @@ function normalizeWizardChoice<T extends WizardRoomChoiceCms | WizardAtmosphereC
   };
 }
 
-function normalizeWizard(wizard: CmsWizardContent): CmsWizardContent {
+export function normalizeWizard(wizard: CmsWizardContent): CmsWizardContent {
   return {
     roomChoices: wizard.roomChoices.map(normalizeWizardChoice),
     atmosphereChoices: wizard.atmosphereChoices.map(normalizeWizardChoice),

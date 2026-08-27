@@ -1,6 +1,6 @@
 import { DEFAULT_CMS_SITE } from "@/lib/cms/defaults";
-import { normalizeSiteMediaPayload } from "@/lib/cms/normalize-media";
-import { EXAMPLE_IMAGE_SLOT_COUNT } from "@/lib/cms/media";
+import { normalizeContentBlock, normalizeSiteMediaPayload } from "@/lib/cms/normalize-media";
+import { EXAMPLE_IMAGE_SLOT_COUNT, readMediaId } from "@/lib/cms/media";
 import { KANTOORVERLICHTING_SEED } from "@/lib/cms/seeds/kantoorverlichting";
 import type {
   CmsImageRecord,
@@ -9,6 +9,8 @@ import type {
   CmsSitePayload,
   CmsSiteStorage,
   CmsWizardContent,
+  ExampleBlock,
+  ProductsBlock,
   ContentBlock,
 } from "@/types/cms";
 
@@ -19,7 +21,13 @@ function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardConten
   const mergeRoomChoices = <T extends { id: string }>(defaultItems: T[], storedItems?: T[]): T[] => {
     if (!storedItems?.length) return defaultItems;
     const byId = new Map(storedItems.map((item) => [item.id, item]));
-    return defaultItems.map((item) => ({ ...item, ...byId.get(item.id) }));
+    return defaultItems.map((item) => {
+      const storedItem = byId.get(item.id);
+      if (!storedItem) return item;
+      const merged = { ...item, ...storedItem };
+      const mediaId = readMediaId(merged as { mediaId?: string | null; imageId?: string | null });
+      return mediaId ? ({ ...merged, mediaId, imageId: mediaId } as T) : merged;
+    });
   };
 
   const storedAtmospheres = stored.atmosphereChoices ?? [];
@@ -37,11 +45,14 @@ function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardConten
   }
 
   const atmosphereChoices = defaults.atmosphereChoices.map((item) => {
-    const merged = { ...item, ...byId.get(item.id) };
+    const storedItem = byId.get(item.id);
+    const merged = storedItem ? { ...item, ...storedItem } : item;
+    const mediaId = readMediaId(merged);
+    const withMedia = mediaId ? { ...merged, mediaId, imageId: mediaId } : merged;
     if (item.id === "premium_architectural") {
-      return { ...merged, enabled: merged.enabled === true ? true : false };
+      return { ...withMedia, enabled: withMedia.enabled === true ? true : false };
     }
-    return merged;
+    return withMedia;
   });
 
   return {
@@ -53,18 +64,11 @@ function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardConten
 function mergeKantoorPage(stored?: CmsPage): CmsPage {
   const seed = KANTOORVERLICHTING_SEED;
   if (!stored) return seed;
-  const hasSeedStructure =
-    stored.blocks.some((b) => b.id === "faq") &&
-    stored.blocks.some((b) => b.type === "hero") &&
-    stored.blocks.length >= 10;
-  if (hasSeedStructure) {
-    return { ...seed, ...stored, seo: { ...seed.seo, ...stored.seo } };
-  }
   return {
     ...seed,
     ...stored,
     seo: { ...seed.seo, ...stored.seo },
-    blocks: seed.blocks,
+    blocks: mergePageBlocks(seed.blocks, stored.blocks),
   };
 }
 
@@ -79,17 +83,84 @@ export function mergeSitePayload(stored?: Partial<CmsSitePayload>): CmsSitePaylo
   });
 }
 
+function mergeExampleBlock(defaultBlock: ExampleBlock, storedBlock: ExampleBlock): ExampleBlock {
+  const storedSlots = storedBlock.resultExamples ?? [];
+  const resultExamples = Array.from({ length: EXAMPLE_IMAGE_SLOT_COUNT }, (_, index) => {
+    const storedSlot = storedSlots[index];
+    const legacyId = storedBlock.imageIds?.[index];
+    const mediaId =
+      readMediaId(storedSlot) ??
+      readMediaId({ imageId: legacyId }) ??
+      readMediaId(defaultBlock.resultExamples?.[index]) ??
+      null;
+    return {
+      mediaId,
+      title: storedSlot?.title ?? defaultBlock.resultExamples?.[index]?.title,
+      altTextOverride: storedSlot?.altTextOverride ?? defaultBlock.resultExamples?.[index]?.altTextOverride,
+    };
+  });
+
+  return {
+    ...defaultBlock,
+    ...storedBlock,
+    resultExamples,
+    imageIds: resultExamples.map((item) => readMediaId(item)).filter((id): id is string => Boolean(id)),
+  };
+}
+
+function mergeProductsBlock(defaultBlock: ProductsBlock, storedBlock: ProductsBlock): ProductsBlock {
+  const storedItems = storedBlock.items ?? [];
+  const defaultItems = defaultBlock.items ?? [];
+  const itemCount = Math.max(storedItems.length, defaultItems.length);
+  const items = Array.from({ length: itemCount }, (_, index) => {
+    const storedItem = storedItems[index];
+    const defaultItem = defaultItems[index] ?? { name: "Product", description: "" };
+    if (!storedItem) return defaultItem;
+    const mediaId = readMediaId(storedItem) ?? readMediaId(defaultItem) ?? null;
+    return {
+      ...defaultItem,
+      ...storedItem,
+      mediaId,
+      imageId: mediaId ?? undefined,
+    };
+  });
+
+  return {
+    ...defaultBlock,
+    ...storedBlock,
+    items,
+  };
+}
+
+function mergeContentBlock(defaultBlock: ContentBlock, storedBlock: ContentBlock): ContentBlock {
+  const merged = {
+    ...defaultBlock,
+    ...storedBlock,
+    id: defaultBlock.id,
+    type: defaultBlock.type,
+  } as ContentBlock;
+
+  if (merged.type === "example" && storedBlock.type === "example") {
+    return mergeExampleBlock(defaultBlock as ExampleBlock, storedBlock as ExampleBlock);
+  }
+  if (merged.type === "products" && storedBlock.type === "products") {
+    return mergeProductsBlock(defaultBlock as ProductsBlock, storedBlock as ProductsBlock);
+  }
+
+  return merged;
+}
+
 function mergePageBlocks(defaultBlocks: ContentBlock[], storedBlocks?: ContentBlock[]): ContentBlock[] {
-  if (!storedBlocks?.length) return [...defaultBlocks];
+  if (!storedBlocks?.length) return defaultBlocks.map(normalizeContentBlock);
   const storedById = new Map(storedBlocks.map((block) => [block.id, block]));
   const merged: ContentBlock[] = defaultBlocks.map((defaultBlock) => {
     const stored = storedById.get(defaultBlock.id);
-    if (!stored || stored.type !== defaultBlock.type) return defaultBlock;
-    return { ...defaultBlock, ...stored, id: defaultBlock.id, type: defaultBlock.type } as ContentBlock;
+    if (!stored || stored.type !== defaultBlock.type) return normalizeContentBlock(defaultBlock);
+    return normalizeContentBlock(mergeContentBlock(defaultBlock, stored));
   });
   for (const stored of storedBlocks) {
     if (!defaultBlocks.some((block) => block.id === stored.id)) {
-      merged.push(stored);
+      merged.push(normalizeContentBlock(stored));
     }
   }
   return merged;

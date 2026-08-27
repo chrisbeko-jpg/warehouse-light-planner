@@ -19,7 +19,12 @@ export function PageEditorClient({
   initialPage: CmsPage;
   previewSlug: string;
 }) {
-  const [page, setPage] = useState(initialPage);
+  const [page, setPageState] = useState(initialPage);
+  const [isDirty, setIsDirty] = useState(false);
+  const setPage = (value: CmsPage | ((prev: CmsPage) => CmsPage)) => {
+    setIsDirty(true);
+    setPageState(value);
+  };
   const [images, setImages] = useState<CmsSiteContent["images"]>({});
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error">("success");
@@ -44,7 +49,7 @@ export function PageEditorClient({
     const key = slug.replace(/^\//, "");
     const savedPage =
       key === "" || slug === "/" || key === "homepage" ? site.homepage : site.pages[key];
-    if (savedPage) setPage(savedPage);
+    if (savedPage) setPageState(savedPage);
     setImages(site.images);
     setDraftUpdatedAt(site.draftUpdatedAt ?? null);
     setPublishedAt(site.publishedAt ?? null);
@@ -63,6 +68,7 @@ export function PageEditorClient({
     });
     applySavedPage(data.site);
     if (data.draftUpdatedAt) setDraftUpdatedAt(data.draftUpdatedAt);
+    setIsDirty(false);
   };
 
   const publish = async () => {
@@ -113,6 +119,7 @@ export function PageEditorClient({
           previewHref={`/internal/preview/${previewSlug}`}
           onSave={saveDraft}
           onPublish={publish}
+          saveDisabled={!isDirty}
           saveSuccessMessage="Pagina opgeslagen als concept"
           publishSuccessMessage="Pagina gepubliceerd"
           onSaved={(text, type) => notify(text, type ?? "success")}
@@ -165,7 +172,10 @@ export function PageEditorClient({
           </label>
           <MediaPicker
             images={images}
-            onImagesChange={setImages}
+            onImagesChange={(next) => {
+              setIsDirty(true);
+              setImages(next);
+            }}
             value={readMediaId({ mediaId: page.seo.ogMediaId, imageId: page.seo.ogImageId })}
             onChange={(mediaId) =>
               setPage({
@@ -216,7 +226,15 @@ export function PageEditorClient({
                 <button type="button" className="rounded border px-2 py-1 text-xs text-red-600" onClick={() => setPage((p) => ({ ...p, blocks: p.blocks.filter((_, i) => i !== index) }))}>Verwijderen</button>
               </div>
             </div>
-            <BlockEditor block={block} images={images} onImagesChange={setImages} onChange={(next) => updateBlock(index, next)} />
+            <BlockEditor
+              block={block}
+              images={images}
+              onImagesChange={(next) => {
+                setIsDirty(true);
+                setImages(next);
+              }}
+              onChange={(next) => updateBlock(index, next)}
+            />
           </article>
         ))}
       </section>

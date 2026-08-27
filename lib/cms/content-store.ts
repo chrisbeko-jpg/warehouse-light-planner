@@ -19,6 +19,7 @@ import {
   mergeSitePayload,
   payloadToPublicContent,
 } from "@/lib/cms/merge";
+import { normalizePage, normalizeWizard } from "@/lib/cms/normalize-media";
 import { syncReferencedImages } from "@/lib/cms/sync-referenced-images";
 import { imagePublicUrl } from "@/lib/cms/image-url";
 import type {
@@ -137,8 +138,24 @@ export async function saveCmsDraft(payload: Partial<CmsSitePayload>): Promise<Cm
   return withStorageMutation(async () => {
     const storage = await readStorage();
     const preservedImages = { ...storage.published.images, ...storage.draft.images };
-    storage.draft = mergeSitePayload({ ...storage.draft, ...payload });
-    storage.draft.images = { ...preservedImages, ...storage.draft.images, ...payload.images };
+    const mergedDraft = mergeSitePayload({ ...storage.draft, ...payload });
+    if (payload.wizard) {
+      mergedDraft.wizard = normalizeWizard(payload.wizard);
+    }
+    if (payload.homepage) {
+      mergedDraft.homepage = normalizePage(payload.homepage);
+    }
+    if (payload.pages) {
+      mergedDraft.pages = {
+        ...mergedDraft.pages,
+        ...Object.fromEntries(
+          Object.entries(payload.pages).map(([slug, page]) => [slug, normalizePage(page)]),
+        ),
+      };
+    }
+    syncReferencedImages(mergedDraft, preservedImages);
+    mergedDraft.images = { ...preservedImages, ...mergedDraft.images, ...payload.images };
+    storage.draft = mergedDraft;
     storage.draftUpdatedAt = new Date().toISOString();
     await writeStorage(storage);
     return loadCmsDraft();
@@ -150,19 +167,16 @@ export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<Cms
     const storage = await readStorage();
     const preservedImages = { ...storage.published.images, ...storage.draft.images };
     const key = slug.replace(/^\//, "");
-    const pageWithTimestamp = { ...page, updatedAt: new Date().toISOString() };
+    const normalizedPage = normalizePage({ ...page, updatedAt: new Date().toISOString() });
+    const mergedDraft = mergeSitePayload(storage.draft);
     if (key === "" || slug === "/" || key === "homepage") {
-      storage.draft = mergeSitePayload({
-        ...storage.draft,
-        homepage: pageWithTimestamp,
-      });
+      mergedDraft.homepage = normalizedPage;
     } else {
-      storage.draft = mergeSitePayload({
-        ...storage.draft,
-        pages: { ...storage.draft.pages, [key]: pageWithTimestamp },
-      });
+      mergedDraft.pages = { ...mergedDraft.pages, [key]: normalizedPage };
     }
-    storage.draft.images = { ...preservedImages, ...storage.draft.images };
+    syncReferencedImages(mergedDraft, preservedImages);
+    mergedDraft.images = { ...preservedImages, ...mergedDraft.images };
+    storage.draft = mergedDraft;
     storage.draftUpdatedAt = new Date().toISOString();
     await writeStorage(storage);
     return loadCmsDraft();

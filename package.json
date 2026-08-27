@@ -10,7 +10,7 @@
     "lint": "next lint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:unit": "npx tsx --test lib/public-wizard/*.test.ts"
+    "test:unit": "npx tsx --test lib/public-wizard/*.test.ts lib/cms/*.test.ts"
   },
   "dependencies": {
     "@tiptap/extension-image": "^3.30.5",
