@@ -48,8 +48,14 @@ export async function PUT(request: Request) {
     return NextResponse.json({ ok: true });
   }
   if (body.wizard) {
-    await saveCmsDraft({ wizard: body.wizard });
-    return NextResponse.json({ ok: true });
+    try {
+      const site = await saveCmsDraft({ wizard: body.wizard });
+      return NextResponse.json({ ok: true, site, draftUpdatedAt: site.draftUpdatedAt });
+    } catch (error) {
+      console.error("cms wizard save error:", error);
+      const message = error instanceof Error ? error.message : "Opslaan is niet gelukt.";
+      return NextResponse.json({ ok: false, message }, { status: 500 });
+    }
   }
   if (body.navigation) {
     await saveCmsDraft({ navigation: body.navigation });

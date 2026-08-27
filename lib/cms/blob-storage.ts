@@ -65,6 +65,7 @@ async function writeBlobSiteStorage(storage: CmsSiteStorage): Promise<void> {
     access: "public",
     contentType: "application/json",
     addRandomSuffix: false,
+    allowOverwrite: true,
     ...getBlobCommandOptions(),
   });
 }
@@ -114,7 +115,7 @@ export async function uploadMediaBinary(
     const blob = await put(storageKey, buffer, {
       access: "public",
       contentType: mimeType,
-      addRandomSuffix: false,
+      addRandomSuffix: true,
       ...getBlobCommandOptions(),
     });
     return { url: blob.url, storageKey: blob.pathname };

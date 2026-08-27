@@ -8,6 +8,12 @@ export async function POST(request: Request) {
   if (!verifyInternalToken(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const site = await publishCmsDraft();
-  return NextResponse.json({ ok: true, publishedAt: site.publishedAt });
+  try {
+    const site = await publishCmsDraft();
+    return NextResponse.json({ ok: true, publishedAt: site.publishedAt, site });
+  } catch (error) {
+    console.error("cms publish error:", error);
+    const message = error instanceof Error ? error.message : "Publiceren is niet gelukt.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

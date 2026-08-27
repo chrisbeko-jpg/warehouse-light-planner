@@ -19,19 +19,17 @@ export function NavigationEditorClient() {
   }, [load]);
 
   const save = async () => {
-    if (!navigation) return;
+    if (!navigation) throw new Error("Geen navigatie geladen.");
     await cmsFetch("/api/internal/cms", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ navigation }),
     });
-    setMessage("Concept opgeslagen.");
   };
 
   const publish = async () => {
     await save();
     await cmsFetch("/api/internal/cms/publish", { method: "POST" });
-    setMessage("Gepubliceerd.");
   };
 
   if (!navigation) return <p>Laden…</p>;

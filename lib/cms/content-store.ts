@@ -274,7 +274,7 @@ export async function replaceImageFile(
     ...record,
     storageKey: uploaded.storageKey,
     url: uploaded.url.startsWith("http") ? uploaded.url : undefined,
-    filename: storedName,
+    filename: path.basename(uploaded.storageKey),
     originalFilename: filename,
     mimeType: resolvedMime,
     fileSizeBytes: buffer.length,

@@ -20,7 +20,6 @@ export function PageEditorClient({
   const [page, setPage] = useState(initialPage);
   const [images, setImages] = useState<CmsSiteContent["images"]>({});
   const [message, setMessage] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const loadImages = useCallback(async () => {
     const data = await cmsFetch<{ site: CmsSiteContent }>("/api/internal/cms?draft=1");
@@ -32,38 +31,21 @@ export function PageEditorClient({
   }, [loadImages]);
 
   const saveDraft = async () => {
-    setSaving(true);
-    setMessage(null);
-    try {
-      await cmsFetch("/api/internal/cms", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pageSlug: slug, page: { ...page, status: "draft" } }),
-      });
-      setMessage("Concept opgeslagen.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Opslaan mislukt");
-    } finally {
-      setSaving(false);
-    }
+    await cmsFetch("/api/internal/cms", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pageSlug: slug, page: { ...page, status: "draft" } }),
+    });
   };
 
   const publish = async () => {
-    setSaving(true);
-    try {
-      await cmsFetch("/api/internal/cms", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pageSlug: slug, page: { ...page, status: "published" } }),
-      });
-      await cmsFetch("/api/internal/cms/publish", { method: "POST" });
-      setPage((p) => ({ ...p, status: "published" }));
-      setMessage("Gepubliceerd.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Publiceren mislukt");
-    } finally {
-      setSaving(false);
-    }
+    await cmsFetch("/api/internal/cms", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pageSlug: slug, page: { ...page, status: "published" } }),
+    });
+    await cmsFetch("/api/internal/cms/publish", { method: "POST" });
+    setPage((p) => ({ ...p, status: "published" }));
   };
 
   const updateBlock = (index: number, block: ContentBlock) => {
@@ -102,7 +84,6 @@ export function PageEditorClient({
       </div>
 
       {message && <p className="rounded-lg bg-[var(--lp-green-soft)] p-3 text-sm">{message}</p>}
-      {saving && <p className="text-sm text-[var(--lp-text-secondary)]">Bezig…</p>}
 
       <section className="lp-card grid gap-4 p-6">
         <h3 className="font-bold">Basis & SEO</h3>
