@@ -6,6 +6,10 @@ import {
   inferMimeType,
   MAX_MEDIA_BYTES,
 } from "../lib/cms/media-upload";
+import {
+  isBlobStorageConfigured,
+  LEDPANEEL_BLOB_ENV,
+} from "../lib/cms/blob-config";
 import { createTestPng } from "./helpers/wizard";
 
 const ADMIN_TOKEN = "playwright-test-token";
@@ -36,6 +40,15 @@ test.describe("CMS media upload logic", () => {
 
   test("inferMimeType accepts jpeg extension", () => {
     expect(inferMimeType("photo.jpeg", "application/octet-stream")).toBe("image/jpeg");
+  });
+
+  test("isBlobStorageConfigured uses ledpaneel_READ_WRITE_TOKEN", () => {
+    const key = LEDPANEEL_BLOB_ENV.READ_WRITE_TOKEN;
+    const previous = process.env[key];
+    process.env[key] = "test-ledpaneel-token";
+    expect(isBlobStorageConfigured()).toBe(true);
+    if (previous === undefined) delete process.env[key];
+    else process.env[key] = previous;
   });
 });
 

@@ -1,6 +1,10 @@
 import { del, get, put } from "@vercel/blob";
 import { promises as fs } from "fs";
 import path from "path";
+import {
+  getBlobCommandOptions,
+  isBlobStorageConfigured,
+} from "@/lib/cms/blob-config";
 import { getCmsDir, getUploadsDir } from "@/lib/storage/data-dir";
 import type { CmsSiteStorage } from "@/types/cms";
 import { normalizeStorage } from "@/lib/cms/merge";
@@ -10,10 +14,7 @@ import { STORAGE_NOT_CONFIGURED_MESSAGE } from "@/lib/cms/storage-constants";
 const SITE_BLOB_PATH = "cms/site.json";
 
 export { STORAGE_NOT_CONFIGURED_MESSAGE };
-
-export function isBlobStorageConfigured(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
-}
+export { isBlobStorageConfigured } from "@/lib/cms/blob-config";
 
 export function requiresBlobStorage(): boolean {
   return Boolean(process.env.VERCEL);
@@ -49,7 +50,7 @@ async function readBlobSiteStorage(): Promise<CmsSiteStorage | null> {
   try {
     const result = await get(SITE_BLOB_PATH, {
       access: "public",
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      ...getBlobCommandOptions(),
     });
     if (!result || result.statusCode === 304 || !result.stream) return null;
     const text = await new Response(result.stream).text();
@@ -64,7 +65,7 @@ async function writeBlobSiteStorage(storage: CmsSiteStorage): Promise<void> {
     access: "public",
     contentType: "application/json",
     addRandomSuffix: false,
-    token: process.env.BLOB_READ_WRITE_TOKEN,
+    ...getBlobCommandOptions(),
   });
 }
 
@@ -114,7 +115,7 @@ export async function uploadMediaBinary(
       access: "public",
       contentType: mimeType,
       addRandomSuffix: false,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      ...getBlobCommandOptions(),
     });
     return { url: blob.url, storageKey: blob.pathname };
   }
@@ -132,7 +133,7 @@ export async function deleteMediaBinary(record: {
   filename: string;
 }): Promise<void> {
   if (isBlobStorageConfigured() && record.url) {
-    await del(record.url, { token: process.env.BLOB_READ_WRITE_TOKEN });
+    await del(record.url, getBlobCommandOptions());
     return;
   }
 
