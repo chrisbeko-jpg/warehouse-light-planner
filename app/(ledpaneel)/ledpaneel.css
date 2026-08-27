@@ -68,6 +68,28 @@
   background: var(--lp-bg-secondary);
 }
 
+.lp-btn-destructive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--lp-danger);
+  background: var(--lp-white);
+  color: var(--lp-danger);
+  font-weight: 600;
+  padding: 0.875rem 1.5rem;
+}
+
+.lp-btn-destructive:hover {
+  background: #fef2f2;
+}
+
+.lp-touch-target {
+  min-height: 2.75rem;
+}
+
 .lp-card {
   border: 1px solid var(--lp-border);
   border-radius: 1rem;

@@ -24,6 +24,7 @@ import type {
   WizardStepId,
 } from "@/types/public-wizard";
 import { computeFitView, parseDistanceMeters, type EditorViewState } from "@/lib/public-wizard/viewport";
+import { SCALE_RESET_PATCH } from "@/lib/public-wizard/scale-reset-patch";
 
 export type PublicEditorMode = "select" | "calibrate-scale" | "draw-room" | "pan";
 
@@ -117,6 +118,7 @@ export interface PublicWizardStore {
   setScaleStepCollapsed: (value: boolean) => void;
   setCalibrationLine: (points: Point2D[]) => void;
   reopenScaleCalibration: () => void;
+  resetScaleDependentState: () => void;
   reopenRoomDrawing: () => void;
   getIndicativeResult: () => ReturnType<typeof calculateIndicativeResult> | null;
   setSubmitResult: (reference: string, email: string) => void;
@@ -546,6 +548,8 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       calibrationDraft: [],
       scaleStepCollapsed: false,
     }),
+
+  resetScaleDependentState: () => set(SCALE_RESET_PATCH),
 
   reopenRoomDrawing: () =>
     set({

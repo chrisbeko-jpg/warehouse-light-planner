@@ -84,7 +84,7 @@ export function StepEditor() {
   const addDownlight = usePublicWizardStore((s) => s.addDownlight);
   const clearEditorMessage = usePublicWizardStore((s) => s.clearEditorMessage);
   const setShowHeatmap = usePublicWizardStore((s) => s.setShowHeatmap);
-  const reopenScaleCalibration = usePublicWizardStore((s) => s.reopenScaleCalibration);
+  const resetScaleDependentState = usePublicWizardStore((s) => s.resetScaleDependentState);
   const reopenRoomDrawing = usePublicWizardStore((s) => s.reopenRoomDrawing);
   const getIndicativeResult = usePublicWizardStore((s) => s.getIndicativeResult);
   const undo = usePublicWizardStore((s) => s.undo);
@@ -97,6 +97,7 @@ export function StepEditor() {
   const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
   const [recognizing, setRecognizing] = useState(false);
   const [showScaleDialog, setShowScaleDialog] = useState(false);
+  const [showScaleResetDialog, setShowScaleResetDialog] = useState(false);
   const [spacePanning, setSpacePanning] = useState(false);
   const [pointerImage, setPointerImage] = useState<Point2D | null>(null);
   const [snapPreview, setSnapPreview] = useState<Point2D | null>(null);
@@ -361,7 +362,7 @@ export function StepEditor() {
   const scaleInstruction =
     editorMode === "calibrate-scale" && !scaleComplete
       ? calibrationDraft.length === 0
-        ? "Selecteer 2 punten waarvan u de werkelijke afstand kent."
+        ? "Klik twee punten op de plattegrond waarvan u de werkelijke afstand kent."
         : calibrationDraft.length === 1
           ? "Selecteer nu het tweede punt."
           : null
@@ -448,8 +449,12 @@ export function StepEditor() {
       <div className="relative flex min-h-0 flex-1">
         <aside
           className={`shrink-0 overflow-y-auto border-r border-[var(--lp-border)] bg-[var(--lp-bg-secondary)] transition-all ${
-            sidePanelCollapsed ? "hidden xl:block xl:w-0 xl:overflow-hidden xl:border-0" : "hidden w-full max-w-[340px] xl:block"
-          } ${mobilePanelOpen ? "absolute inset-x-0 top-0 z-10 max-h-[45vh] shadow-lg xl:relative xl:max-h-none xl:shadow-none" : "hidden xl:block"}`}
+            sidePanelCollapsed
+              ? "hidden xl:block xl:w-0 xl:overflow-hidden xl:border-0"
+              : mobilePanelOpen
+                ? "absolute inset-x-0 top-0 z-10 block max-h-[45vh] w-full max-w-[340px] shadow-lg xl:relative xl:max-h-none xl:shadow-none"
+                : "hidden w-full max-w-[340px] xl:block"
+          }`}
           style={{ width: sidePanelCollapsed ? 0 : SIDE_PANEL_WIDTH }}
         >
           <SidePanel
@@ -466,10 +471,12 @@ export function StepEditor() {
             fixturesCount={fixtures.length}
             indicativeResult={indicativeResult}
             hasSelection={Boolean(selectedFixtureId)}
-            onReopenScale={() => {
-              reopenScaleCalibration();
+            onReopenScale={() => setShowScaleResetDialog(true)}
+            onResetCalibrationPoints={() => {
+              resetCalibrationDraft();
               setShowScaleDialog(false);
             }}
+            calibrationDraftCount={calibrationDraft.length}
             onReopenRoom={() => reopenRoomDrawing()}
             onGenerate={() => generateLightingPlan()}
             onUndo={undo}
@@ -496,10 +503,23 @@ export function StepEditor() {
         <div ref={canvasRef} data-testid="editor-canvas-area" className="relative min-w-0 flex-1 bg-[var(--lp-editor-bg)]">
           {scaleInstruction && (
             <div
-              className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-sm text-white"
+              className="pointer-events-none absolute left-1/2 top-3 z-10 flex max-w-[min(100%,28rem)] -translate-x-1/2 flex-col items-center gap-2 px-3 sm:flex-row"
               data-testid="scale-instruction"
             >
-              {scaleInstruction}
+              <p className="rounded-lg bg-black/70 px-4 py-2 text-center text-sm text-white">{scaleInstruction}</p>
+              {calibrationDraft.length >= 1 && (
+                <button
+                  type="button"
+                  data-testid="calibration-restart-overlay-button"
+                  className="lp-btn-secondary lp-touch-target pointer-events-auto shrink-0 text-sm"
+                  onClick={() => {
+                    resetCalibrationDraft();
+                    setShowScaleDialog(false);
+                  }}
+                >
+                  Opnieuw
+                </button>
+              )}
             </div>
           )}
           {scaleComplete && editorMode !== "calibrate-scale" && (
@@ -710,25 +730,47 @@ export function StepEditor() {
       </div>
 
       {showScaleDialog && calibrationDraft.length === 2 && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
-            <h2 className="mb-3 text-lg font-bold">Wat is de werkelijke afstand?</h2>
+        <div className="absolute inset-0 z-[60] flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div
+            className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl"
+            role="dialog"
+            aria-labelledby="scale-distance-title"
+            data-testid="scale-distance-dialog"
+          >
+            <h2 id="scale-distance-title" className="mb-3 text-lg font-bold">
+              Wat is de werkelijke afstand?
+            </h2>
             <input
               type="text"
               placeholder="4,80 m"
               value={calibrationDistanceMm}
               onChange={(e) => setCalibrationDistanceMm(e.target.value)}
-              className="mb-4 w-full rounded-lg border border-[var(--lp-border)] px-3 py-2"
+              className="lp-touch-target mb-3 w-full rounded-lg border border-[var(--lp-border)] px-3 py-2"
               autoFocus
             />
-            <div className="flex gap-2">
-              <button type="button" className="lp-btn-secondary flex-1" onClick={() => setShowScaleDialog(false)}>
+            <button
+              type="button"
+              data-testid="calibration-restart-dialog-button"
+              className="lp-btn-secondary lp-touch-target mb-4 w-full text-sm"
+              onClick={() => {
+                resetCalibrationDraft();
+                setShowScaleDialog(false);
+              }}
+            >
+              Opnieuw
+            </button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                className="lp-btn-secondary lp-touch-target flex-1"
+                onClick={() => setShowScaleDialog(false)}
+              >
                 Annuleren
               </button>
               <button
                 type="button"
                 data-testid="apply-scale-button"
-                className="lp-btn-primary flex-1"
+                className="lp-btn-primary lp-touch-target flex-1"
                 onClick={() => {
                   if (applyCalibration()) {
                     setShowScaleDialog(false);
@@ -738,6 +780,48 @@ export function StepEditor() {
                 }}
               >
                 Schaal instellen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showScaleResetDialog && (
+        <div className="absolute inset-0 z-[60] flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div
+            className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl"
+            role="dialog"
+            aria-labelledby="scale-reset-title"
+            data-testid="scale-reset-dialog"
+          >
+            <h2 id="scale-reset-title" className="mb-3 text-lg font-bold">
+              Schaal opnieuw instellen?
+            </h2>
+            <p className="mb-5 text-sm leading-relaxed text-[var(--lp-text-secondary)]">
+              Als u de schaal wijzigt, wordt het huidige lichtplan verwijderd en begint u opnieuw vanaf
+              de schaalinstelling. Uw gekozen ruimtefunctie, sfeer en geüploade plattegrond blijven
+              behouden.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                data-testid="scale-reset-cancel-button"
+                className="lp-btn-secondary lp-touch-target flex-1"
+                onClick={() => setShowScaleResetDialog(false)}
+              >
+                Annuleren
+              </button>
+              <button
+                type="button"
+                data-testid="scale-reset-confirm-button"
+                className="lp-btn-destructive flex-1"
+                onClick={() => {
+                  resetScaleDependentState();
+                  setShowScaleResetDialog(false);
+                  setShowScaleDialog(false);
+                }}
+              >
+                Schaal opnieuw instellen
               </button>
             </div>
           </div>
@@ -762,6 +846,8 @@ function SidePanel({
   indicativeResult,
   hasSelection,
   onReopenScale,
+  onResetCalibrationPoints,
+  calibrationDraftCount,
   onReopenRoom,
   onGenerate,
   onUndo,
@@ -789,6 +875,8 @@ function SidePanel({
   indicativeResult: ReturnType<ReturnType<typeof usePublicWizardStore.getState>["getIndicativeResult"]>;
   hasSelection: boolean;
   onReopenScale: () => void;
+  onResetCalibrationPoints: () => void;
+  calibrationDraftCount: number;
   onReopenRoom: () => void;
   onGenerate: () => void;
   onUndo: () => void;
@@ -813,15 +901,30 @@ function SidePanel({
       >
         {!scaleComplete && (
           <p className="text-xs text-[var(--lp-text-secondary)]">
-            Klik twee bekende punten op de plattegrond en voer de afstand in.
+            Klik twee punten op de plattegrond waarvan u de werkelijke afstand kent.
           </p>
+        )}
+        {!scaleComplete && editorMode === "calibrate-scale" && calibrationDraftCount >= 1 && (
+          <button
+            type="button"
+            data-testid="calibration-restart-button"
+            className="lp-btn-secondary lp-touch-target w-full text-sm"
+            onClick={onResetCalibrationPoints}
+          >
+            Opnieuw
+          </button>
         )}
         {scaleComplete && pixelsPerMeter && (
           <p className="text-xs font-medium text-[var(--lp-green-dark)]">{formatScaleLabel(pixelsPerMeter)}</p>
         )}
         {scaleComplete && (
-          <button type="button" className="lp-btn-secondary w-full text-sm" onClick={onReopenScale}>
-            Schaal aanpassen
+          <button
+            type="button"
+            data-testid="reset-scale-button"
+            className="lp-btn-secondary lp-touch-target w-full text-sm"
+            onClick={onReopenScale}
+          >
+            Schaal opnieuw instellen
           </button>
         )}
       </StepBlock>
