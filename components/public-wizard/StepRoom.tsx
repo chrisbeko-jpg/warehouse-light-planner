@@ -26,7 +26,7 @@ export function StepRoom() {
   const [cmsChoices, setCmsChoices] = useState<WizardRoomChoiceView[]>([]);
 
   useEffect(() => {
-    void fetch("/api/cms/wizard")
+    void fetch("/api/cms/wizard", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { roomChoices?: WizardRoomChoiceView[] } | null) => {
         if (data?.roomChoices?.length) setCmsChoices(data.roomChoices);

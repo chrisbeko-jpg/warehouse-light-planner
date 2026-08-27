@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AtmosphereCardImage } from "@/components/public-wizard/AtmosphereCardImage";
 import { ATMOSPHERES, getAtmosphere } from "@/lib/public-wizard/atmospheres";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardNav } from "@/components/public-wizard/WizardShell";
@@ -11,6 +12,7 @@ interface WizardAtmosphereChoiceView {
   title: string;
   subtitle: string;
   description: string;
+  imageMediaId: string | null;
   imageUrl: string | null;
   imageAlt: string;
   enabled: boolean;
@@ -23,31 +25,13 @@ function isSelectableAtmosphere(id: string, enabled: boolean | undefined): boole
   return id === "warm" || id === "neutraal";
 }
 
-function AtmosphereCardContent({
-  item,
-  fallbackGradient,
-}: {
-  item: WizardAtmosphereChoiceView;
-  fallbackGradient: string;
-}) {
+function AtmosphereCardBody({ item }: { item: WizardAtmosphereChoiceView }) {
   return (
-    <>
-      <div className={`relative h-40 bg-gradient-to-br ${fallbackGradient}`}>
-        {item.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.imageUrl}
-            alt={item.imageAlt || item.title}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        )}
-      </div>
-      <div className="space-y-2 p-4">
-        <h2 className="text-lg font-bold">{item.title}</h2>
-        <p className="text-sm font-medium text-[var(--lp-green-dark)]">{item.subtitle}</p>
-        <p className="text-sm text-[var(--lp-text-secondary)]">{item.description}</p>
-      </div>
-    </>
+    <div className="space-y-2 p-4">
+      <h2 className="text-lg font-bold">{item.title}</h2>
+      <p className="text-sm font-medium text-[var(--lp-green-dark)]">{item.subtitle}</p>
+      <p className="text-sm text-[var(--lp-text-secondary)]">{item.description}</p>
+    </div>
   );
 }
 
@@ -58,7 +42,7 @@ export function StepAtmosphere() {
   const [cmsChoices, setCmsChoices] = useState<WizardAtmosphereChoiceView[]>([]);
 
   useEffect(() => {
-    void fetch("/api/cms/wizard")
+    void fetch("/api/cms/wizard", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { atmosphereChoices?: WizardAtmosphereChoiceView[] } | null) => {
         if (data?.atmosphereChoices?.length) setCmsChoices(data.atmosphereChoices);
@@ -73,6 +57,7 @@ export function StepAtmosphere() {
         title: item.title,
         subtitle: item.subtitle,
         description: item.presentationText,
+        imageMediaId: null,
         imageUrl: null as string | null,
         imageAlt: item.title,
         enabled: item.id !== "premium_architectural",
@@ -102,15 +87,18 @@ export function StepAtmosphere() {
                 data-testid={`atmosphere-option-${item.id}`}
                 data-disabled="true"
                 aria-disabled="true"
-                className="relative cursor-not-allowed overflow-hidden rounded-2xl border-2 border-[var(--lp-border)] text-left opacity-80 grayscale"
+                className="cursor-not-allowed overflow-hidden rounded-2xl border-2 border-[var(--lp-border)] text-left"
               >
-                <div className="pointer-events-none absolute inset-0 z-10 bg-stone-900/10" />
-                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center p-4">
-                  <span className="-rotate-12 rounded-md bg-black/75 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-white shadow-lg sm:text-sm">
-                    {item.badgeText ?? "ONLY PREMIUM"}
-                  </span>
-                </div>
-                <AtmosphereCardContent item={item} fallbackGradient={fallback.imageGradient} />
+                <AtmosphereCardImage
+                  choiceId={item.id}
+                  imageUrl={item.imageUrl}
+                  imageAlt={item.imageAlt}
+                  title={item.title}
+                  fallbackGradient={fallback.imageGradient}
+                  premiumOverlay
+                  badgeText={item.badgeText ?? "ONLY PREMIUM"}
+                />
+                <AtmosphereCardBody item={item} />
               </div>
             );
           }
@@ -128,7 +116,14 @@ export function StepAtmosphere() {
                   : "border-[var(--lp-border)] hover:border-[var(--lp-green)]"
               }`}
             >
-              <AtmosphereCardContent item={item} fallbackGradient={fallback.imageGradient} />
+              <AtmosphereCardImage
+                choiceId={item.id}
+                imageUrl={item.imageUrl}
+                imageAlt={item.imageAlt}
+                title={item.title}
+                fallbackGradient={fallback.imageGradient}
+              />
+              <AtmosphereCardBody item={item} />
             </button>
           );
         })}
