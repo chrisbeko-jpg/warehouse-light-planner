@@ -18,6 +18,7 @@ import {
 import { DEFAULT_CMS_SITE } from "@/lib/cms/defaults";
 import {
   mergeSitePayload,
+  mergeWizardContent,
   payloadToPublicContent,
 } from "@/lib/cms/merge";
 import { normalizePage, normalizeWizard } from "@/lib/cms/normalize-media";
@@ -211,7 +212,7 @@ export async function saveCmsDraft(payload: Partial<CmsSitePayload>): Promise<Cm
     const preservedImages = { ...storage.published.images, ...storage.draft.images };
     const mergedDraft = mergeSitePayload({ ...storage.draft, ...payload });
     if (payload.wizard) {
-      mergedDraft.wizard = normalizeWizard(payload.wizard);
+      mergedDraft.wizard = normalizeWizard(mergeWizardContent(payload.wizard));
     }
     if (payload.homepage) {
       mergedDraft.homepage = normalizePage(payload.homepage);

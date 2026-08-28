@@ -101,26 +101,37 @@ test("wizard room and atmosphere mediaIds survive save and reload", async () => 
   const { saveCmsDraft, loadCmsDraft } = await import("./content-store");
 
   const roomId = DEFAULT_WIZARD_CONTENT.roomChoices[0]!.id;
-  const atmosphereId = DEFAULT_WIZARD_CONTENT.atmosphereChoices.find((c) => c.id === "warm")!.id;
   const wizard = {
     ...DEFAULT_WIZARD_CONTENT,
     roomChoices: DEFAULT_WIZARD_CONTENT.roomChoices.map((choice, index) =>
       index === 0 ? applyMediaId(choice, "img-test-wizard-room") : choice,
     ),
     atmosphereChoices: DEFAULT_WIZARD_CONTENT.atmosphereChoices.map((choice) =>
-      choice.id === atmosphereId ? applyMediaId(choice, "img-test-wizard-atmosphere") : choice,
+      applyMediaId(choice, `img-test-atmosphere-${choice.id}`),
     ),
   };
 
   const saveResult = await saveCmsDraft({ wizard });
   const expected = snapshotSiteMediaReferences(saveResult.site);
   assert.equal(expected.wizardRooms[roomId], "img-test-wizard-room");
-  assert.equal(expected.wizardAtmospheres[atmosphereId], "img-test-wizard-atmosphere");
+  for (const choice of DEFAULT_WIZARD_CONTENT.atmosphereChoices) {
+    assert.equal(
+      expected.wizardAtmospheres[choice.id],
+      `img-test-atmosphere-${choice.id}`,
+      `expected media for ${choice.id}`,
+    );
+  }
 
   const reloaded = await loadCmsDraft();
   const afterReload = snapshotSiteMediaReferences(reloaded);
   assert.equal(afterReload.wizardRooms[roomId], "img-test-wizard-room");
-  assert.equal(afterReload.wizardAtmospheres[atmosphereId], "img-test-wizard-atmosphere");
+  for (const choice of DEFAULT_WIZARD_CONTENT.atmosphereChoices) {
+    assert.equal(
+      afterReload.wizardAtmospheres[choice.id],
+      `img-test-atmosphere-${choice.id}`,
+      `reloaded media for ${choice.id}`,
+    );
+  }
 });
 
 test.after(() => {

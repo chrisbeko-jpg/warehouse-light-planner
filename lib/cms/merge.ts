@@ -12,9 +12,68 @@ import type {
   ExampleBlock,
   ProductsBlock,
   ContentBlock,
+  WizardAtmosphereChoiceCms,
 } from "@/types/cms";
 
-function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardContent {
+function migrateLegacyAtmosphereIds(byId: Map<string, WizardAtmosphereChoiceCms>): void {
+  const legacyNeutral = byId.get("neutral");
+  if (legacyNeutral && !byId.has("neutraal")) {
+    byId.set("neutraal", { ...legacyNeutral, id: "neutraal" });
+    byId.delete("neutral");
+  }
+
+  const legacyLuxe = byId.get("luxe");
+  if (!legacyLuxe) return;
+
+  const existingPremium = byId.get("premium_architectural");
+  const mediaId = readMediaId(existingPremium) ?? readMediaId(legacyLuxe);
+  byId.set("premium_architectural", {
+    ...legacyLuxe,
+    ...(existingPremium ?? {}),
+    id: "premium_architectural",
+    title: existingPremium?.title ?? legacyLuxe.title,
+    subtitle: existingPremium?.subtitle ?? legacyLuxe.subtitle,
+    description: existingPremium?.description ?? legacyLuxe.description,
+    imageAlt: existingPremium?.imageAlt ?? legacyLuxe.imageAlt,
+    altTextOverride: existingPremium?.altTextOverride ?? legacyLuxe.altTextOverride,
+    badgeText: existingPremium?.badgeText ?? legacyLuxe.badgeText ?? "ONLY PREMIUM",
+    mediaId,
+    imageId: mediaId ?? undefined,
+    enabled: existingPremium?.enabled === true,
+    flow: existingPremium?.flow ?? legacyLuxe.flow ?? "standard",
+    sortOrder: existingPremium?.sortOrder ?? legacyLuxe.sortOrder,
+    active: existingPremium?.active ?? legacyLuxe.active ?? true,
+  });
+  byId.delete("luxe");
+}
+
+function mergeAtmosphereChoices(
+  defaultItems: WizardAtmosphereChoiceCms[],
+  storedItems?: WizardAtmosphereChoiceCms[],
+): WizardAtmosphereChoiceCms[] {
+  const byId = new Map((storedItems ?? []).map((item) => [item.id, item]));
+  migrateLegacyAtmosphereIds(byId);
+
+  return defaultItems.map((defaultItem) => {
+    const storedItem = byId.get(defaultItem.id);
+    if (!storedItem) return defaultItem;
+
+    const mediaId = readMediaId(storedItem) ?? readMediaId(defaultItem) ?? null;
+    const merged: WizardAtmosphereChoiceCms = {
+      ...defaultItem,
+      ...storedItem,
+      mediaId,
+      imageId: mediaId ?? undefined,
+    };
+
+    if (defaultItem.id === "premium_architectural") {
+      return { ...merged, enabled: merged.enabled === true };
+    }
+    return merged;
+  });
+}
+
+export function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardContent {
   const defaults = DEFAULT_CMS_SITE.wizard;
   if (!stored) return defaults;
 
@@ -30,34 +89,9 @@ function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardConten
     });
   };
 
-  const storedAtmospheres = stored.atmosphereChoices ?? [];
-  const byId = new Map(storedAtmospheres.map((item) => [item.id, item]));
-  const legacyLuxe = byId.get("luxe");
-  if (legacyLuxe) {
-    byId.set("premium_architectural", {
-      ...legacyLuxe,
-      id: "premium_architectural",
-      enabled: false,
-      flow: "standard",
-      badgeText: legacyLuxe.badgeText ?? "ONLY PREMIUM",
-    });
-    byId.delete("luxe");
-  }
-
-  const atmosphereChoices = defaults.atmosphereChoices.map((item) => {
-    const storedItem = byId.get(item.id);
-    const merged = storedItem ? { ...item, ...storedItem } : item;
-    const mediaId = readMediaId(merged);
-    const withMedia = mediaId ? { ...merged, mediaId, imageId: mediaId } : merged;
-    if (item.id === "premium_architectural") {
-      return { ...withMedia, enabled: withMedia.enabled === true ? true : false };
-    }
-    return withMedia;
-  });
-
   return {
     roomChoices: mergeRoomChoices(defaults.roomChoices, stored.roomChoices),
-    atmosphereChoices,
+    atmosphereChoices: mergeAtmosphereChoices(defaults.atmosphereChoices, stored.atmosphereChoices),
   };
 }
 
