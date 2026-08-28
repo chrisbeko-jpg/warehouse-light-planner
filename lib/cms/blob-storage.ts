@@ -132,6 +132,17 @@ async function writeLocalSiteStorage(storage: CmsSiteStorage): Promise<string> {
 
 async function readBlobJson(pathname: string): Promise<string | null> {
   try {
+    const listed = await list({
+      prefix: pathname,
+      limit: 10,
+      ...getBlobCommandOptions(),
+    });
+    const blob = listed.blobs.find((entry) => entry.pathname === pathname);
+    if (blob?.url) {
+      const response = await fetch(blob.url, { cache: "no-store" });
+      if (response.ok) return await response.text();
+    }
+
     const result = await get(pathname, {
       access: "public",
       ...getBlobCommandOptions(),

@@ -4,8 +4,9 @@ import { KANTOORVERLICHTING_SEED } from "@/lib/cms/seeds/kantoorverlichting";
 import { mergeSitePayload, normalizeStorage } from "@/lib/cms/merge";
 import { normalizePage } from "@/lib/cms/normalize-media";
 import { applyMediaId, readMediaId } from "@/lib/cms/media";
-import { snapshotPageMediaReferences } from "@/lib/cms/media-reference-audit";
+import { snapshotPageMediaReferences, snapshotAllPageBlockMedia, diffMediaReferences, snapshotSiteMediaReferences } from "@/lib/cms/media-reference-audit";
 import type { CmsSiteStorage } from "@/types/cms";
+import { DEFAULT_CMS_SITE } from "@/lib/cms/defaults";
 
 function heroMediaId(page: { blocks: { id: string; type: string }[] }) {
   const hero = page.blocks.find((block) => block.id === "hero-kantoor");
@@ -89,4 +90,52 @@ test("saveCmsDraftPage persists kantoorverlichting hero image", async () => {
   }
 
   rmSync(dir, { recursive: true, force: true });
+});
+
+test("subpage save verification compares homepage fields against homepage, not subpage seo", () => {
+  const page = normalizePage({
+    ...KANTOORVERLICHTING_SEED,
+    seo: {
+      ...KANTOORVERLICHTING_SEED.seo,
+      ogMediaId: "img-kantoor-og",
+      ogImageId: "img-kantoor-og",
+    },
+    blocks: KANTOORVERLICHTING_SEED.blocks.map((block) =>
+      block.id === "hero-kantoor" && block.type === "hero"
+        ? { ...block, ...applyMediaId(block, "img-kantoor-hero") }
+        : block,
+    ),
+  });
+
+  const mergedDraft = mergeSitePayload({
+    homepage: normalizePage({
+      ...DEFAULT_CMS_SITE.homepage,
+      seo: {
+        ...DEFAULT_CMS_SITE.homepage.seo,
+        ogMediaId: "img-homepage-og",
+        ogImageId: "img-homepage-og",
+      },
+    }),
+    pages: { kantoorverlichting: page },
+  });
+
+  const expectedFromMerged = snapshotSiteMediaReferences(mergedDraft, { pageKey: "kantoorverlichting" });
+  assert.equal(expectedFromMerged.ogMediaId, "img-homepage-og");
+  assert.equal(expectedFromMerged.pageBlockMedia["hero-kantoor"], "img-kantoor-hero");
+  assert.equal(expectedFromMerged.pageBlockMedia["seo:ogMediaId"], "img-kantoor-og");
+
+  const wrongExpected = {
+    homepageHero: snapshotPageMediaReferences(page).homepageHero ?? null,
+    exampleSlots: snapshotPageMediaReferences(page).exampleSlots ?? [],
+    productItems: snapshotPageMediaReferences(page).productItems ?? [],
+    ogMediaId: snapshotPageMediaReferences(page).ogMediaId ?? null,
+    pageBlockMedia: snapshotAllPageBlockMedia(page),
+    wizardRooms: {},
+    wizardAtmospheres: {},
+  };
+  const lost = diffMediaReferences(
+    wrongExpected,
+    snapshotSiteMediaReferences(mergedDraft, { pageKey: "kantoorverlichting" }),
+  );
+  assert.ok(lost.some((entry) => entry.startsWith("ogMediaId:")), lost.join("; "));
 });
