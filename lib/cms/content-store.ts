@@ -28,6 +28,7 @@ import {
   MediaPersistenceError,
   snapshotPageMediaReferences,
   snapshotSiteMediaReferences,
+  snapshotAllPageBlockMedia,
   type MediaReferenceSnapshot,
 } from "@/lib/cms/media-reference-audit";
 import { syncReferencedImages } from "@/lib/cms/sync-referenced-images";
@@ -139,6 +140,7 @@ async function verifyPersistedDraftMatchesMemory(
   storage: CmsSiteStorage,
   expected: MediaReferenceSnapshot,
   context: string,
+  savedPageKey?: string,
 ): Promise<string> {
   auditStage("BEFORE WRITE mediaIds", storage.draft);
   const versionPath = await writeSiteStorage(storage);
@@ -156,14 +158,16 @@ async function verifyPersistedDraftMatchesMemory(
   const normalizedRead = await readStorage();
   auditStage("AFTER NORMALIZE mediaIds (readSiteStorage)", normalizedRead.draft);
 
+  const snapshotOptions = savedPageKey ? { pageKey: savedPageKey } : undefined;
+
   assertMediaReferencesPreserved(
     expected,
-    snapshotSiteMediaReferences(persistedAtVersion.draft),
+    snapshotSiteMediaReferences(persistedAtVersion.draft, snapshotOptions),
     `${context}/written-version`,
   );
   assertMediaReferencesPreserved(
     expected,
-    snapshotSiteMediaReferences(normalizedRead.draft),
+    snapshotSiteMediaReferences(normalizedRead.draft, snapshotOptions),
     `${context}/normalized-read`,
   );
 
@@ -246,6 +250,8 @@ export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<Cms
     const normalizedPage = normalizePage({ ...page, updatedAt: new Date().toISOString() });
     const storageBase = mergeSitePayload(storage.draft);
     const pageRefs = snapshotPageMediaReferences(normalizedPage);
+    const pageBlockMedia = snapshotAllPageBlockMedia(normalizedPage);
+    const savedPageKey = key === "" || slug === "/" || key === "homepage" ? "homepage" : key;
     const mergedDraft =
       key === "" || slug === "/" || key === "homepage"
         ? mergeSitePayload({
@@ -264,6 +270,7 @@ export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<Cms
       exampleSlots: pageRefs.exampleSlots ?? [],
       productItems: pageRefs.productItems ?? [],
       ogMediaId: pageRefs.ogMediaId ?? null,
+      pageBlockMedia,
       wizardRooms: snapshotSiteMediaReferences(storageBase).wizardRooms,
       wizardAtmospheres: snapshotSiteMediaReferences(storageBase).wizardAtmospheres,
     };
@@ -271,8 +278,17 @@ export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<Cms
     storage.draft = mergedDraft;
     storage.draftUpdatedAt = new Date().toISOString();
 
-    assertMediaReferencesPreserved(expected, snapshotSiteMediaReferences(storage.draft), "saveCmsDraftPage/memory");
-    const versionPath = await verifyPersistedDraftMatchesMemory(storage, expected, "saveCmsDraftPage");
+    assertMediaReferencesPreserved(
+      expected,
+      snapshotSiteMediaReferences(storage.draft, { pageKey: savedPageKey }),
+      "saveCmsDraftPage/memory",
+    );
+    const versionPath = await verifyPersistedDraftMatchesMemory(
+      storage,
+      expected,
+      "saveCmsDraftPage",
+      savedPageKey,
+    );
     return buildSaveResult(storage, versionPath);
   });
 }

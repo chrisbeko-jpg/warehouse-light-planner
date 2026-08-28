@@ -13,6 +13,7 @@ export interface MediaReferenceSnapshot {
   exampleSlots: (string | null)[];
   productItems: (string | null)[];
   ogMediaId: string | null;
+  pageBlockMedia: Record<string, string | null>;
   wizardRooms: Record<string, string | null>;
   wizardAtmospheres: Record<string, string | null>;
 }
@@ -29,6 +30,50 @@ export class MediaPersistenceError extends Error {
 
 function blockById(blocks: ContentBlock[], id: string): ContentBlock | undefined {
   return blocks.find((block) => block.id === id);
+}
+
+export function getDraftPageByKey(payload: CmsSitePayload, key: string): CmsPage | null {
+  const normalizedKey = key.replace(/^\//, "");
+  if (normalizedKey === "" || normalizedKey === "homepage") return payload.homepage;
+  return payload.pages[normalizedKey] ?? null;
+}
+
+/** Snapshot every media reference on a page keyed by block id (and slot indices). */
+export function snapshotAllPageBlockMedia(page: CmsPage): Record<string, string | null> {
+  const refs: Record<string, string | null> = {};
+
+  for (const block of page.blocks) {
+    if (
+      block.type === "hero" ||
+      block.type === "text-image" ||
+      block.type === "image-text" ||
+      block.type === "wide-image"
+    ) {
+      const mediaId = readMediaId(block);
+      if (mediaId) refs[block.id] = mediaId;
+    }
+
+    if (block.type === "example") {
+      const example = block as ExampleBlock;
+      example.resultExamples?.forEach((slot, index) => {
+        const mediaId = readMediaId(slot);
+        if (mediaId) refs[`${block.id}:${index}`] = mediaId;
+      });
+    }
+
+    if (block.type === "products") {
+      const products = block as ProductsBlock;
+      products.items.forEach((item, index) => {
+        const mediaId = readMediaId(item);
+        if (mediaId) refs[`${block.id}:${index}`] = mediaId;
+      });
+    }
+  }
+
+  const ogMediaId = readMediaId({ mediaId: page.seo.ogMediaId, imageId: page.seo.ogImageId });
+  if (ogMediaId) refs["seo:ogMediaId"] = ogMediaId;
+
+  return refs;
 }
 
 export function snapshotPageMediaReferences(page: CmsPage): Partial<MediaReferenceSnapshot> {
@@ -55,13 +100,26 @@ export function snapshotPageMediaReferences(page: CmsPage): Partial<MediaReferen
   };
 }
 
-export function snapshotSiteMediaReferences(payload: CmsSitePayload): MediaReferenceSnapshot {
+export function snapshotSiteMediaReferences(
+  payload: CmsSitePayload,
+  options?: { pageKey?: string },
+): MediaReferenceSnapshot {
   const pageRefs = snapshotPageMediaReferences(payload.homepage);
+  let pageBlockMedia: Record<string, string | null> = {};
+
+  if (options?.pageKey) {
+    const page = getDraftPageByKey(payload, options.pageKey);
+    if (page) pageBlockMedia = snapshotAllPageBlockMedia(page);
+  } else {
+    pageBlockMedia = snapshotAllSitePageBlockMedia(payload);
+  }
+
   return {
     homepageHero: pageRefs.homepageHero ?? null,
     exampleSlots: pageRefs.exampleSlots ?? Array.from({ length: EXAMPLE_IMAGE_SLOT_COUNT }, () => null),
     productItems: pageRefs.productItems ?? [],
     ogMediaId: pageRefs.ogMediaId ?? null,
+    pageBlockMedia,
     wizardRooms: Object.fromEntries(
       payload.wizard.roomChoices.map((choice) => [choice.id, readMediaId(choice)]),
     ),
@@ -69,6 +127,22 @@ export function snapshotSiteMediaReferences(payload: CmsSitePayload): MediaRefer
       payload.wizard.atmosphereChoices.map((choice) => [choice.id, readMediaId(choice)]),
     ),
   };
+}
+
+function snapshotAllSitePageBlockMedia(payload: CmsSitePayload): Record<string, string | null> {
+  const refs: Record<string, string | null> = {};
+  const addPage = (pageKey: string, page: CmsPage) => {
+    for (const [blockKey, mediaId] of Object.entries(snapshotAllPageBlockMedia(page))) {
+      if (mediaId) refs[`${pageKey}/${blockKey}`] = mediaId;
+    }
+  };
+
+  addPage("homepage", payload.homepage);
+  for (const [pageKey, page] of Object.entries(payload.pages)) {
+    addPage(pageKey, page);
+  }
+
+  return refs;
 }
 
 function compareNullableId(label: string, expected: string | null, actual: string | null): string | null {
@@ -112,6 +186,16 @@ export function diffMediaReferences(
       `wizardAtmospheres.${id}`,
       expectedMediaId,
       actual.wizardAtmospheres[id] ?? null,
+    );
+    if (diff) diffs.push(diff);
+  }
+
+  for (const [blockKey, expectedMediaId] of Object.entries(expected.pageBlockMedia ?? {})) {
+    if (!expectedMediaId) continue;
+    const diff = compareNullableId(
+      `pageBlockMedia.${blockKey}`,
+      expectedMediaId,
+      actual.pageBlockMedia?.[blockKey] ?? null,
     );
     if (diff) diffs.push(diff);
   }
