@@ -244,22 +244,28 @@ export async function saveCmsDraftPage(slug: string, page: CmsPage): Promise<Cms
     const preservedImages = { ...storage.published.images, ...storage.draft.images };
     const key = slug.replace(/^\//, "");
     const normalizedPage = normalizePage({ ...page, updatedAt: new Date().toISOString() });
-    const mergedDraft = mergeSitePayload(storage.draft);
-    if (key === "" || slug === "/" || key === "homepage") {
-      mergedDraft.homepage = normalizedPage;
-    } else {
-      mergedDraft.pages = { ...mergedDraft.pages, [key]: normalizedPage };
-    }
+    const storageBase = mergeSitePayload(storage.draft);
+    const pageRefs = snapshotPageMediaReferences(normalizedPage);
+    const mergedDraft =
+      key === "" || slug === "/" || key === "homepage"
+        ? mergeSitePayload({
+            ...storage.draft,
+            homepage: normalizedPage,
+          })
+        : mergeSitePayload({
+            ...storage.draft,
+            pages: { ...storage.draft.pages, [key]: normalizedPage },
+          });
     syncReferencedImages(mergedDraft, preservedImages);
     mergedDraft.images = { ...preservedImages, ...mergedDraft.images };
 
-    const expectedFromPage = snapshotPageMediaReferences(normalizedPage);
     const expected: MediaReferenceSnapshot = {
-      ...snapshotSiteMediaReferences(mergedDraft),
-      homepageHero: expectedFromPage.homepageHero ?? null,
-      exampleSlots: expectedFromPage.exampleSlots ?? [],
-      productItems: expectedFromPage.productItems ?? [],
-      ogMediaId: expectedFromPage.ogMediaId ?? null,
+      homepageHero: pageRefs.homepageHero ?? null,
+      exampleSlots: pageRefs.exampleSlots ?? [],
+      productItems: pageRefs.productItems ?? [],
+      ogMediaId: pageRefs.ogMediaId ?? null,
+      wizardRooms: snapshotSiteMediaReferences(storageBase).wizardRooms,
+      wizardAtmospheres: snapshotSiteMediaReferences(storageBase).wizardAtmospheres,
     };
 
     storage.draft = mergedDraft;

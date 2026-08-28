@@ -32,6 +32,13 @@ test("mergePageBlocks preserves hero mediaId after save round-trip", () => {
   if (hero?.type === "hero") {
     assert.equal(hero.mediaId, "img-hero-1");
   }
+
+  const roundTrip = mergeSitePayload(merged);
+  const heroAfterRead = roundTrip.homepage.blocks.find((block) => block.id === "hero");
+  assert.equal(heroAfterRead?.type, "hero");
+  if (heroAfterRead?.type === "hero") {
+    assert.equal(heroAfterRead.mediaId, "img-hero-1");
+  }
 });
 
 test("mergePageBlocks preserves example imageIds when resultExamples are missing", () => {

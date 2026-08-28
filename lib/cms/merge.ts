@@ -13,6 +13,9 @@ import type {
   ProductsBlock,
   ContentBlock,
   WizardAtmosphereChoiceCms,
+  HeroBlock,
+  TextImageBlock,
+  WideImageBlock,
 } from "@/types/cms";
 
 function migrateLegacyAtmosphereIds(byId: Map<string, WizardAtmosphereChoiceCms>): void {
@@ -166,7 +169,33 @@ function mergeProductsBlock(defaultBlock: ProductsBlock, storedBlock: ProductsBl
   };
 }
 
+function mergeMediaFields<T extends { mediaId?: string | null; imageId?: string | null }>(
+  defaultBlock: T,
+  storedBlock: T,
+): T {
+  const mediaId = readMediaId(storedBlock) ?? readMediaId(defaultBlock) ?? null;
+  return {
+    ...defaultBlock,
+    ...storedBlock,
+    mediaId,
+    imageId: mediaId ?? undefined,
+  };
+}
+
 function mergeContentBlock(defaultBlock: ContentBlock, storedBlock: ContentBlock): ContentBlock {
+  if (defaultBlock.type === "hero" && storedBlock.type === "hero") {
+    return mergeMediaFields(defaultBlock as HeroBlock, storedBlock as HeroBlock);
+  }
+  if (
+    (defaultBlock.type === "text-image" || defaultBlock.type === "image-text") &&
+    storedBlock.type === defaultBlock.type
+  ) {
+    return mergeMediaFields(defaultBlock as TextImageBlock, storedBlock as TextImageBlock);
+  }
+  if (defaultBlock.type === "wide-image" && storedBlock.type === "wide-image") {
+    return mergeMediaFields(defaultBlock as WideImageBlock, storedBlock as WideImageBlock);
+  }
+
   const merged = {
     ...defaultBlock,
     ...storedBlock,
