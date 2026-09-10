@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AtmosphereCardImage } from "@/components/public-wizard/AtmosphereCardImage";
 import { ATMOSPHERES, getAtmosphere } from "@/lib/public-wizard/atmospheres";
+import { getAtmosphereFallback } from "@/lib/ledpaneel/fallback-images";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardNav } from "@/components/public-wizard/WizardShell";
 import type { AtmosphereId } from "@/types/public-wizard";
@@ -58,7 +59,7 @@ export function StepAtmosphere() {
         subtitle: item.subtitle,
         description: item.presentationText,
         imageMediaId: null,
-        imageUrl: null as string | null,
+        imageUrl: getAtmosphereFallback(item.id),
         imageAlt: item.title,
         enabled: item.id !== "premium_architectural",
         badgeText: item.id === "premium_architectural" ? "ONLY PREMIUM" : undefined,

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getRoomFunction, ROOM_FUNCTIONS } from "@/lib/public-wizard/room-functions";
+import { getRoomFallback } from "@/lib/ledpaneel/fallback-images";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardCard, WizardNav } from "@/components/public-wizard/WizardShell";
 import type { RoomFunctionId } from "@/types/public-wizard";
@@ -41,7 +42,7 @@ export function StepRoom() {
         title: room.name,
         description: room.explanation,
         suggestedLux: room.suggestedLux,
-        imageUrl: null as string | null,
+        imageUrl: getRoomFallback(room.id),
         imageAlt: room.name,
       }));
     }

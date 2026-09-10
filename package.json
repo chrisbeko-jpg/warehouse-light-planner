@@ -10,7 +10,7 @@
     "lint": "next lint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:unit": "npx tsx --test lib/public-wizard/*.test.ts lib/cms/*.test.ts"
+    "test:unit": "npx tsx --test lib/public-wizard/*.test.ts lib/cms/*.test.ts lib/ledpaneel/*.test.ts"
   },
   "dependencies": {
     "@tiptap/extension-image": "^3.30.5",
@@ -22,7 +22,6 @@
     "@tiptap/starter-kit": "^3.30.5",
     "@vercel/blob": "^2.8.0",
     "html2canvas": "^1.4.1",
-    "sanitize-html": "^2.17.1",
     "jspdf": "^4.2.1",
     "konva": "^9.3.20",
     "next": "^15.3.3",
@@ -31,21 +30,23 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-konva": "^19.0.6",
+    "sanitize-html": "^2.17.1",
     "zustand": "^5.0.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.55.0",
     "@tailwindcss/postcss": "^4",
-    "@types/sanitize-html": "^2.16.0",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sanitize-html": "^2.16.0",
     "eslint": "^9",
     "eslint-config-next": "^15.3.3",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "tsx": "^4.20.5"
+    "tsx": "^4.20.5",
+    "typescript": "^5"
   }
 }

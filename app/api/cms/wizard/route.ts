@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { loadCmsSite } from "@/lib/cms/content-store";
-import { readMediaId, resolveMedia } from "@/lib/cms/media";
+import { readMediaId } from "@/lib/cms/media";
+import { getAtmosphereFallback, getRoomFallback } from "@/lib/ledpaneel/fallback-images";
+import { resolveMediaUrlWithFallback } from "@/lib/ledpaneel/resolve-fallback-media";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,11 +17,11 @@ function mapRoomChoices(site: Awaited<ReturnType<typeof loadCmsSite>>) {
       return {
         ...choice,
         imageMediaId: mediaId,
-        imageUrl: resolveMedia(site.images, mediaId, {
+        imageUrl: resolveMediaUrlWithFallback(site.images, choice, getRoomFallback(choice.id), {
           altFallback: choice.title,
           altOverride: choice.altTextOverride ?? choice.imageAlt,
           context: choice.id,
-        })?.url ?? null,
+        }),
         imageAlt: choice.altTextOverride ?? choice.imageAlt ?? choice.title,
       };
     });
@@ -34,11 +36,11 @@ function mapAtmosphereChoices(site: Awaited<ReturnType<typeof loadCmsSite>>) {
       return {
         ...choice,
         imageMediaId: mediaId,
-        imageUrl: resolveMedia(site.images, mediaId, {
+        imageUrl: resolveMediaUrlWithFallback(site.images, choice, getAtmosphereFallback(choice.id), {
           altFallback: choice.title,
           altOverride: choice.altTextOverride ?? choice.imageAlt,
           context: choice.id,
-        })?.url ?? null,
+        }),
         imageAlt: choice.altTextOverride ?? choice.imageAlt ?? choice.title,
       };
     });

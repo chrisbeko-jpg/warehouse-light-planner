@@ -1,7 +1,14 @@
 import Link from "next/link";
 import type { ContentBlock, CmsSiteContent } from "@/types/cms";
 import { CmsImage } from "@/components/cms/CmsImage";
-import { resolveMediaFromSource } from "@/lib/cms/media";
+import {
+  getHeroFallback,
+  getHomepageExampleFallback,
+  getKantoorExampleFallback,
+  getProductFallback,
+  getTextImageFallback,
+} from "@/lib/ledpaneel/fallback-images";
+import { resolveMediaWithFallback } from "@/lib/ledpaneel/resolve-fallback-media";
 import { getExampleImageSlots } from "@/lib/cms/normalize-media";
 import { RichTextContent } from "@/components/cms/RichTextContent";
 import { sanitizeRichHtml } from "@/lib/cms/sanitize";
@@ -41,12 +48,12 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
               </div>
             </div>
             <CmsImage
-              media={resolveMediaFromSource(images, block, {
+              media={resolveMediaWithFallback(images, block, getHeroFallback(block.id), {
                 altFallback: block.headline,
                 altOverride: block.altTextOverride ?? block.imageAlt,
                 context: "hero",
               })}
-              testId="homepage-hero-image"
+              testId={block.id === "hero" ? "homepage-hero-image" : undefined}
             />
           </div>
         </section>
@@ -89,7 +96,7 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
         <section className="lp-section">
           <div className="lp-container">
             <CmsImage
-              media={resolveMediaFromSource(images, block, {
+              media={resolveMediaWithFallback(images, block, getTextImageFallback(block.id), {
                 altFallback: block.alt,
                 context: block.id,
               })}
@@ -152,7 +159,7 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
               {block.items.map((item, index) => (
                 <article key={item.name} className="lp-card overflow-hidden">
                   <CmsImage
-                    media={resolveMediaFromSource(images, item, {
+                    media={resolveMediaWithFallback(images, item, getProductFallback(index), {
                       altFallback: item.name,
                       altOverride: item.altTextOverride,
                       context: `product-${index}`,
@@ -179,25 +186,25 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
               <p className="lp-body mt-4">{block.body}</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {getExampleImageSlots(block)
-                .map((ref, index) => ({
-                  ref,
-                  index,
-                  media: resolveMediaFromSource(images, ref, {
-                    altFallback: ref.title ?? `Voorbeeld ${index + 1}`,
-                    altOverride: ref.altTextOverride,
-                    context: `example-${index}`,
-                  }),
-                }))
-                .filter((entry) => entry.media)
-                .map(({ ref, index, media }) => (
+              {getExampleImageSlots(block).map((ref, index) => {
+                const fallbackPath =
+                  block.id === "voorbeeld-project"
+                    ? getKantoorExampleFallback(index)
+                    : getHomepageExampleFallback(index);
+                const media = resolveMediaWithFallback(images, ref, fallbackPath, {
+                  altFallback: ref.title ?? `Voorbeeld ${index + 1}`,
+                  altOverride: ref.altTextOverride,
+                  context: `example-${index}`,
+                });
+                return (
                   <CmsImage
                     key={`example-${index}`}
                     media={media}
                     alt={ref.altTextOverride ?? ref.title ?? `Voorbeeld ${index + 1}`}
                     testId={`example-image-${index}`}
                   />
-                ))}
+                );
+              })}
             </div>
           </div>
         </section>
@@ -226,7 +233,7 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
             </div>
             <div className={block.type === "image-text" ? "lg:[direction:ltr]" : ""}>
               <CmsImage
-                media={resolveMediaFromSource(images, block, {
+                media={resolveMediaWithFallback(images, block, getTextImageFallback(block.id), {
                   altFallback: block.heading,
                   altOverride: block.altTextOverride ?? block.imageAlt,
                   context: block.id,
