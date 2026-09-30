@@ -19,7 +19,7 @@ export async function startWizard(page: Page) {
   await expect(page.getByText("Welke ruimte wilt u verlichten?")).toBeVisible();
 }
 
-export async function selectRoom(page: Page, roomId: string) {
+export async function selectRoom(page: Page, roomId = "workplace_office") {
   const option = page.getByTestId(`room-option-${roomId}`);
   await option.scrollIntoViewIfNeeded();
   await expect(option).toBeVisible();
@@ -28,7 +28,7 @@ export async function selectRoom(page: Page, roomId: string) {
   await expect(page.getByTestId("wizard-next-button")).toBeEnabled({ timeout: 5000 });
 }
 
-export async function advanceRoom(page: Page, roomId = "open_kantoor") {
+export async function advanceRoom(page: Page, roomId = "workplace_office") {
   await startWizard(page);
   await selectRoom(page, roomId);
   await page.getByTestId("wizard-next-button").click();
@@ -37,6 +37,31 @@ export async function advanceRoom(page: Page, roomId = "open_kantoor") {
 export async function advanceAtmosphere(page: Page) {
   await page.getByTestId("atmosphere-option-neutraal").click();
   await page.getByTestId("wizard-next-button").click();
+}
+
+export async function advanceInputMethodFloorplan(page: Page) {
+  await page.getByTestId("input-method-floorplan").click();
+  await page.getByTestId("wizard-next-button").click();
+}
+
+export async function advanceInputMethodDimensions(page: Page) {
+  await page.getByTestId("input-method-dimensions").click();
+  await page.getByTestId("wizard-next-button").click();
+}
+
+export async function advanceToFloorplanUpload(page: Page, roomId = "workplace_office") {
+  await advanceRoom(page, roomId);
+  await advanceAtmosphere(page);
+  await advanceInputMethodFloorplan(page);
+}
+
+export async function fillManualDimensions(page: Page, length = "8,00", width = "5,00", height = "2,70") {
+  await page.getByTestId("manual-length-input").fill(length);
+  await page.getByTestId("manual-width-input").fill(width);
+  await page.getByTestId("manual-height-input").fill(height);
+  await expect(page.getByTestId("manual-area-label")).toContainText("40,0 m²");
+  await page.getByTestId("wizard-next-button").click();
+  await expect(page.getByTestId("floor-plan-editor")).toBeVisible({ timeout: 15000 });
 }
 
 export async function uploadFloorPlan(page: Page) {
@@ -89,8 +114,11 @@ export async function setupEditor(page: Page) {
 }
 
 export async function generateAndOpenResult(page: Page) {
-  await page.getByTestId("generate-light-plan-button").click();
-  await expect(page.getByTestId("toggle-heatmap-button")).toBeVisible();
+  const generate = page.getByTestId("generate-light-plan-button");
+  if (await generate.isVisible()) {
+    await generate.click();
+  }
+  await expect(page.getByTestId("toggle-heatmap-button")).toBeVisible({ timeout: 15000 });
   await page.getByTestId("editor-continue-button").click();
   await expect(page.getByText("Indicatief resultaat")).toBeVisible();
 }

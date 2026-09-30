@@ -76,6 +76,21 @@ export function generatePublicLeadPdf(record: PublicLeadRecord): string {
   y += 4;
   doc.text(`Ruimte: ${room.name} · Sfeer: ${atmosphere.title} · Plafond: ${wizard.ceilingHeightM} m`, MARGIN, y);
   y += 5;
+  const inputLabel =
+    wizard.inputMethod === "dimensions"
+      ? "Invoermethode: handmatig ingevoerde afmetingen"
+      : "Invoermethode: geüploade plattegrond";
+  doc.text(inputLabel, MARGIN, y);
+  y += 5;
+  if (wizard.inputMethod === "dimensions" && wizard.manualDimensions) {
+    const d = wizard.manualDimensions;
+    doc.text(
+      `Afmetingen: ${d.lengthM.toFixed(2)} × ${d.widthM.toFixed(2)} m · Oppervlakte: ${(d.lengthM * d.widthM).toFixed(1)} m²`,
+      MARGIN,
+      y,
+    );
+    y += 5;
+  }
   doc.text(`Doel lux: ${wizard.targetLux} · Indicatief: ${wizard.result.indicativeAverageLux} lux · Voldoet: ${wizard.result.meetsTarget ? "Ja" : "Nee"}`, MARGIN, y);
 
   addImagePage(doc, "Pagina 1 — Lichtplan", lightPlanImageBase64, [

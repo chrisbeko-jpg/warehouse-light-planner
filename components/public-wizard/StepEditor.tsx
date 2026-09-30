@@ -60,6 +60,8 @@ export function StepEditor() {
   const aiRecognitionFailed = usePublicWizardStore((s) => s.aiRecognitionFailed);
   const aiRecognitionAttempted = usePublicWizardStore((s) => s.aiRecognitionAttempted);
   const preferredProductId = usePublicWizardStore((s) => s.preferredProductId);
+  const inputMethod = usePublicWizardStore((s) => s.inputMethod);
+  const manualDimensionsRoute = inputMethod === "dimensions";
 
   const prevStep = usePublicWizardStore((s) => s.prevStep);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
@@ -113,11 +115,12 @@ export function StepEditor() {
   const indicativeResult = getIndicativeResult();
 
   useEffect(() => {
+    if (manualDimensionsRoute) return;
     if (!pixelsPerMeter) {
       setEditorMode("calibrate-scale");
       setEditorPhase("scale");
     }
-  }, [pixelsPerMeter, setEditorMode, setEditorPhase]);
+  }, [pixelsPerMeter, setEditorMode, setEditorPhase, manualDimensionsRoute]);
 
   useEffect(() => {
     if (calibrationDraft.length === 2 && editorMode === "calibrate-scale") {
@@ -200,9 +203,16 @@ export function StepEditor() {
   }, [backgroundDataUrl, pixelsPerMeter, setAiRecognitionState, setRoomVertices, setEditorPhase, setEditorMode]);
 
   useEffect(() => {
+    if (manualDimensionsRoute) return;
     if (typeof window !== "undefined" && window.localStorage.getItem("skip-ai-room") === "1") return;
     if (pixelsPerMeter && backgroundDataUrl && !aiRecognitionAttempted) void runRecognition();
-  }, [pixelsPerMeter, backgroundDataUrl, aiRecognitionAttempted, runRecognition]);
+  }, [
+    pixelsPerMeter,
+    backgroundDataUrl,
+    aiRecognitionAttempted,
+    runRecognition,
+    manualDimensionsRoute,
+  ]);
 
   const heatmapSpots = useMemo(() => {
     if (!showHeatmap || !pixelsPerMeter || fixtures.length === 0) return [];
@@ -464,6 +474,7 @@ export function StepEditor() {
             roomComplete={roomComplete}
             roomAreaM2={roomAreaM2}
             pixelsPerMeter={pixelsPerMeter}
+            manualDimensionsRoute={manualDimensionsRoute}
             recognizing={recognizing}
             aiRecognitionFailed={aiRecognitionFailed}
             showHeatmap={showHeatmap}
@@ -838,6 +849,7 @@ function SidePanel({
   roomComplete,
   roomAreaM2,
   pixelsPerMeter,
+  manualDimensionsRoute,
   recognizing,
   aiRecognitionFailed,
   showHeatmap,
@@ -867,6 +879,7 @@ function SidePanel({
   roomComplete: boolean;
   roomAreaM2: number | null;
   pixelsPerMeter: number | null;
+  manualDimensionsRoute: boolean;
   recognizing: boolean;
   aiRecognitionFailed: boolean;
   showHeatmap: boolean;
@@ -894,17 +907,23 @@ function SidePanel({
     <div className="space-y-3 p-4 text-sm" data-testid="editor-steps-panel">
       <StepBlock
         number={1}
-        title="Schaal"
-        active={editorPhase === "scale" || editorMode === "calibrate-scale"}
+        title={manualDimensionsRoute ? "Afmetingen" : "Schaal"}
+        active={!manualDimensionsRoute && (editorPhase === "scale" || editorMode === "calibrate-scale")}
         done={scaleComplete}
-        statusLabel={scaleComplete ? "Schaal ingesteld ✓" : undefined}
+        statusLabel={
+          scaleComplete
+            ? manualDimensionsRoute
+              ? "Afmetingen uit invoer ✓"
+              : "Schaal ingesteld ✓"
+            : undefined
+        }
       >
-        {!scaleComplete && (
+        {!scaleComplete && !manualDimensionsRoute && (
           <p className="text-xs text-[var(--lp-text-secondary)]">
             Klik twee punten op de plattegrond waarvan u de werkelijke afstand kent.
           </p>
         )}
-        {!scaleComplete && editorMode === "calibrate-scale" && calibrationDraftCount >= 1 && (
+        {!scaleComplete && !manualDimensionsRoute && editorMode === "calibrate-scale" && calibrationDraftCount >= 1 && (
           <button
             type="button"
             data-testid="calibration-restart-button"
@@ -914,10 +933,10 @@ function SidePanel({
             Opnieuw
           </button>
         )}
-        {scaleComplete && pixelsPerMeter && (
+        {scaleComplete && pixelsPerMeter && !manualDimensionsRoute && (
           <p className="text-xs font-medium text-[var(--lp-green-dark)]">{formatScaleLabel(pixelsPerMeter)}</p>
         )}
-        {scaleComplete && (
+        {scaleComplete && !manualDimensionsRoute && (
           <button
             type="button"
             data-testid="reset-scale-button"

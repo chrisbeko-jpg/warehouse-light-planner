@@ -24,5 +24,7 @@ test("scale reset preserve keys include wizard choices and floor plan", () => {
   assert.ok(SCALE_RESET_PRESERVE_KEYS.includes("atmosphere"));
   assert.ok(SCALE_RESET_PRESERVE_KEYS.includes("preferredProductId"));
   assert.ok(SCALE_RESET_PRESERVE_KEYS.includes("backgroundDataUrl"));
+  assert.ok(SCALE_RESET_PRESERVE_KEYS.includes("inputMethod"));
+  assert.ok(SCALE_RESET_PRESERVE_KEYS.includes("manualDimensions"));
   assert.ok(SCALE_RESET_PRESERVE_KEYS.includes("backgroundFileName"));
 });

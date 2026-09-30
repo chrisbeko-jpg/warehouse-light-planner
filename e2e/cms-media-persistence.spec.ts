@@ -91,7 +91,7 @@ test.describe("CMS mediaId persistence after save", () => {
     const upload = await uploadTestImage(request, "persist-room.png");
     await loginAsAdmin(page, "/internal/content/wizard/rooms");
 
-    const roomCard = page.getByTestId("room-choice-open_kantoor");
+    const roomCard = page.getByTestId("room-choice-workplace_office");
     await roomCard.locator('[data-testid="media-picker-select"]').selectOption(upload.media.id);
     await page.getByRole("button", { name: "Opslaan als concept" }).click();
     await expect(roomCard.locator('[data-testid="media-picker-select"]')).toHaveValue(upload.media.id);

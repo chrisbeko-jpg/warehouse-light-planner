@@ -8,11 +8,17 @@ import {
   MATERIAL_PRICE_DISCLAIMER,
   MATERIAL_PRICE_FOOTNOTE,
 } from "@/lib/public-wizard/pricing";
+import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
+import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import { createRoomPolygon } from "@/lib/public-wizard/placement";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
+import { formatMetersNl } from "@/lib/public-wizard/viewport";
 import { WizardCard, WizardNav } from "@/components/public-wizard/WizardShell";
 
 export function StepResult() {
+  const roomFunction = usePublicWizardStore((s) => s.roomFunction);
+  const atmosphere = usePublicWizardStore((s) => s.atmosphere);
+  const manualDimensions = usePublicWizardStore((s) => s.manualDimensions);
   const roomVertices = usePublicWizardStore((s) => s.roomVertices);
   const pixelsPerMeter = usePublicWizardStore((s) => s.pixelsPerMeter);
   const targetLux = usePublicWizardStore((s) => s.targetLux);
@@ -32,6 +38,12 @@ export function StepResult() {
   }
 
   const price = calculateMaterialPrice(fixtures);
+  const roomMeta = roomFunction ? getRoomFunction(roomFunction) : null;
+  const atmosphereMeta = atmosphere ? getAtmosphere(atmosphere) : null;
+  const dimensionLabel =
+    manualDimensions != null
+      ? `${formatMetersNl(manualDimensions.lengthM)} × ${formatMetersNl(manualDimensions.widthM)} m`
+      : null;
 
   return (
     <div>
@@ -42,8 +54,17 @@ export function StepResult() {
 
       <WizardCard className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Stat label="Oppervlakte" value={`${result.areaM2.toFixed(2)} m²`} />
+          {roomMeta && <Stat label="Ruimte" value={roomMeta.name} />}
+          {dimensionLabel && <Stat label="Afmetingen" value={dimensionLabel} />}
+          <Stat label="Oppervlakte" value={`${formatMetersNl(result.areaM2, 1)} m²`} />
+          <Stat label="Plafondhoogte" value={`${formatMetersNl(ceilingHeightM)} m`} />
           <Stat label="Doel lux" value={`${result.targetLux} lux`} />
+          {atmosphereMeta && (
+            <>
+              <Stat label="Sfeer" value={atmosphereMeta.title} />
+              <Stat label="Lichtkleur" value={atmosphereMeta.subtitle.replace(/^LED-panelen ·\s*/i, "")} />
+            </>
+          )}
           <Stat label="Armaturen" value={`${result.fixtureCount}`} />
           <Stat label="Totaal vermogen" value={`${result.totalWattage} W`} />
           <Stat label="Indicatief berekend" value={`${result.indicativeAverageLux} lux`} />

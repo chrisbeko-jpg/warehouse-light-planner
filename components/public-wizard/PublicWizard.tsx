@@ -6,6 +6,8 @@ import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardProgress } from "@/components/public-wizard/WizardShell";
 import { StepRoom } from "@/components/public-wizard/StepRoom";
 import { StepAtmosphere } from "@/components/public-wizard/StepAtmosphere";
+import { StepInputMethod } from "@/components/public-wizard/StepInputMethod";
+import { StepManualDimensions } from "@/components/public-wizard/StepManualDimensions";
 import { StepFloorPlanUpload } from "@/components/public-wizard/StepFloorPlanUpload";
 import { StepResult } from "@/components/public-wizard/StepResult";
 import { StepRequest } from "@/components/public-wizard/StepRequest";
@@ -45,6 +47,8 @@ export function PublicWizard() {
       </div>
       {step === "room" && <StepRoom />}
       {step === "atmosphere" && <StepAtmosphere />}
+      {step === "inputMethod" && <StepInputMethod />}
+      {step === "dimensions" && <StepManualDimensions />}
       {step === "floorplan" && <StepFloorPlanUpload />}
       {step === "result" && <StepResult />}
       {step === "request" && <StepRequest />}

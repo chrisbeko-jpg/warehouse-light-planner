@@ -1,13 +1,16 @@
 import { test, expect } from "@playwright/test";
 import {
   advanceAtmosphere,
+  advanceInputMethodDimensions,
+  advanceInputMethodFloorplan,
   advanceRoom,
+  advanceToFloorplanUpload,
   drawRoomPolygon,
+  fillManualDimensions,
   generateAndOpenResult,
   setupEditor,
   startWizard,
   uploadFloorPlan,
-  calibrateScale,
   selectRoom,
 } from "./helpers/wizard";
 
@@ -18,15 +21,24 @@ test.describe("Public LED site & wizard", () => {
     await expect(page.getByRole("link", { name: "Start gratis AI Lichtadvies" }).first()).toBeVisible();
   });
 
-  test("room function selection", async ({ page }) => {
+  test("room function selection sets target lux", async ({ page }) => {
     await startWizard(page);
-    await selectRoom(page, "gang");
-    await expect(page.locator('input[type="number"]').nth(1)).toHaveValue("100");
+    await selectRoom(page, "reception_hall");
+    await expect(page.getByText("250 lux")).toBeVisible();
+    await selectRoom(page, "workplace_office");
+    await expect(page.getByText("500 lux")).toBeVisible();
+  });
+
+  test("shows three compact room choices", async ({ page }) => {
+    await startWizard(page);
+    await expect(page.getByTestId("room-option-workplace_office")).toBeVisible();
+    await expect(page.getByTestId("room-option-reception_hall")).toBeVisible();
+    await expect(page.getByTestId("room-option-other_spaces")).toBeVisible();
+    await expect(page.getByTestId("room-option-open_kantoor")).toHaveCount(0);
   });
 
   test("fullscreen editor layout", async ({ page }) => {
-    await advanceRoom(page);
-    await advanceAtmosphere(page);
+    await advanceToFloorplanUpload(page);
     await uploadFloorPlan(page);
     await expect(page.getByTestId("floor-plan-editor")).toBeVisible();
     await expect(page.getByLabel("Zoom in")).toBeVisible();
@@ -36,8 +48,7 @@ test.describe("Public LED site & wizard", () => {
   });
 
   test("full wizard flow through editor", async ({ page }) => {
-    await advanceRoom(page);
-    await advanceAtmosphere(page);
+    await advanceToFloorplanUpload(page);
     await uploadFloorPlan(page);
     await setupEditor(page);
     await generateAndOpenResult(page);
@@ -45,9 +56,18 @@ test.describe("Public LED site & wizard", () => {
     await expect(page.getByText(/Exclusief btw, verzending, montage/i)).toBeVisible();
   });
 
-  test("result and request allow returning to editor with state", async ({ page }) => {
+  test("manual dimensions route generates plan", async ({ page }) => {
     await advanceRoom(page);
     await advanceAtmosphere(page);
+    await advanceInputMethodDimensions(page);
+    await fillManualDimensions(page);
+    await generateAndOpenResult(page);
+    await expect(page.getByText("8,00 × 5,00 m")).toBeVisible();
+    await expect(page.getByText("500 lux")).toBeVisible();
+  });
+
+  test("result and request allow returning to editor with state", async ({ page }) => {
+    await advanceToFloorplanUpload(page);
     await uploadFloorPlan(page);
     await setupEditor(page);
     await generateAndOpenResult(page);
@@ -63,25 +83,32 @@ test.describe("Public LED site & wizard", () => {
 
   test("premium atmosphere is visible but disabled", async ({ page }) => {
     await startWizard(page);
-    await selectRoom(page, "open_kantoor");
+    await selectRoom(page, "workplace_office");
     await page.getByTestId("wizard-next-button").click();
     const premium = page.getByTestId("atmosphere-option-premium_architectural");
     await expect(premium).toBeVisible();
     await expect(premium).toHaveAttribute("data-disabled", "true");
     await page.getByTestId("atmosphere-option-warm").click();
     await page.getByTestId("wizard-next-button").click();
+    await expect(page.getByText("Hoe wilt u de ruimte invoeren?")).toBeVisible();
+    await advanceInputMethodFloorplan(page);
     await expect(page.getByText(/plattegrond/i).first()).toBeVisible();
   });
 
-  test("wizard CMS endpoint serves room and atmosphere choices", async ({ request }) => {
+  test("wizard CMS endpoint serves three room choices", async ({ request }) => {
     const res = await request.get("/api/cms/wizard");
     expect(res.ok()).toBeTruthy();
     const data = (await res.json()) as {
-      roomChoices: { id: string; title: string }[];
+      roomChoices: { id: string; title: string; suggestedLux: number }[];
       atmosphereChoices: { id: string; enabled: boolean }[];
     };
-    expect(data.roomChoices.length).toBeGreaterThan(0);
-    expect(data.atmosphereChoices.some((c) => c.id === "warm" && c.enabled !== false)).toBeTruthy();
+    expect(data.roomChoices.length).toBe(3);
+    expect(data.roomChoices.map((c) => c.id).sort()).toEqual([
+      "other_spaces",
+      "reception_hall",
+      "workplace_office",
+    ]);
+    expect(data.atmosphereChoices.some((c) => c.id === "neutraal" && c.enabled !== false)).toBeTruthy();
     expect(
       data.atmosphereChoices.some((c) => c.id === "premium_architectural" && c.enabled === false),
     ).toBeTruthy();
@@ -95,8 +122,7 @@ test.describe("Public LED site & wizard", () => {
         body: JSON.stringify({ success: true, message: "Aanvraag ontvangen", reference: "LP-TEST-002" }),
       });
     });
-    await advanceRoom(page);
-    await advanceAtmosphere(page);
+    await advanceToFloorplanUpload(page);
     await uploadFloorPlan(page);
     await setupEditor(page);
     await generateAndOpenResult(page);

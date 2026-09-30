@@ -20,11 +20,13 @@ import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
 import { createRoomPolygon } from "@/lib/public-wizard/placement";
 import type {
   LeadContactForm,
+  ManualDimensions,
   PublicLeadRecord,
   PublicProductId,
   PlacedPublicFixture,
   RoomFunctionId,
   AtmosphereId,
+  WizardInputMethod,
 } from "@/types/public-wizard";
 
 export const runtime = "nodejs";
@@ -42,6 +44,8 @@ interface SubmitBody {
   fixtures: PlacedPublicFixture[];
   roomVertices: { x: number; y: number }[];
   pixelsPerMeter: number;
+  inputMethod: WizardInputMethod;
+  manualDimensions: ManualDimensions | null;
   floorPlanDataUrl: string | null;
   lightPlanImageBase64?: string | null;
   heatmapImageBase64?: string | null;
@@ -76,7 +80,7 @@ export async function POST(request: Request) {
       return jsonError(validationError, 400);
     }
 
-    if (!body.roomFunction || !body.atmosphere || !body.fixtures || !body.roomVertices?.length) {
+    if (!body.roomFunction || !body.atmosphere || !body.fixtures || !body.roomVertices?.length || !body.inputMethod) {
       return jsonError("Wizardgegevens ontbreken.", 400);
     }
 
@@ -105,6 +109,8 @@ export async function POST(request: Request) {
         fixtures: body.fixtures,
         roomVertices: body.roomVertices,
         pixelsPerMeter: body.pixelsPerMeter,
+        inputMethod: body.inputMethod,
+        manualDimensions: body.manualDimensions ?? null,
         result,
         price,
       },

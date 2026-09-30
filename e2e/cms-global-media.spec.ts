@@ -165,18 +165,18 @@ test.describe("Global CMS media pipeline", () => {
     const premium = await uploadImage(request, "premium-global.png");
 
     await publishWizardMedia(request, {
-      open_kantoor: room.media.id,
+      workplace_office: room.media.id,
       warm: warm.media.id,
       premium_architectural: premium.media.id,
     });
 
     await startWizard(page);
-    await expect(page.getByTestId("room-option-open_kantoor").locator("img")).toHaveAttribute(
+    await expect(page.getByTestId("room-option-workplace_office").locator("img")).toHaveAttribute(
       "src",
       new RegExp(room.media.id),
     );
 
-    await selectRoom(page, "open_kantoor");
+    await selectRoom(page, "workplace_office");
     await page.getByTestId("wizard-next-button").click();
 
     await expect(page.getByTestId("atmosphere-card-image-warm")).toHaveAttribute(

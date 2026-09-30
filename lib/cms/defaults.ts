@@ -133,7 +133,7 @@ export const DEFAULT_WIZARD_CONTENT: CmsWizardContent = {
   roomChoices: ROOM_FUNCTIONS.map((room, index) => ({
     id: room.id,
     title: room.name,
-    description: room.explanation,
+    description: "",
     suggestedLux: room.suggestedLux,
     imageAlt: room.name,
     sortOrder: index,

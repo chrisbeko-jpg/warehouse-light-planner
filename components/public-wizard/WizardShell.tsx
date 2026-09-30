@@ -1,11 +1,13 @@
 "use client";
 
-import { usePublicWizardStore, WIZARD_STEP_LABELS } from "@/lib/public-wizard/store";
+import { getVisibleProgressSteps } from "@/lib/public-wizard/wizard-navigation";
+import { usePublicWizardStore } from "@/lib/public-wizard/store";
 
 export function WizardProgress() {
   const step = usePublicWizardStore((s) => s.step);
+  const inputMethod = usePublicWizardStore((s) => s.inputMethod);
   const setStep = usePublicWizardStore((s) => s.setStep);
-  const progressSteps = WIZARD_STEP_LABELS.filter((s) => s.showInProgress);
+  const progressSteps = getVisibleProgressSteps(inputMethod);
   const currentIdx = progressSteps.findIndex((s) => s.id === step);
 
   return (

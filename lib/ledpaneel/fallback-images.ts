@@ -1,4 +1,5 @@
 import type { AtmosphereId, PublicProductId, RoomFunctionId } from "@/types/public-wizard";
+import { normalizeRoomFunctionId } from "@/lib/public-wizard/room-functions";
 
 const IMAGE_ROOT = "/ledpaneel/images";
 
@@ -26,14 +27,9 @@ export const FALLBACK_IMAGES = {
     premium_architectural: imagePath("kantoorverlichting-premium.webp"),
   } satisfies Record<AtmosphereId, string>,
   rooms: {
-    open_kantoor: imagePath("open-kantoor-verlichting.webp"),
-    gesloten_kantoor: imagePath("gesloten-kantoor-verlichting.webp"),
-    vergader: imagePath("vergaderruimte-verlichting.webp"),
-    entree: imagePath("entree-verlichting.webp"),
-    gang: imagePath("gang-verlichting.webp"),
-    pantry: imagePath("kantine-verlichting.webp"),
-    toilet: imagePath("toilet-verlichting.webp"),
-    overig: imagePath("overig-ruimte-verlichting.webp"),
+    workplace_office: imagePath("open-kantoor-verlichting.webp"),
+    reception_hall: imagePath("entree-verlichting.webp"),
+    other_spaces: imagePath("overig-ruimte-verlichting.webp"),
   } satisfies Record<RoomFunctionId, string>,
   kantoorverlichting: {
     hero: imagePath("kantoorverlichting-hero.webp"),
@@ -67,14 +63,9 @@ export const FALLBACK_IMAGE_ALTS: Record<string, string> = {
   [FALLBACK_IMAGES.atmospheres.warm]: "Warm en comfortabel verlicht kantoor",
   [FALLBACK_IMAGES.atmospheres.neutraal]: "Helder functioneel verlicht kantoor met LED-panelen",
   [FALLBACK_IMAGES.atmospheres.premium_architectural]: "Luxe architectonische kantoorverlichting met rail- en pendelarmaturen",
-  [FALLBACK_IMAGES.rooms.open_kantoor]: "Open kantoor met uniforme LED-verlichting",
-  [FALLBACK_IMAGES.rooms.gesloten_kantoor]: "Gesloten kantoor met professionele verlichting",
-  [FALLBACK_IMAGES.rooms.vergader]: "Vergaderruimte met sfeervolle projectverlichting",
-  [FALLBACK_IMAGES.rooms.entree]: "Representatieve entree met professionele verlichting",
-  [FALLBACK_IMAGES.rooms.gang]: "Gangverlichting in kantooromgeving",
-  [FALLBACK_IMAGES.rooms.pantry]: "Kantine of pantry met warme verlichting",
-  [FALLBACK_IMAGES.rooms.toilet]: "Downlight verlichting voor sanitaire ruimte",
-  [FALLBACK_IMAGES.rooms.overig]: "Professionele verlichting in kantooromgeving",
+  [FALLBACK_IMAGES.rooms.workplace_office]: "Werkplek kantoor met professionele LED-verlichting",
+  [FALLBACK_IMAGES.rooms.reception_hall]: "Ontvangst of halzone met representatieve verlichting",
+  [FALLBACK_IMAGES.rooms.other_spaces]: "Neutrale zakelijke nevenruimte met professionele verlichting",
   [FALLBACK_IMAGES.kantoorverlichting.hero]: "Kantoorverlichting met LED-panelen in systeemplafond",
   [FALLBACK_IMAGES.kantoorverlichting.lichtkleur]: "Functionele kantoorverlichting met neutrale LED-panelen",
   [FALLBACK_IMAGES.kantoorverlichting.examples[0]!]: "Voorbeeld lichtplan kantoorverlichting",
@@ -105,10 +96,9 @@ export function getProductFallbackByIndex(index: number): PublicProductId {
 }
 
 export function getRoomFallback(roomId: string): string | null {
-  if (roomId in FALLBACK_IMAGES.rooms) {
-    return FALLBACK_IMAGES.rooms[roomId as RoomFunctionId];
-  }
-  return null;
+  const normalized = normalizeRoomFunctionId(roomId);
+  if (!normalized) return null;
+  return FALLBACK_IMAGES.rooms[normalized];
 }
 
 export function getAtmosphereFallback(atmosphereId: string): string | null {

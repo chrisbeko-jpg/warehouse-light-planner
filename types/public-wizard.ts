@@ -3,20 +3,22 @@ import type { Point2D } from "@/types/floor-plan";
 export type WizardStepId =
   | "room"
   | "atmosphere"
+  | "inputMethod"
   | "floorplan"
+  | "dimensions"
   | "editor"
   | "result"
   | "request";
 
-export type RoomFunctionId =
-  | "open_kantoor"
-  | "gesloten_kantoor"
-  | "vergader"
-  | "entree"
-  | "gang"
-  | "pantry"
-  | "toilet"
-  | "overig";
+export type WizardInputMethod = "floorplan" | "dimensions";
+
+export type RoomFunctionId = "workplace_office" | "reception_hall" | "other_spaces";
+
+export interface ManualDimensions {
+  lengthM: number;
+  widthM: number;
+  ceilingHeightM: number;
+}
 
 export type AtmosphereId = "warm" | "neutraal" | "premium_architectural";
 
@@ -129,6 +131,8 @@ export interface PublicLeadRecord {
     fixtures: PlacedPublicFixture[];
     roomVertices: Point2D[];
     pixelsPerMeter: number;
+    inputMethod: WizardInputMethod;
+    manualDimensions: ManualDimensions | null;
     result: IndicativeResult;
     price: MaterialPriceIndication;
   };

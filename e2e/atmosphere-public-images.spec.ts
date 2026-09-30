@@ -48,7 +48,7 @@ async function publishAtmosphereImages(
 
 async function openAtmosphereStep(page: import("@playwright/test").Page) {
   await startWizard(page);
-  await selectRoom(page, "open_kantoor");
+  await selectRoom(page, "workplace_office");
   await page.getByTestId("wizard-next-button").click();
   await expect(page.getByRole("heading", { name: "Welke sfeer zoekt u?" })).toBeVisible();
 }

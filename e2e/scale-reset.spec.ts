@@ -1,7 +1,8 @@
 import { test, expect, devices } from "@playwright/test";
 import {
   advanceAtmosphere,
-  advanceRoom,
+  advanceInputMethodFloorplan,
+  advanceToFloorplanUpload,
   calibrateScale,
   drawRoomPolygon,
   generateAndOpenResult,
@@ -27,8 +28,7 @@ async function openEditorStepsPanel(page: import("@playwright/test").Page) {
 
 test.describe("Scale reset (iPad/touch editor)", () => {
   test.beforeEach(async ({ page }) => {
-    await advanceRoom(page, "open_kantoor");
-    await advanceAtmosphere(page);
+    await advanceToFloorplanUpload(page);
     await uploadFloorPlan(page);
     await openEditorStepsPanel(page);
   });
@@ -135,8 +135,7 @@ test("iPad viewport supports touch-sized scale controls", async ({ browser }) =>
   const context = await browser.newContext({ ...devices["iPad Pro 11"] });
   const page = await context.newPage();
   try {
-    await advanceRoom(page, "open_kantoor");
-    await advanceAtmosphere(page);
+    await advanceToFloorplanUpload(page);
     await uploadFloorPlan(page);
     await clickCanvasPoint(page, 0.3, 0.5);
     const overlayRestartBox = await page.getByTestId("calibration-restart-overlay-button").boundingBox();

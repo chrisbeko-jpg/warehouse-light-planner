@@ -65,7 +65,7 @@ test.describe("CMS wizard save and publish", () => {
     await page.getByLabel("Admin token").fill(ADMIN_TOKEN);
     await page.getByRole("button", { name: "Inloggen" }).click();
 
-    const roomCard = page.getByTestId("room-choice-open_kantoor");
+    const roomCard = page.getByTestId("room-choice-workplace_office");
     await roomCard.locator("select").selectOption(upload.media.id);
     await page.getByRole("button", { name: "Opslaan als concept" }).click();
     await expect(page.getByTestId("wizard-editor-message")).toContainText("Wijzigingen opgeslagen");

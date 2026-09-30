@@ -53,6 +53,8 @@ export const SCALE_RESET_PATCH: Pick<
 /** Wizard choices and uploaded floor plan fields that must survive a scale reset. */
 export const SCALE_RESET_PRESERVE_KEYS = [
   "roomFunction",
+  "inputMethod",
+  "manualDimensions",
   "ceilingHeightM",
   "targetLux",
   "atmosphere",

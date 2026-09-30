@@ -2,6 +2,8 @@ import { DEFAULT_CMS_SITE } from "@/lib/cms/defaults";
 import { normalizeContentBlock, normalizeSiteMediaPayload } from "@/lib/cms/normalize-media";
 import { EXAMPLE_IMAGE_SLOT_COUNT, readMediaId } from "@/lib/cms/media";
 import { KANTOORVERLICHTING_SEED } from "@/lib/cms/seeds/kantoorverlichting";
+import { normalizeRoomFunctionId } from "@/lib/public-wizard/room-functions";
+import type { RoomFunctionId } from "@/types/public-wizard";
 import type {
   CmsImageRecord,
   CmsPage,
@@ -13,6 +15,7 @@ import type {
   ProductsBlock,
   ContentBlock,
   WizardAtmosphereChoiceCms,
+  WizardRoomChoiceCms,
   HeroBlock,
   TextImageBlock,
   WideImageBlock,
@@ -76,21 +79,46 @@ function mergeAtmosphereChoices(
   });
 }
 
+function mergeRoomChoices(
+  defaultItems: WizardRoomChoiceCms[],
+  storedItems?: WizardRoomChoiceCms[],
+): WizardRoomChoiceCms[] {
+  const byId = new Map<RoomFunctionId, WizardRoomChoiceCms>();
+  for (const item of storedItems ?? []) {
+    const normalizedId = normalizeRoomFunctionId(item.id);
+    if (!normalizedId) continue;
+    const existing = byId.get(normalizedId);
+    const mediaId = readMediaId(item) ?? readMediaId(existing) ?? null;
+    byId.set(normalizedId, {
+      ...(existing ?? defaultItems.find((entry) => entry.id === normalizedId)),
+      ...existing,
+      ...item,
+      id: normalizedId,
+      mediaId,
+      imageId: mediaId ?? undefined,
+      suggestedLux:
+        defaultItems.find((entry) => entry.id === normalizedId)?.suggestedLux ?? item.suggestedLux,
+    });
+  }
+
+  return defaultItems.map((defaultItem) => {
+    const storedItem = byId.get(defaultItem.id as RoomFunctionId);
+    if (!storedItem) return defaultItem;
+    const mediaId = readMediaId(storedItem) ?? readMediaId(defaultItem) ?? null;
+    return {
+      ...defaultItem,
+      ...storedItem,
+      id: defaultItem.id,
+      suggestedLux: defaultItem.suggestedLux,
+      mediaId,
+      imageId: mediaId ?? undefined,
+    };
+  });
+}
+
 export function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardContent {
   const defaults = DEFAULT_CMS_SITE.wizard;
   if (!stored) return defaults;
-
-  const mergeRoomChoices = <T extends { id: string }>(defaultItems: T[], storedItems?: T[]): T[] => {
-    if (!storedItems?.length) return defaultItems;
-    const byId = new Map(storedItems.map((item) => [item.id, item]));
-    return defaultItems.map((item) => {
-      const storedItem = byId.get(item.id);
-      if (!storedItem) return item;
-      const merged = { ...item, ...storedItem };
-      const mediaId = readMediaId(merged as { mediaId?: string | null; imageId?: string | null });
-      return mediaId ? ({ ...merged, mediaId, imageId: mediaId } as T) : merged;
-    });
-  };
 
   return {
     roomChoices: mergeRoomChoices(defaults.roomChoices, stored.roomChoices),

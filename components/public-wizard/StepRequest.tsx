@@ -44,6 +44,8 @@ export function StepRequest() {
   const roomVertices = usePublicWizardStore((s) => s.roomVertices);
   const pixelsPerMeter = usePublicWizardStore((s) => s.pixelsPerMeter);
   const backgroundDataUrl = usePublicWizardStore((s) => s.backgroundDataUrl);
+  const inputMethod = usePublicWizardStore((s) => s.inputMethod);
+  const manualDimensions = usePublicWizardStore((s) => s.manualDimensions);
   const backgroundWidth = usePublicWizardStore((s) => s.backgroundWidth);
   const backgroundHeight = usePublicWizardStore((s) => s.backgroundHeight);
   const setSubmitResult = usePublicWizardStore((s) => s.setSubmitResult);
@@ -84,7 +86,7 @@ export function StepRequest() {
       setError(validationError);
       return;
     }
-    if (!roomFunction || !atmosphere || !pixelsPerMeter || !backgroundDataUrl) {
+    if (!roomFunction || !atmosphere || !pixelsPerMeter || !backgroundDataUrl || !inputMethod) {
       setError("Wizardgegevens ontbreken. Start opnieuw.");
       return;
     }
@@ -116,6 +118,8 @@ export function StepRequest() {
           fixtures,
           roomVertices,
           pixelsPerMeter,
+          inputMethod,
+          manualDimensions,
           floorPlanDataUrl: backgroundDataUrl,
           lightPlanImageBase64: snapshots.lightPlanPng,
           heatmapImageBase64: snapshots.heatmapPng,

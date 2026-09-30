@@ -70,6 +70,29 @@ export function parseDistanceMeters(input: string): number | null {
   return value;
 }
 
+export const DIMENSION_LIMITS = {
+  minM: 0.5,
+  maxLengthM: 100,
+  maxWidthM: 100,
+  maxCeilingM: 12,
+} as const;
+
+export function parseDimensionMeters(
+  input: string,
+  options?: { max?: number; min?: number },
+): number | null {
+  const value = parseDistanceMeters(input);
+  if (value === null) return null;
+  const min = options?.min ?? DIMENSION_LIMITS.minM;
+  const max = options?.max ?? DIMENSION_LIMITS.maxLengthM;
+  if (value < min || value > max) return null;
+  return value;
+}
+
+export function formatMetersNl(value: number, digits = 2): string {
+  return value.toFixed(digits).replace(".", ",");
+}
+
 export function distanceBetween(a: Point2D, b: Point2D): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }

@@ -15,12 +15,20 @@ import {
   snapFixtureCenter,
 } from "@/lib/public-wizard/placement";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
+import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
+import {
+  getNextWizardStep,
+  getPrevWizardStep,
+  isWizardStepReachable,
+} from "@/lib/public-wizard/wizard-navigation";
 import type { Point2D } from "@/types/floor-plan";
 import type {
   AtmosphereId,
+  ManualDimensions,
   PlacedPublicFixture,
   PublicProductId,
   RoomFunctionId,
+  WizardInputMethod,
   WizardStepId,
 } from "@/types/public-wizard";
 import { computeFitView, parseDistanceMeters, type EditorViewState } from "@/lib/public-wizard/viewport";
@@ -30,18 +38,11 @@ export type PublicEditorMode = "select" | "calibrate-scale" | "draw-room" | "pan
 
 export type EditorPhase = "scale" | "room" | "plan";
 
-const WIZARD_STEPS: WizardStepId[] = [
-  "room",
-  "atmosphere",
-  "floorplan",
-  "editor",
-  "result",
-  "request",
-];
-
 export interface PublicWizardStore {
   step: WizardStepId;
   roomFunction: RoomFunctionId | null;
+  inputMethod: WizardInputMethod | null;
+  manualDimensions: ManualDimensions | null;
   ceilingHeightM: number;
   targetLux: number;
   atmosphere: AtmosphereId | null;
@@ -80,6 +81,8 @@ export interface PublicWizardStore {
   nextStep: () => boolean;
   prevStep: () => void;
   selectRoomFunction: (id: RoomFunctionId) => void;
+  selectInputMethod: (method: WizardInputMethod) => void;
+  applyManualDimensions: (dimensions: ManualDimensions) => boolean;
   setCeilingHeightM: (value: number) => void;
   setTargetLux: (value: number) => void;
   selectAtmosphere: (id: AtmosphereId) => void;
@@ -130,6 +133,8 @@ const initialFixtures: PlacedPublicFixture[] = [];
 const initialState = {
   step: "room" as WizardStepId,
   roomFunction: null as RoomFunctionId | null,
+  inputMethod: null as WizardInputMethod | null,
+  manualDimensions: null as ManualDimensions | null,
   ceilingHeightM: 2.7,
   targetLux: 500,
   atmosphere: null as AtmosphereId | null,
@@ -172,26 +177,82 @@ function cloneFixtures(fixtures: PlacedPublicFixture[]): PlacedPublicFixture[] {
 export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   ...initialState,
 
-  setStep: (step) => set({ step }),
+  setStep: (step) => {
+    const { step: current, inputMethod } = get();
+    if (!isWizardStepReachable(step, current, inputMethod)) return;
+    set({ step });
+  },
 
   nextStep: () => {
-    const { step } = get();
-    const idx = WIZARD_STEPS.indexOf(step);
-    if (idx < 0 || idx >= WIZARD_STEPS.length - 1) return false;
-    set({ step: WIZARD_STEPS[idx + 1]! });
+    const { step, inputMethod } = get();
+    const next = getNextWizardStep(step, inputMethod);
+    if (!next) return false;
+    set({ step: next });
     return true;
   },
 
   prevStep: () => {
-    const { step } = get();
-    const idx = WIZARD_STEPS.indexOf(step);
-    if (idx <= 0) return;
-    set({ step: WIZARD_STEPS[idx - 1]! });
+    const { step, inputMethod } = get();
+    const prev = getPrevWizardStep(step, inputMethod);
+    if (!prev) return;
+    set({ step: prev });
   },
 
   selectRoomFunction: (id) => {
     const def = getRoomFunction(id);
     set({ roomFunction: id, targetLux: def.suggestedLux });
+  },
+
+  selectInputMethod: (method) => {
+    set({
+      inputMethod: method,
+      manualDimensions: method === "dimensions" ? get().manualDimensions : null,
+      ...(method === "dimensions"
+        ? {
+            backgroundDataUrl: null,
+            backgroundFileName: null,
+            backgroundWidth: 0,
+            backgroundHeight: 0,
+          }
+        : {}),
+    });
+  },
+
+  applyManualDimensions: (dimensions) => {
+    const scene = buildManualRoomScene({
+      lengthM: dimensions.lengthM,
+      widthM: dimensions.widthM,
+    });
+    set({
+      inputMethod: "dimensions",
+      manualDimensions: dimensions,
+      ceilingHeightM: Math.max(2, Math.min(12, dimensions.ceilingHeightM)),
+      backgroundDataUrl: scene.dataUrl,
+      backgroundFileName: "handmatige-maatvoering.svg",
+      backgroundWidth: scene.width,
+      backgroundHeight: scene.height,
+      pixelsPerMeter: scene.pixelsPerMeter,
+      calibrationDraft: [],
+      calibrationDistanceMm: "",
+      calibrationLine: [],
+      polygonDraft: [],
+      roomVertices: scene.vertices,
+      roomAreaM2: scene.areaM2,
+      fixtures: [],
+      selectedFixtureId: null,
+      showHeatmap: false,
+      historyPast: [],
+      historyFuture: [],
+      lightingPlanGenerated: false,
+      layoutWarning: null,
+      editorMessage: null,
+      aiRecognitionAttempted: false,
+      aiRecognitionFailed: false,
+      editorPhase: "plan",
+      editorMode: "select",
+      scaleStepCollapsed: true,
+    });
+    return get().generateLightingPlan();
   },
 
   setCeilingHeightM: (value) => set({ ceilingHeightM: Math.max(2, Math.min(12, value)) }),
@@ -209,6 +270,8 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
 
   setBackground: (dataUrl, fileName, width, height) =>
     set({
+      inputMethod: "floorplan",
+      manualDimensions: null,
       backgroundDataUrl: dataUrl,
       backgroundFileName: fileName,
       backgroundWidth: width,
@@ -575,13 +638,6 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   resetWizard: () => set({ ...initialState }),
 }));
 
-export const WIZARD_STEP_LABELS: { id: WizardStepId; label: string; showInProgress: boolean }[] = [
-  { id: "room", label: "Ruimte", showInProgress: true },
-  { id: "atmosphere", label: "Sfeer", showInProgress: true },
-  { id: "floorplan", label: "Plattegrond", showInProgress: true },
-  { id: "editor", label: "Lichtplan", showInProgress: true },
-  { id: "result", label: "Resultaat", showInProgress: true },
-  { id: "request", label: "Aanvragen", showInProgress: false },
-];
+export { WIZARD_STEP_LABELS } from "@/lib/public-wizard/wizard-navigation";
 
 export { validateLeadForm } from "@/lib/public-wizard/lead-form";
