@@ -131,7 +131,7 @@ export function StepAtmosphere() {
       </div>
 
       <WizardNav
-        nextLabel="Volgende: upload plattegrond"
+        nextLabel="Volgende"
         nextDisabled={!atmosphere}
         onNext={() => {
           if (atmosphere) nextStep();
