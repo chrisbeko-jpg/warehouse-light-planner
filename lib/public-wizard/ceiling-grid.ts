@@ -196,14 +196,97 @@ function enumerateFullMatrixSizes(requiredCount: number): Array<{ rows: number; 
   return sizes;
 }
 
-function maxUniformStepCells(
-  spanPx: number,
+export const MIN_AUTO_PANEL_CENTER_SPACING_M = 1.2;
+const MIN_AUTO_PANEL_CENTER_SPACING_CELLS = 2;
+
+export function getMatrixCenterSpacingM(
+  fixtures: Array<{ x: number; y: number }>,
+  pixelsPerMeter: number,
+): { spacingXM: number; spacingYM: number } {
+  const { rowSpacingPx, colSpacingPx } = getGridSpacingPx(fixtures);
+  return {
+    spacingXM: rowSpacingPx / pixelsPerMeter,
+    spacingYM: colSpacingPx / pixelsPerMeter,
+  };
+}
+
+export function matrixHasMinimumPanelGap(
+  fixtures: Array<{ x: number; y: number }>,
+  pixelsPerMeter: number,
+  minCenterSpacingM = MIN_AUTO_PANEL_CENTER_SPACING_M,
+): boolean {
+  const { spacingXM, spacingYM } = getMatrixCenterSpacingM(fixtures, pixelsPerMeter);
+  const matrix = describeFixtureMatrix(fixtures);
+  const minGap = minCenterSpacingM - 0.02;
+  if (matrix.cols > 1 && spacingXM < minGap) return false;
+  if (matrix.rows > 1 && spacingYM < minGap) return false;
+  return true;
+}
+
+/** Rank row×col candidates for a rectangular room (aspect ratio, symmetry, count fit). */
+export function chooseBestMatrix(
+  targetCount: number,
+  roomWidthM: number,
+  roomHeightM: number,
+): Array<{ rows: number; cols: number; total: number }> {
+  const roomAspect = roomWidthM / Math.max(roomHeightM, 0.01);
+  const sizes = enumerateFullMatrixSizes(targetCount);
+  const ranked = sizes.map(({ rows, cols }) => {
+    const [r, c] = orientMatrixForRoom(rows, cols, roomAspect);
+    const total = r * c;
+    const matrixAspect = c / Math.max(r, 1);
+    const aspectErr = Math.abs(Math.log((matrixAspect + 0.01) / (roomAspect + 0.01)));
+    const delta = total - targetCount;
+    let score = 1000;
+    score -= aspectErr * 120;
+    score -= Math.abs(delta) * 80;
+    if (delta < 0) score -= Math.abs(delta) * 120;
+    if (r === c) score += 200;
+    score -= Math.abs(r - c) * 15;
+    return { rows: r, cols: c, total, score };
+  });
+  ranked.sort((a, b) => b.score - a.score);
+  return ranked.map(({ rows, cols, total }) => ({ rows, cols, total }));
+}
+
+function mustAllowAdjacentPanelSpacing(
+  cols: number,
+  rows: number,
+  safeWidthPx: number,
+  safeHeightPx: number,
+  gridPx: number,
+): boolean {
+  if (cols > 1 && (cols - 1) * MIN_AUTO_PANEL_CENTER_SPACING_CELLS * gridPx > safeWidthPx + 0.5) {
+    return true;
+  }
+  if (rows > 1 && (rows - 1) * MIN_AUTO_PANEL_CENTER_SPACING_CELLS * gridPx > safeHeightPx + 0.5) {
+    return true;
+  }
+  return false;
+}
+
+/** Largest grid step (×600 mm) that fits in safe span, prefer ≥1.20 m center spacing. */
+function pickBestStepCells(
+  safeSpanPx: number,
   panelCountOnAxis: number,
   gridPx: number,
-): number {
-  if (panelCountOnAxis <= 1) return 12;
-  const maxStep = Math.floor(spanPx / ((panelCountOnAxis - 1) * gridPx));
-  return Math.max(1, Math.min(12, maxStep));
+): number | null {
+  if (panelCountOnAxis <= 1) return 1;
+  let bestCells: number | null = null;
+  let bestSpan = -1;
+  for (let cells = MIN_AUTO_PANEL_CENTER_SPACING_CELLS; cells <= 12; cells++) {
+    const span = (panelCountOnAxis - 1) * cells * gridPx;
+    if (span <= safeSpanPx + 0.5 && span > bestSpan) {
+      bestSpan = span;
+      bestCells = cells;
+    }
+  }
+  if (bestCells != null) return bestCells;
+  for (let cells = 1; cells <= 12; cells++) {
+    const span = (panelCountOnAxis - 1) * cells * gridPx;
+    if (span <= safeSpanPx + 0.5) return cells;
+  }
+  return null;
 }
 
 function tryBuildCenteredMatrix(
@@ -309,8 +392,23 @@ function scoreCompleteMatrixLayout(
     else score -= Math.abs(rowSpacingPx - colSpacingPx) * 0.03;
   }
 
-  if (stepCellsX === stepCellsY) score += 80;
-  else score -= Math.abs(stepCellsX - stepCellsY) * 15;
+  if (stepCellsX === stepCellsY) score += 120;
+  else score -= Math.abs(stepCellsX - stepCellsY) * 20;
+
+  const minStepPx = MIN_AUTO_PANEL_CENTER_SPACING_CELLS * (CEILING_GRID_M * pixelsPerMeter);
+  if (cols > 1 && colSpacingPx > 0 && colSpacingPx < minStepPx - 1) score -= 8000;
+  if (rows > 1 && rowSpacingPx > 0 && rowSpacingPx < minStepPx - 1) score -= 8000;
+  if (cols > 1 && colSpacingPx >= minStepPx - 1) score += 400;
+  if (rows > 1 && rowSpacingPx >= minStepPx - 1) score += 400;
+
+  const safeWidthM = safe.width / pixelsPerMeter;
+  const safeHeightM = safe.height / pixelsPerMeter;
+  const usedWidthM =
+    cols > 1 ? ((cols - 1) * stepCellsX * CEILING_GRID_M) : 0;
+  const usedHeightM =
+    rows > 1 ? ((rows - 1) * stepCellsY * CEILING_GRID_M) : 0;
+  if (safeWidthM > 0 && cols > 1) score += (usedWidthM / safeWidthM) * 250;
+  if (safeHeightM > 0 && rows > 1) score += (usedHeightM / safeHeightM) * 250;
 
   const fixtures: PlacedPublicFixture[] = points.map((point, index) => ({
     id: `score-${index}`,
@@ -375,61 +473,76 @@ function computeBestCompleteMatrixLayout(
 ): { points: Point2D[]; rows: number; cols: number } | null {
   const safe = getSafeBoundsPx(vertices, pixelsPerMeter, productId);
   const gridPx = CEILING_GRID_M * pixelsPerMeter;
-  const roomAspect =
-    (safe.bounds.maxX - safe.bounds.minX) / Math.max(safe.bounds.maxY - safe.bounds.minY, 0.01);
+  const roomWidthM = (safe.bounds.maxX - safe.bounds.minX) / pixelsPerMeter;
+  const roomHeightM = (safe.bounds.maxY - safe.bounds.minY) / pixelsPerMeter;
+
+  const matrixCandidates = chooseBestMatrix(requiredCount, roomWidthM, roomHeightM);
 
   let bestPoints: Point2D[] | null = null;
   let bestRows = 0;
   let bestCols = 0;
   let bestScore = -Infinity;
 
-  for (const size of enumerateFullMatrixSizes(requiredCount)) {
-    const [rows, cols] = orientMatrixForRoom(size.rows, size.cols, roomAspect);
-    const maxStepX = maxUniformStepCells(safe.width, cols, gridPx);
-    const maxStepY = maxUniformStepCells(safe.height, rows, gridPx);
-    const maxUniform = Math.min(maxStepX, maxStepY);
+  for (const candidate of matrixCandidates) {
+    const { rows, cols } = candidate;
+    const stepCellsXRaw = pickBestStepCells(safe.width, cols, gridPx);
+    const stepCellsYRaw = pickBestStepCells(safe.height, rows, gridPx);
+    if (stepCellsXRaw == null || stepCellsYRaw == null) continue;
 
-    const stepPlans: Array<[number, number]> = [];
-    for (let step = 1; step <= maxUniform; step++) {
-      stepPlans.push([step, step]);
-    }
-    for (let stepX = 1; stepX <= maxStepX; stepX++) {
-      for (let stepY = 1; stepY <= maxStepY; stepY++) {
-        if (stepX === stepY) continue;
-        stepPlans.push([stepX, stepY]);
+    let stepCellsX = stepCellsXRaw;
+    let stepCellsY = stepCellsYRaw;
+    let uniformStep = 0;
+    for (let cells = 12; cells >= MIN_AUTO_PANEL_CENTER_SPACING_CELLS; cells--) {
+      const spanX = (cols - 1) * cells * gridPx;
+      const spanY = (rows - 1) * cells * gridPx;
+      if (spanX <= safe.width + 0.5 && spanY <= safe.height + 0.5) {
+        uniformStep = cells;
+        break;
       }
     }
+    if (uniformStep >= MIN_AUTO_PANEL_CENTER_SPACING_CELLS) {
+      stepCellsX = uniformStep;
+      stepCellsY = uniformStep;
+    }
 
-    for (const [stepX, stepY] of stepPlans) {
-      const points = tryBuildCenteredMatrix(
-        vertices,
-        pixelsPerMeter,
-        rows,
-        cols,
-        stepX,
-        stepY,
-        productId,
-      );
-      if (!points || points.length !== rows * cols) continue;
+    const adjacentOnly =
+      (cols > 1 && stepCellsX < MIN_AUTO_PANEL_CENTER_SPACING_CELLS) ||
+      (rows > 1 && stepCellsY < MIN_AUTO_PANEL_CENTER_SPACING_CELLS);
+    if (
+      adjacentOnly &&
+      !mustAllowAdjacentPanelSpacing(cols, rows, safe.width, safe.height, gridPx)
+    ) {
+      continue;
+    }
 
-      const score = scoreCompleteMatrixLayout(
-        points,
-        rows,
-        cols,
-        requiredCount,
-        vertices,
-        pixelsPerMeter,
-        productId,
-        context,
-        stepX,
-        stepY,
-      );
-      if (score > bestScore) {
-        bestScore = score;
-        bestPoints = points;
-        bestRows = rows;
-        bestCols = cols;
-      }
+    const points = tryBuildCenteredMatrix(
+      vertices,
+      pixelsPerMeter,
+      rows,
+      cols,
+      stepCellsX,
+      stepCellsY,
+      productId,
+    );
+    if (!points || points.length !== rows * cols) continue;
+
+    const score = scoreCompleteMatrixLayout(
+      points,
+      rows,
+      cols,
+      requiredCount,
+      vertices,
+      pixelsPerMeter,
+      productId,
+      context,
+      stepCellsX,
+      stepCellsY,
+    );
+    if (score > bestScore) {
+      bestScore = score;
+      bestPoints = points;
+      bestRows = rows;
+      bestCols = cols;
     }
   }
 

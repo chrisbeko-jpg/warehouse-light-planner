@@ -6,6 +6,8 @@ import {
 } from "@/lib/public-wizard/calculation";
 import {
   buildValidGridCenters,
+  describeFixtureMatrix,
+  matrixHasMinimumPanelGap,
   placePanelsOnCeilingGrid,
 } from "@/lib/public-wizard/ceiling-grid";
 import { CEILING_GRID_M } from "@/lib/public-wizard/grid";
@@ -21,6 +23,7 @@ import {
 import type { Point2D } from "@/types/floor-plan";
 
 const PPM = 100;
+const CEILING = 2.7;
 const PRODUCT = "led_panel_4000" as const;
 const MIN_EDGE_M = 0.6;
 
@@ -66,11 +69,16 @@ test("small room places fewer panels instead of violating wall clearance", () =>
 
 test("narrow room prefers a multi-row layout over a single row at the wall", () => {
   const vertices = rectPolygon(50, 50, 6, 3.6);
-  const layout = placePanelsOnCeilingGrid(vertices, PPM, 6, PRODUCT);
-  assert.equal(layout.fixtures.length, 6);
+  const layout = placePanelsOnCeilingGrid(vertices, PPM, 6, PRODUCT, {
+    areaM2: 6 * 3.6,
+    targetLux: 500,
+    ceilingHeightM: CEILING,
+  });
+  assert.ok(layout.fixtures.length >= 6);
   assertAllPanelsClearWalls(vertices, layout.fixtures);
-  const ys = [...new Set(layout.fixtures.map((f) => Math.round(f.y)))];
-  assert.ok(ys.length > 1);
+  assert.equal(matrixHasMinimumPanelGap(layout.fixtures, PPM), true);
+  const matrix = describeFixtureMatrix(layout.fixtures);
+  assert.ok(matrix.rows > 1);
 });
 
 test("drag snap rejects wall zone and keeps previous position", () => {

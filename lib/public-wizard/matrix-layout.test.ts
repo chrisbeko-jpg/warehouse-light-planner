@@ -6,7 +6,10 @@ import {
 } from "@/lib/public-wizard/calculation";
 import {
   describeFixtureMatrix,
+  getMatrixCenterSpacingM,
+  matrixHasMinimumPanelGap,
   placePanelsOnCeilingGrid,
+  chooseBestMatrix,
 } from "@/lib/public-wizard/ceiling-grid";
 import { calculateMaterialPrice } from "@/lib/public-wizard/pricing";
 import { minPanelOuterEdgeClearanceM } from "@/lib/public-wizard/placement-constraints";
@@ -74,6 +77,44 @@ test("7,65 × 6,30 m at 500 lux prefers a full 4×4 matrix over 14 incomplete pa
 
   const price = calculateMaterialPrice(layout.fixtures);
   assert.equal(price.totalEuro, 16 * 50);
+  assert.equal(matrixHasMinimumPanelGap(layout.fixtures, ppm), true);
+  const spacing = getMatrixCenterSpacingM(layout.fixtures, ppm);
+  assert.ok(spacing.spacingXM >= 1.2 - 0.02);
+  assert.ok(spacing.spacingYM >= 1.2 - 0.02);
+});
+
+test("7,65 × 6,30 with 16 panels is 4×4 with even spacing and no adjacency", () => {
+  const vertices = rect(50, 50, 7.65, 6.3, 100);
+  const areaM2 = 7.65 * 6.3;
+  const layout = placePanelsOnCeilingGrid(vertices, 100, 16, PRODUCT, {
+    areaM2,
+    targetLux: 500,
+    ceilingHeightM: CEILING,
+  });
+  assertCompleteMatrix(vertices, 100, layout.fixtures);
+  const matrix = describeFixtureMatrix(layout.fixtures);
+  assert.equal(matrix.rows, 4);
+  assert.equal(matrix.cols, 4);
+  assert.equal(matrixHasMinimumPanelGap(layout.fixtures, 100), true);
+  const spacing = getMatrixCenterSpacingM(layout.fixtures, 100);
+  assert.ok(Math.abs(spacing.spacingXM - spacing.spacingYM) < 0.05);
+});
+
+test("8 × 5 with 12 panels uses complete matrix without adjacent panels", () => {
+  const vertices = rect(50, 50, 8, 5, 100);
+  const layout = placePanelsOnCeilingGrid(vertices, 100, 12, PRODUCT, {
+    areaM2: 40,
+    targetLux: 500,
+    ceilingHeightM: CEILING,
+  });
+  assertCompleteMatrix(vertices, 100, layout.fixtures);
+  assert.equal(matrixHasMinimumPanelGap(layout.fixtures, 100), true);
+});
+
+test("chooseBestMatrix prefers 4×4 for 16 panels in nearly square room", () => {
+  const first = chooseBestMatrix(16, 7.65, 6.3)[0]!;
+  assert.equal(first.rows, 4);
+  assert.equal(first.cols, 4);
 });
 
 test("8 × 5 m uses complete matrices for 200, 250 and 500 lux", () => {
