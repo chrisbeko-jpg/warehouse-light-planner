@@ -14,10 +14,12 @@ function parseField(value: string, max: number): number | null {
 }
 
 export function StepManualDimensions() {
+  const atmosphere = usePublicWizardStore((s) => s.atmosphere);
+  const roomFunction = usePublicWizardStore((s) => s.roomFunction);
   const manualDimensions = usePublicWizardStore((s) => s.manualDimensions);
   const applyManualDimensions = usePublicWizardStore((s) => s.applyManualDimensions);
   const lightingPlanGenerated = usePublicWizardStore((s) => s.lightingPlanGenerated);
-  const setStep = usePublicWizardStore((s) => s.setStep);
+  const goToEditor = usePublicWizardStore((s) => s.goToEditor);
 
   const [lengthInput, setLengthInput] = useState(
     manualDimensions ? formatMetersNl(manualDimensions.lengthM) : "8,00",
@@ -29,6 +31,7 @@ export function StepManualDimensions() {
     manualDimensions ? formatMetersNl(manualDimensions.ceilingHeightM) : "2,70",
   );
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const parsed = useMemo(() => {
     const lengthM = parseField(lengthInput, DIMENSION_LIMITS.maxLengthM);
@@ -39,9 +42,19 @@ export function StepManualDimensions() {
   }, [lengthInput, widthInput, heightInput]);
 
   const submit = () => {
+    if (loading) return;
+
     const { lengthM, widthM, ceilingHeightM } = parsed;
     if (!lengthM || !widthM || !ceilingHeightM) {
       setError("Vul geldige afmetingen in (lengte, breedte en plafondhoogte).");
+      return;
+    }
+    if (!roomFunction) {
+      setError("Kies eerst een ruimte/luxniveau.");
+      return;
+    }
+    if (!atmosphere) {
+      setError("Kies eerst een sfeer voordat u een lichtplan maakt.");
       return;
     }
 
@@ -61,13 +74,23 @@ export function StepManualDimensions() {
       return;
     }
 
-    const ok = applyManualDimensions({ lengthM, widthM, ceilingHeightM });
-    if (!ok) {
-      setError("Het lichtplan kon niet worden gemaakt. Controleer de afmetingen.");
-      return;
-    }
+    setLoading(true);
     setError(null);
-    setStep("editor");
+    try {
+      const ok = applyManualDimensions({ lengthM, widthM, ceilingHeightM });
+      if (!ok) {
+        setError(
+          "Het lichtplan kon niet worden gemaakt. Controleer de afmetingen of ga terug naar de sfeerkeuze.",
+        );
+        return;
+      }
+      goToEditor();
+    } catch (err) {
+      console.error("[StepManualDimensions] submit failed", err);
+      setError("Er ging iets mis bij het maken van uw lichtplan. Probeer het opnieuw.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -82,6 +105,7 @@ export function StepManualDimensions() {
             inputMode="decimal"
             data-testid="manual-length-input"
             value={lengthInput}
+            disabled={loading}
             onChange={(event) => {
               setLengthInput(event.target.value);
               setError(null);
@@ -97,6 +121,7 @@ export function StepManualDimensions() {
             inputMode="decimal"
             data-testid="manual-width-input"
             value={widthInput}
+            disabled={loading}
             onChange={(event) => {
               setWidthInput(event.target.value);
               setError(null);
@@ -112,6 +137,7 @@ export function StepManualDimensions() {
             inputMode="decimal"
             data-testid="manual-height-input"
             value={heightInput}
+            disabled={loading}
             onChange={(event) => {
               setHeightInput(event.target.value);
               setError(null);
@@ -127,11 +153,17 @@ export function StepManualDimensions() {
         Oppervlakte: {parsed.areaM2 ? `${formatMetersNl(parsed.areaM2, 1)} m²` : "—"}
       </p>
 
+      {loading && (
+        <p className="mt-3 text-sm text-[var(--lp-text-secondary)]" data-testid="manual-plan-loading">
+          Uw lichtplan wordt gemaakt…
+        </p>
+      )}
+
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       <WizardNav
-        nextLabel="Maak mijn lichtplan"
-        nextDisabled={!parsed.lengthM || !parsed.widthM || !parsed.ceilingHeightM}
+        nextLabel={loading ? "Bezig…" : "Maak mijn lichtplan"}
+        nextDisabled={loading || !parsed.lengthM || !parsed.widthM || !parsed.ceilingHeightM}
         onNext={submit}
       />
     </div>

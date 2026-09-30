@@ -19,7 +19,7 @@ import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
 import {
   getNextWizardStep,
   getPrevWizardStep,
-  isWizardStepReachable,
+  isWizardFlowStep,
 } from "@/lib/public-wizard/wizard-navigation";
 import type { Point2D } from "@/types/floor-plan";
 import type {
@@ -31,7 +31,12 @@ import type {
   WizardInputMethod,
   WizardStepId,
 } from "@/types/public-wizard";
-import { computeFitView, parseDistanceMeters, type EditorViewState } from "@/lib/public-wizard/viewport";
+import {
+  computeFitView,
+  EDITOR_VIEWPORT,
+  parseDistanceMeters,
+  type EditorViewState,
+} from "@/lib/public-wizard/viewport";
 import { SCALE_RESET_PATCH } from "@/lib/public-wizard/scale-reset-patch";
 
 export type PublicEditorMode = "select" | "calibrate-scale" | "draw-room" | "pan";
@@ -178,8 +183,8 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   ...initialState,
 
   setStep: (step) => {
-    const { step: current, inputMethod } = get();
-    if (!isWizardStepReachable(step, current, inputMethod)) return;
+    const { inputMethod } = get();
+    if (!isWizardFlowStep(step, inputMethod)) return;
     set({ step });
   },
 
@@ -219,10 +224,24 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   },
 
   applyManualDimensions: (dimensions) => {
+    const { atmosphere, roomFunction } = get();
+    if (!roomFunction) return false;
+    if (!atmosphere) return false;
+
     const scene = buildManualRoomScene({
       lengthM: dimensions.lengthM,
       widthM: dimensions.widthM,
     });
+
+    const defaultViewport = { width: 1280, height: 720 };
+    const viewState = computeFitView(
+      defaultViewport.width,
+      defaultViewport.height,
+      scene.width,
+      scene.height,
+      EDITOR_VIEWPORT.MARGIN,
+    );
+
     set({
       inputMethod: "dimensions",
       manualDimensions: dimensions,
@@ -246,13 +265,24 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       lightingPlanGenerated: false,
       layoutWarning: null,
       editorMessage: null,
-      aiRecognitionAttempted: false,
+      aiRecognitionAttempted: true,
       aiRecognitionFailed: false,
       editorPhase: "plan",
       editorMode: "select",
       scaleStepCollapsed: true,
+      viewState,
     });
-    return get().generateLightingPlan();
+
+    const planOk = get().generateLightingPlan();
+    if (!planOk) {
+      console.error("[applyManualDimensions] generateLightingPlan failed", {
+        roomVertices: get().roomVertices.length,
+        pixelsPerMeter: get().pixelsPerMeter,
+        targetLux: get().targetLux,
+      });
+      return false;
+    }
+    return true;
   },
 
   setCeilingHeightM: (value) => set({ ceilingHeightM: Math.max(2, Math.min(12, value)) }),

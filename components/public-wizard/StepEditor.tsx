@@ -533,7 +533,7 @@ export function StepEditor() {
               )}
             </div>
           )}
-          {scaleComplete && editorMode !== "calibrate-scale" && (
+          {scaleComplete && !manualDimensionsRoute && editorMode !== "calibrate-scale" && (
             <div className="pointer-events-none absolute left-1/2 top-3 z-10 hidden -translate-x-1/2 rounded-lg bg-[var(--lp-green-dark)]/90 px-4 py-2 text-sm text-white sm:block">
               Schaal ingesteld ✓
             </div>

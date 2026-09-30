@@ -33,7 +33,7 @@ export function getPrevWizardStep(
   return flow[idx - 1] ?? null;
 }
 
-export function isWizardStepReachable(
+export function isWizardProgressStepReachable(
   target: WizardStepId,
   current: WizardStepId,
   inputMethod: WizardInputMethod | null,
@@ -43,6 +43,19 @@ export function isWizardStepReachable(
   const currentIdx = flow.indexOf(current);
   if (targetIdx < 0 || currentIdx < 0) return false;
   return targetIdx <= currentIdx;
+}
+
+/** @deprecated use isWizardProgressStepReachable */
+export function isWizardStepReachable(
+  target: WizardStepId,
+  current: WizardStepId,
+  inputMethod: WizardInputMethod | null,
+): boolean {
+  return isWizardProgressStepReachable(target, current, inputMethod);
+}
+
+export function isWizardFlowStep(step: WizardStepId, inputMethod: WizardInputMethod | null): boolean {
+  return getWizardFlowSteps(inputMethod).includes(step);
 }
 
 export const WIZARD_PROGRESS_STEP_IDS: WizardStepId[] = [
