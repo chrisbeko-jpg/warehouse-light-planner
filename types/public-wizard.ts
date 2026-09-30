@@ -75,6 +75,7 @@ export interface IndicativeResult {
   areaM2: number;
   targetLux: number;
   fixtureCount: number;
+  requiredFixtureCount?: number;
   totalWattage: number;
   indicativeAverageLux: number;
   meetsTarget: boolean;

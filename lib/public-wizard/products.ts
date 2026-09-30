@@ -11,6 +11,8 @@ export interface PublicProductDefinition {
   widthM: number;
   heightM: number;
   diameterM?: number;
+  /** Minimum clearance from room boundary to outer fixture edge (meters). */
+  minWallClearanceM?: number;
 }
 
 /** Central public catalogue — four products only. */
@@ -25,6 +27,7 @@ export const PUBLIC_PRODUCTS: PublicProductDefinition[] = [
     beamAngleDeg: 90,
     widthM: 0.595,
     heightM: 0.595,
+    minWallClearanceM: 0.6,
   },
   {
     id: "led_panel_4000",
@@ -36,6 +39,7 @@ export const PUBLIC_PRODUCTS: PublicProductDefinition[] = [
     beamAngleDeg: 90,
     widthM: 0.595,
     heightM: 0.595,
+    minWallClearanceM: 0.6,
   },
   {
     id: "downlight_3000",

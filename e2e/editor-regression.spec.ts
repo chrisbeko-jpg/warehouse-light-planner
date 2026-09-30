@@ -6,6 +6,7 @@ import {
 } from "../lib/public-wizard/grid";
 import {
   buildValidGridCenters,
+  describeFixtureMatrix,
   getGridSpacingPx,
   getSpreadMetrics,
   panelFootprintInside,
@@ -53,15 +54,12 @@ test.describe("Editor placement & grid logic", () => {
     expect(snapped.y % GRID_PX).toBeCloseTo(0, 5);
   });
 
-  test("full-room grid generation covers the room bounds", () => {
-    const grid = buildValidGridCenters(OFFICE_POLYGON, PPM, true);
-    expect(grid.length).toBeGreaterThan(20);
-    const xs = grid.map((p) => p.x);
-    const ys = grid.map((p) => p.y);
-    expect(Math.min(...xs)).toBeLessThan(OFFICE_BOUNDS.minX + GRID_PX * 2);
-    expect(Math.max(...xs)).toBeGreaterThan(OFFICE_BOUNDS.maxX - GRID_PX * 2);
-    expect(Math.min(...ys)).toBeLessThan(OFFICE_BOUNDS.minY + GRID_PX * 2);
-    expect(Math.max(...ys)).toBeGreaterThan(OFFICE_BOUNDS.maxY - GRID_PX * 2);
+  test("full-room grid generation stays inside safe wall clearance zone", () => {
+    const grid = buildValidGridCenters(OFFICE_POLYGON, PPM, "led_panel_4000");
+    expect(grid.length).toBeGreaterThan(10);
+    for (const point of grid) {
+      expect(panelFootprintInside(point, PPM, OFFICE_POLYGON, "led_panel_4000")).toBeTruthy();
+    }
   });
 
   test("generated panel fixtures align to 600 mm grid with rectangular spacing", () => {
@@ -75,7 +73,7 @@ test.describe("Editor placement & grid logic", () => {
     for (const fixture of fixtures) {
       expect(fixture.x % GRID_PX).toBeCloseTo(0, 4);
       expect(fixture.y % GRID_PX).toBeCloseTo(0, 4);
-      expect(panelFootprintInside(fixture, PPM, OFFICE_POLYGON)).toBeTruthy();
+      expect(panelFootprintInside(fixture, PPM, OFFICE_POLYGON, "led_panel_4000")).toBeTruthy();
     }
 
     const { rowSpacingPx, colSpacingPx } = getGridSpacingPx(fixtures);
@@ -87,10 +85,16 @@ test.describe("Editor placement & grid logic", () => {
     }
   });
 
-  test("panels spread across room instead of compact center cluster", () => {
-    const layout = placePanelsOnCeilingGrid(OFFICE_POLYGON, PPM, 12, "led_panel_4000");
+  test("panels spread across room as a complete matrix", () => {
+    const layout = placePanelsOnCeilingGrid(OFFICE_POLYGON, PPM, 12, "led_panel_4000", {
+      areaM2: 54,
+      targetLux: 500,
+      ceilingHeightM: 2.7,
+    });
     const fixtures = layout.fixtures;
-    expect(fixtures.length).toBe(12);
+    const matrix = describeFixtureMatrix(fixtures);
+    expect(matrix.isComplete).toBeTruthy();
+    expect(fixtures.length).toBeGreaterThanOrEqual(12);
 
     const metrics = getSpreadMetrics(fixtures, OFFICE_BOUNDS);
     expect(metrics.extentXRatio).toBeGreaterThan(0.55);

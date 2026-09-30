@@ -36,6 +36,7 @@ export function calculateIndicativeResult(
   targetLux: number,
   ceilingHeightM: number,
   fixtures: PlacedPublicFixture[],
+  requiredFixtureCount?: number,
 ): IndicativeResult {
   const totalWattage = fixtures.reduce(
     (sum, f) => sum + getPublicProduct(f.productId).watts,
@@ -52,6 +53,7 @@ export function calculateIndicativeResult(
     areaM2,
     targetLux,
     fixtureCount: fixtures.length,
+    requiredFixtureCount,
     totalWattage,
     indicativeAverageLux: Math.round(indicativeAverageLux),
     meetsTarget: indicativeAverageLux >= targetLux * 0.95,

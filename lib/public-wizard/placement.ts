@@ -4,6 +4,7 @@ import {
   placePanelsOnCeilingGrid,
   snapFixtureToGrid,
   type CeilingLayoutResult,
+  type PanelLayoutContext,
 } from "@/lib/public-wizard/ceiling-grid";
 import { CEILING_GRID_M, snapPointToGridPx, uniqueGridPoints } from "@/lib/public-wizard/grid";
 import { getPublicProduct } from "@/lib/public-wizard/products";
@@ -83,10 +84,18 @@ export function placeFixturesInPolygon(
   pixelsPerMeter: number,
   count: number,
   productId: PublicProductId,
+  layoutContext?: PanelLayoutContext,
 ): PlacedPublicFixture[] {
   const product = getPublicProduct(productId);
   if (product.category === "led_panel") {
-    return placePanelsOnCeilingGrid(vertices, pixelsPerMeter, count, productId).fixtures;
+    const ctx =
+      layoutContext ??
+      ({
+        areaM2: createRoomPolygon(vertices, pixelsPerMeter).areaM2,
+        targetLux: 500,
+        ceilingHeightM: 2.7,
+      } as const);
+    return placePanelsOnCeilingGrid(vertices, pixelsPerMeter, count, productId, ctx).fixtures;
   }
 
   const candidates = generateGridCandidates(vertices, pixelsPerMeter);
@@ -113,8 +122,25 @@ export function placeFixturesWithLayoutInfo(
   pixelsPerMeter: number,
   count: number,
   productId: PublicProductId,
+  layoutContext?: PanelLayoutContext,
 ): CeilingLayoutResult {
-  return placePanelsOnCeilingGrid(vertices, pixelsPerMeter, count, productId);
+  const product = getPublicProduct(productId);
+  if (product.category === "led_panel") {
+    const ctx =
+      layoutContext ??
+      ({
+        areaM2: createRoomPolygon(vertices, pixelsPerMeter).areaM2,
+        targetLux: 500,
+        ceilingHeightM: 2.7,
+      } as const);
+    return placePanelsOnCeilingGrid(vertices, pixelsPerMeter, count, productId, ctx);
+  }
+  const fixtures = placeFixturesInPolygon(vertices, pixelsPerMeter, count, productId);
+  return {
+    fixtures,
+    requestedCount: count,
+    placedCount: fixtures.length,
+  };
 }
 
 export function createRoomPolygon(
@@ -161,13 +187,12 @@ export function findFreeGridPosition(
     x: (bounds.minX + bounds.maxX) / 2,
     y: (bounds.minY + bounds.maxY) / 2,
   };
-  const isPanel = getPublicProduct(productId).category === "led_panel";
   return findNearestFreeGridPosition(
     vertices,
     pixelsPerMeter,
     fixtures,
     center,
-    isPanel,
+    productId,
   );
 }
 

@@ -41,6 +41,7 @@ export function StepRequest() {
   const atmosphere = usePublicWizardStore((s) => s.atmosphere);
   const preferredProductId = usePublicWizardStore((s) => s.preferredProductId);
   const fixtures = usePublicWizardStore((s) => s.fixtures);
+  const requiredFixtureCount = usePublicWizardStore((s) => s.requiredFixtureCount);
   const roomVertices = usePublicWizardStore((s) => s.roomVertices);
   const pixelsPerMeter = usePublicWizardStore((s) => s.pixelsPerMeter);
   const backgroundDataUrl = usePublicWizardStore((s) => s.backgroundDataUrl);
@@ -116,6 +117,7 @@ export function StepRequest() {
           atmosphere,
           preferredProductId,
           fixtures,
+          requiredFixtureCount,
           roomVertices,
           pixelsPerMeter,
           inputMethod,

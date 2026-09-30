@@ -24,14 +24,21 @@ export function StepResult() {
   const targetLux = usePublicWizardStore((s) => s.targetLux);
   const ceilingHeightM = usePublicWizardStore((s) => s.ceilingHeightM);
   const fixtures = usePublicWizardStore((s) => s.fixtures);
+  const requiredFixtureCount = usePublicWizardStore((s) => s.requiredFixtureCount);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
   const goToEditor = usePublicWizardStore((s) => s.goToEditor);
 
   const result = useMemo(() => {
     if (roomVertices.length < 3 || !pixelsPerMeter) return null;
     const areaM2 = createRoomPolygon(roomVertices, pixelsPerMeter).areaM2;
-    return calculateIndicativeResult(areaM2, targetLux, ceilingHeightM, fixtures);
-  }, [roomVertices, pixelsPerMeter, targetLux, ceilingHeightM, fixtures]);
+    return calculateIndicativeResult(
+      areaM2,
+      targetLux,
+      ceilingHeightM,
+      fixtures,
+      requiredFixtureCount ?? undefined,
+    );
+  }, [roomVertices, pixelsPerMeter, targetLux, ceilingHeightM, fixtures, requiredFixtureCount]);
 
   if (!result) {
     return <p>Geen resultaat beschikbaar. Ga terug en genereer een lichtplan.</p>;
@@ -44,6 +51,11 @@ export function StepResult() {
     manualDimensions != null
       ? `${formatMetersNl(manualDimensions.lengthM)} × ${formatMetersNl(manualDimensions.widthM)} m`
       : null;
+
+  const requiredCount = result.requiredFixtureCount ?? requiredFixtureCount;
+  const placedBelowRequired =
+    requiredCount != null && result.fixtureCount < requiredCount;
+  const luxShortfall = placedBelowRequired && !result.meetsTarget;
 
   return (
     <div>
@@ -59,15 +71,26 @@ export function StepResult() {
           <Stat label="Oppervlakte" value={`${formatMetersNl(result.areaM2, 1)} m²`} />
           <Stat label="Plafondhoogte" value={`${formatMetersNl(ceilingHeightM)} m`} />
           <Stat label="Doel lux" value={`${result.targetLux} lux`} />
+          {requiredCount != null && (
+            <>
+              <Stat label="Theoretisch benodigd" value={`${requiredCount} panelen`} />
+              <Stat label="Gekozen nette verdeling" value={`${result.fixtureCount} panelen`} />
+            </>
+          )}
           {atmosphereMeta && (
             <>
               <Stat label="Sfeer" value={atmosphereMeta.title} />
               <Stat label="Lichtkleur" value={atmosphereMeta.subtitle.replace(/^LED-panelen ·\s*/i, "")} />
             </>
           )}
-          <Stat label="Armaturen" value={`${result.fixtureCount}`} />
           <Stat label="Totaal vermogen" value={`${result.totalWattage} W`} />
-          <Stat label="Indicatief berekend" value={`${result.indicativeAverageLux} lux`} />
+          <Stat label="Indicatieve gemiddelde verlichting" value={`${result.indicativeAverageLux} lux`} />
+          {luxShortfall && (
+            <p className="col-span-full text-sm text-[var(--lp-warn)]">
+              Doelwaarde {result.targetLux} lux wordt met deze nette plaatsing indicatief niet volledig
+              gehaald.
+            </p>
+          )}
           <Stat
             label="Resultaat"
             value={

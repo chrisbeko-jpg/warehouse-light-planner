@@ -14,6 +14,7 @@ import {
   removeFixture,
   snapFixtureCenter,
 } from "@/lib/public-wizard/placement";
+import { getPublicProduct } from "@/lib/public-wizard/products";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
 import {
@@ -80,6 +81,7 @@ export interface PublicWizardStore {
   roomAreaM2: number | null;
   lightingPlanGenerated: boolean;
   layoutWarning: string | null;
+  requiredFixtureCount: number | null;
   editorMessage: string | null;
 
   setStep: (step: WizardStepId) => void;
@@ -172,6 +174,7 @@ const initialState = {
   roomAreaM2: null as number | null,
   lightingPlanGenerated: false,
   layoutWarning: null as string | null,
+  requiredFixtureCount: null as number | null,
   editorMessage: null as string | null,
 };
 
@@ -264,6 +267,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       historyFuture: [],
       lightingPlanGenerated: false,
       layoutWarning: null,
+      requiredFixtureCount: null,
       editorMessage: null,
       aiRecognitionAttempted: true,
       aiRecognitionFailed: false,
@@ -412,6 +416,11 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       pixelsPerMeter,
       count,
       preferredProductId,
+      {
+        areaM2: room.areaM2,
+        targetLux,
+        ceilingHeightM,
+      },
     );
     set({
       fixtures: layout.fixtures,
@@ -420,6 +429,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       selectedFixtureId: null,
       lightingPlanGenerated: true,
       layoutWarning: layout.warning ?? null,
+      requiredFixtureCount: count,
       editorMode: "select",
       editorPhase: "plan",
     });
@@ -487,6 +497,21 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       set({ editorMessage: "Geen geldige rasterpositie. Armatuur teruggezet." });
       return;
     }
+    const dragAttempted =
+      Math.hypot(x - previous.x, y - previous.y) > 4;
+    const unchanged =
+      Math.abs(snapped.x - previous.x) < 2 && Math.abs(snapped.y - previous.y) < 2;
+    if (
+      dragAttempted &&
+      unchanged &&
+      getPublicProduct(fixture.productId).category === "led_panel"
+    ) {
+      set({
+        editorMessage: "Minimale afstand tot wand is 60 cm.",
+        selectedFixtureId: id,
+      });
+      return;
+    }
     set({
       fixtures: moveFixture(fixtures, id, snapped.x, snapped.y),
       selectedFixtureId: id,
@@ -528,7 +553,8 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     );
     if (!position) {
       set({
-        editorMessage: "Er is geen vrije rasterpositie beschikbaar. Verplaats eerst een bestaand armatuur.",
+        editorMessage:
+          "Er is binnen de huidige ruimte geen geschikte vrije positie meer met minimaal 60 cm wandafstand.",
       });
       return false;
     }
@@ -656,10 +682,17 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     }),
 
   getIndicativeResult: () => {
-    const { roomVertices, pixelsPerMeter, targetLux, ceilingHeightM, fixtures } = get();
+    const { roomVertices, pixelsPerMeter, targetLux, ceilingHeightM, fixtures, requiredFixtureCount } =
+      get();
     if (roomVertices.length < 3 || !pixelsPerMeter) return null;
     const areaM2 = createRoomPolygon(roomVertices, pixelsPerMeter).areaM2;
-    return calculateIndicativeResult(areaM2, targetLux, ceilingHeightM, fixtures);
+    return calculateIndicativeResult(
+      areaM2,
+      targetLux,
+      ceilingHeightM,
+      fixtures,
+      requiredFixtureCount ?? undefined,
+    );
   },
 
   setSubmitResult: (reference, email) =>

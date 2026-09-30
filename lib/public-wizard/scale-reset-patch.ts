@@ -17,6 +17,7 @@ export const SCALE_RESET_PATCH: Pick<
   | "historyFuture"
   | "lightingPlanGenerated"
   | "layoutWarning"
+  | "requiredFixtureCount"
   | "editorMessage"
   | "aiRecognitionAttempted"
   | "aiRecognitionFailed"
@@ -40,6 +41,7 @@ export const SCALE_RESET_PATCH: Pick<
   historyFuture: [],
   lightingPlanGenerated: false,
   layoutWarning: null,
+  requiredFixtureCount: null,
   editorMessage: null,
   aiRecognitionAttempted: false,
   aiRecognitionFailed: false,

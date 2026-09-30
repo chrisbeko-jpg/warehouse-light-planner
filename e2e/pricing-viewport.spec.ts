@@ -23,9 +23,9 @@ function fixture(productId: PlacedPublicFixture["productId"], n: number): Placed
 }
 
 test.describe("Material pricing", () => {
-  test("LED panels at €30 and downlights at €15", () => {
-    expect(PUBLIC_PRICING.led_panel_3000).toBe(30);
-    expect(PUBLIC_PRICING.led_panel_4000).toBe(30);
+  test("LED panels at €50 and downlights at €15", () => {
+    expect(PUBLIC_PRICING.led_panel_3000).toBe(50);
+    expect(PUBLIC_PRICING.led_panel_4000).toBe(50);
     expect(PUBLIC_PRICING.downlight_3000).toBe(15);
     expect(PUBLIC_PRICING.downlight_4000).toBe(15);
   });
@@ -35,18 +35,18 @@ test.describe("Material pricing", () => {
       ...fixture("led_panel_4000", 18),
       ...fixture("downlight_4000", 4),
     ]);
-    expect(price.totalEuro).toBe(18 * 30 + 4 * 15);
-    expect(formatMaterialPrice(price)).toContain("€600,00");
+    expect(price.totalEuro).toBe(18 * 50 + 4 * 15);
+    expect(formatMaterialPrice(price)).toContain("€960,00");
   });
 
   test("updates when fixtures are added or removed", () => {
     const base = calculateMaterialPrice(fixture("led_panel_4000", 2));
-    expect(base.totalEuro).toBe(60);
+    expect(base.totalEuro).toBe(100);
     const withDownlight = calculateMaterialPrice([
       ...fixture("led_panel_4000", 2),
       ...fixture("downlight_3000", 1),
     ]);
-    expect(withDownlight.totalEuro).toBe(75);
+    expect(withDownlight.totalEuro).toBe(115);
   });
 
   test("includes exclusief btw disclaimer text", () => {

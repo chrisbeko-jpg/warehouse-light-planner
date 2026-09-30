@@ -3,8 +3,8 @@ import type { MaterialPriceIndication, PlacedPublicFixture, PublicProductId } fr
 
 /** Central public material pricing — change here only. */
 export const PUBLIC_PRICING: Record<PublicProductId, number> = {
-  led_panel_3000: 30,
-  led_panel_4000: 30,
+  led_panel_3000: 50,
+  led_panel_4000: 50,
   downlight_3000: 15,
   downlight_4000: 15,
 };

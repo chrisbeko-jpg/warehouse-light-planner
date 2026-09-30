@@ -3,6 +3,7 @@ import test from "node:test";
 import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
 import { calculateRequiredFixtureCount } from "@/lib/public-wizard/calculation";
 import { placeFixturesWithLayoutInfo, createRoomPolygon } from "@/lib/public-wizard/placement";
+import { minPanelOuterEdgeClearanceM } from "@/lib/public-wizard/placement-constraints";
 
 test("manual 8x5 office scene produces spread panel layout", () => {
   const scene = buildManualRoomScene({ lengthM: 8, widthM: 5 });
@@ -18,12 +19,17 @@ test("manual 8x5 office scene produces spread panel layout", () => {
     count,
     "led_panel_4000",
   );
-  assert.equal(layout.fixtures.length, count);
-
-  const xs = layout.fixtures.map((f) => f.x);
-  const ys = layout.fixtures.map((f) => f.y);
-  const spreadX = Math.max(...xs) - Math.min(...xs);
-  const spreadY = Math.max(...ys) - Math.min(...ys);
-  assert.ok(spreadX > scene.pixelsPerMeter * 2);
-  assert.ok(spreadY > scene.pixelsPerMeter * 1.5);
+  assert.ok(layout.fixtures.length > 0);
+  assert.ok(layout.placedCount >= count - 1);
+  assert.ok(layout.placedCount <= Math.ceil(count * 1.28));
+  for (const fixture of layout.fixtures) {
+    assert.ok(
+      minPanelOuterEdgeClearanceM(
+        { x: fixture.x, y: fixture.y },
+        scene.pixelsPerMeter,
+        scene.vertices,
+        "led_panel_4000",
+      ) >= 0.6 - 0.001,
+    );
+  }
 });

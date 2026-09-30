@@ -46,6 +46,7 @@ interface SubmitBody {
   pixelsPerMeter: number;
   inputMethod: WizardInputMethod;
   manualDimensions: ManualDimensions | null;
+  requiredFixtureCount?: number | null;
   floorPlanDataUrl: string | null;
   lightPlanImageBase64?: string | null;
   heatmapImageBase64?: string | null;
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
       body.targetLux,
       body.ceilingHeightM,
       body.fixtures,
+      body.requiredFixtureCount ?? undefined,
     );
     const price = calculateMaterialPrice(body.fixtures);
     const reference = generateReference();
