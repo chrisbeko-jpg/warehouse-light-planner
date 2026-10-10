@@ -96,6 +96,7 @@ export function placeFixturesInPolygon(
         areaM2: createRoomPolygon(vertices, pixelsPerMeter).areaM2,
         targetLux: 500,
         ceilingHeightM: 2.7,
+        ceilingType: "grid_600",
       } as const);
     return placePanelsOnCeilingGrid(vertices, pixelsPerMeter, count, productId, ctx).fixtures;
   }

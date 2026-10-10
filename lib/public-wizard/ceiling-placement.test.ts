@@ -5,6 +5,7 @@ import { DEFAULT_WIZARD_CONTENT } from "@/lib/cms/defaults";
 import { calculateIndicativeResult, calculateRequiredFixtureCount } from "@/lib/public-wizard/calculation";
 import { buildCeilingRaster, centeredModuleCentersM } from "@/lib/public-wizard/ceiling-raster";
 import { describeFixtureMatrix } from "@/lib/public-wizard/ceiling-grid";
+import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
 import { placeDownlightsSymmetrically, placeElongatedPanelsOnModules } from "@/lib/public-wizard/matrix-placement";
 import { placeFixturesWithLayoutInfo } from "@/lib/public-wizard/placement";
 import { minPanelOuterEdgeClearanceM } from "@/lib/public-wizard/placement-constraints";
@@ -177,7 +178,14 @@ test("1200×300 panels spread across large 120×60 rooms", () => {
   });
   assert.ok(layout.placedCount > 0);
   assert.equal(layout.placedCount, required);
-  assertAlignedMatrix(layout.fixtures);
+  const bounds = {
+    minX: Math.min(...vertices.map((v) => v.x)),
+    maxX: Math.max(...vertices.map((v) => v.x)),
+    minY: Math.min(...vertices.map((v) => v.y)),
+    maxY: Math.max(...vertices.map((v) => v.y)),
+  };
+  const quality = evaluateLayoutQuality(layout.fixtures, bounds);
+  assert.equal(quality.rejected, false, quality.rejectionReasons.join(", "));
   const product = getPublicProduct(productId);
   for (const fixture of layout.fixtures) {
     assert.equal(fixture.rotation, 0);

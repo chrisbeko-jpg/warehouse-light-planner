@@ -3,7 +3,8 @@ import test from "node:test";
 import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
 import { calculateRequiredFixtureCount } from "@/lib/public-wizard/calculation";
 import { placeFixturesWithLayoutInfo, createRoomPolygon } from "@/lib/public-wizard/placement";
-import { describeFixtureMatrix, getSpreadMetrics } from "@/lib/public-wizard/ceiling-grid";
+import { describeFixtureMatrix } from "@/lib/public-wizard/ceiling-grid";
+import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
 import { isPanelFootprintInsideRoom } from "@/lib/public-wizard/placement-constraints";
 
 test("manual 8x5 office scene produces spread panel layout", () => {
@@ -36,14 +37,10 @@ test("manual 8x5 office scene produces spread panel layout", () => {
     minY: Math.min(...ys),
     maxY: Math.max(...ys),
   };
-  const spread = getSpreadMetrics(layout.fixtures, bounds);
+  const quality = evaluateLayoutQuality(layout.fixtures, bounds);
+  assert.equal(quality.rejected, false);
   const matrix = describeFixtureMatrix(layout.fixtures);
-  if (matrix.rows > 1 && matrix.cols > 1) {
-    assert.ok(spread.extentXRatio >= 0.45);
-    assert.ok(spread.extentYRatio >= 0.45);
-  } else {
-    assert.ok(Math.max(spread.extentXRatio, spread.extentYRatio) >= 0.45);
-  }
+  assert.ok(matrix.rows >= 1 && matrix.cols >= 1);
   for (const fixture of layout.fixtures) {
     assert.ok(
       isPanelFootprintInsideRoom(

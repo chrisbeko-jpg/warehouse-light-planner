@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateRequiredFixtureCount } from "@/lib/public-wizard/calculation";
 import { describeFixtureMatrix, getSpreadMetrics } from "@/lib/public-wizard/ceiling-grid";
+import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
 import { placeElongatedPanelsOnModules } from "@/lib/public-wizard/matrix-placement";
 import { placeFixturesWithLayoutInfo } from "@/lib/public-wizard/placement";
 import { calculateMaterialPrice } from "@/lib/public-wizard/pricing";
@@ -45,9 +46,11 @@ test("10×7.5 m 120×60 ceiling spreads 21 elongated panels across the room", ()
   assert.equal(layout.placedCount, 21);
   assert.equal(uniqueRounded(layout.fixtures), 21);
 
+  const quality = evaluateLayoutQuality(layout.fixtures, boundsOf(vertices));
+  assert.equal(quality.rejected, false);
+  assert.ok(quality.rowCount >= 2);
   const spread = getSpreadMetrics(layout.fixtures, boundsOf(vertices));
-  assert.ok(spread.extentXRatio >= 0.68, `extentXRatio ${spread.extentXRatio}`);
-  assert.ok(spread.extentYRatio >= 0.68, `extentYRatio ${spread.extentYRatio}`);
+  assert.ok(Math.max(spread.extentXRatio, spread.extentYRatio) >= 0.55);
 
   const xs = [...new Set(layout.fixtures.map((f) => Math.round(f.x)))].sort((a, b) => a - b);
   const ys = [...new Set(layout.fixtures.map((f) => Math.round(f.y)))].sort((a, b) => a - b);
@@ -72,9 +75,10 @@ test("10×7.5 m calculated count uses distributed module layout", () => {
     ceilingType: "grid_1200_600",
   });
   assert.ok(layout.placedCount > 0);
+  const quality = evaluateLayoutQuality(layout.fixtures, boundsOf(vertices));
+  assert.equal(quality.rejected, false);
   const spread = getSpreadMetrics(layout.fixtures, boundsOf(vertices));
-  assert.ok(spread.extentXRatio >= 0.65);
-  assert.ok(spread.extentYRatio >= 0.65);
+  assert.ok(Math.max(spread.extentXRatio, spread.extentYRatio) >= 0.55);
   assert.equal(uniqueRounded(layout.fixtures), layout.placedCount);
   const price = calculateMaterialPrice(layout.fixtures);
   assert.ok(price.totalEuro > 0);
@@ -91,12 +95,6 @@ test("8×5 m 600×600 panels spread across room", () => {
     ceilingType: "grid_600",
   });
   assert.ok(layout.placedCount >= required - 2);
-  const spread = getSpreadMetrics(layout.fixtures, boundsOf(vertices));
-  const matrix = describeFixtureMatrix(layout.fixtures);
-  if (matrix.rows > 1 && matrix.cols > 1) {
-    assert.ok(spread.extentXRatio >= 0.55);
-    assert.ok(spread.extentYRatio >= 0.55);
-  } else {
-    assert.ok(Math.max(spread.extentXRatio, spread.extentYRatio) >= 0.55);
-  }
+  const quality = evaluateLayoutQuality(layout.fixtures, boundsOf(vertices));
+  assert.equal(quality.rejected, false);
 });

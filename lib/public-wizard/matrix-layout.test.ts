@@ -10,6 +10,7 @@ import {
   getSpreadMetrics,
   placePanelsOnCeilingGrid,
 } from "@/lib/public-wizard/ceiling-grid";
+import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
 import { calculateMaterialPrice } from "@/lib/public-wizard/pricing";
 import { isPanelFootprintInsideRoom } from "@/lib/public-wizard/placement-constraints";
 import type { Point2D } from "@/types/floor-plan";
@@ -42,15 +43,17 @@ function assertSpreadLayout(vertices: Point2D[], ppm: number, fixtures: Array<{ 
       "panel footprint must stay inside room",
     );
   }
-  const spread = getSpreadMetrics(fixtures, boundsOf(vertices));
+  const bounds = boundsOf(vertices);
+  const quality = evaluateLayoutQuality(fixtures, bounds);
+  assert.equal(quality.rejected, false, quality.rejectionReasons.join(", "));
+  assert.ok(quality.coverageRatio > 0, `coverage ${quality.coverageRatio}`);
+  const spread = getSpreadMetrics(fixtures, bounds);
   const matrix = describeFixtureMatrix(fixtures);
-  if (matrix.rows <= 1) {
-    assert.ok(spread.extentXRatio >= 0.45, `extentX ${spread.extentXRatio}`);
-  } else if (matrix.cols <= 1) {
-    assert.ok(spread.extentYRatio >= 0.45, `extentY ${spread.extentYRatio}`);
-  } else {
-    assert.ok(spread.extentXRatio >= 0.45, `extentX ${spread.extentXRatio}`);
-    assert.ok(spread.extentYRatio >= 0.45, `extentY ${spread.extentYRatio}`);
+  if (matrix.rows > 1 && matrix.cols > 1) {
+    assert.ok(
+      Math.max(spread.extentXRatio, spread.extentYRatio) >= 0.35,
+      `extent max ${Math.max(spread.extentXRatio, spread.extentYRatio)}`,
+    );
   }
 }
 

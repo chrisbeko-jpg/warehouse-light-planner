@@ -18,6 +18,7 @@ import {
   isPanelPlacementValid,
 } from "@/lib/public-wizard/placement-constraints";
 import { selectBestDistributedModuleMatrix } from "@/lib/public-wizard/distributed-placement";
+import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
 import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import { pointInPolygon } from "@/lib/public-wizard/placement";
 import type { Point2D } from "@/types/floor-plan";
@@ -391,11 +392,13 @@ function scoreCompleteMatrixLayout(
 
   score -= Math.abs(Math.log((matrixAspect + 0.01) / (aspect + 0.01))) * 90;
 
-  const metrics = getSpreadMetrics(points, safe.bounds);
-  score += (metrics.extentXRatio + metrics.extentYRatio) * 700;
+  const quality = evaluateLayoutQuality(points, safe.bounds);
+  if (quality.rejected) return -Infinity;
+  score += quality.score * 600;
+  const spread = getSpreadMetrics(points, safe.bounds);
   score -=
-    (Math.abs(metrics.leftMarginPx - metrics.rightMarginPx) +
-      Math.abs(metrics.topMarginPx - metrics.bottomMarginPx)) *
+    (Math.abs(spread.leftMarginPx - spread.rightMarginPx) +
+      Math.abs(spread.topMarginPx - spread.bottomMarginPx)) *
     0.1;
 
   const { rowSpacingPx, colSpacingPx } = getGridSpacingPx(points);
@@ -557,6 +560,7 @@ function computeBestCompleteMatrixLayout(
 
   for (const candidate of matrixCandidates) {
     const { rows, cols } = candidate;
+    if (rows * cols > requiredCount) continue;
     const stepCellsXRaw = pickBestStepCells(safe.width, cols, gridPx);
     const stepCellsYRaw = pickBestStepCells(safe.height, rows, gridPx);
     if (stepCellsXRaw == null || stepCellsYRaw == null) continue;

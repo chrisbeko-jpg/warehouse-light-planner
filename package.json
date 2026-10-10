@@ -10,7 +10,8 @@
     "lint": "next lint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:unit": "npx tsx --test lib/public-wizard/*.test.ts lib/cms/*.test.ts lib/ledpaneel/*.test.ts"
+    "test:unit": "npx tsx --test lib/public-wizard/*.test.ts lib/cms/*.test.ts lib/ledpaneel/*.test.ts",
+    "test:placement-report": "npx tsx scripts/placement-quality-report.mjs"
   },
   "dependencies": {
     "@tiptap/extension-image": "^3.30.5",
