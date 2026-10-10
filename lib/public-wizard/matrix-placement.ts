@@ -1,6 +1,9 @@
 import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
 import { ceilingCellSizeM } from "@/lib/public-wizard/ceiling-raster";
-import { selectBestDistributedModuleMatrix } from "@/lib/public-wizard/distributed-placement";
+import {
+  MATRIX_COUNT_SEARCH_DELTA,
+  selectBestDistributedModuleMatrix,
+} from "@/lib/public-wizard/distributed-placement";
 import {
   buildRoomCeilingGrid,
   downlightCenterPx,
@@ -73,8 +76,8 @@ function orientMatrix(rows: number, cols: number, roomAspect: number): [number, 
 }
 
 function matrixSizes(requiredCount: number): Array<{ rows: number; cols: number }> {
-  const minTotal = Math.max(1, requiredCount - 1);
-  const maxTotal = Math.min(80, Math.max(requiredCount, Math.ceil(requiredCount * 1.28)));
+  const minTotal = Math.max(1, requiredCount - MATRIX_COUNT_SEARCH_DELTA);
+  const maxTotal = Math.min(80, requiredCount + MATRIX_COUNT_SEARCH_DELTA);
   const sizes: Array<{ rows: number; cols: number }> = [];
   for (let rows = 1; rows <= 12; rows++) {
     for (let cols = 1; cols <= 12; cols++) {
@@ -385,6 +388,7 @@ function placeDownlightsOnModuleGrid(
     productId,
     context,
     rotation: 0,
+    countSearchDelta: MATRIX_COUNT_SEARCH_DELTA + 1,
   });
 
   const fixtures: PlacedPublicFixture[] = (best?.points ?? []).map((point) => ({

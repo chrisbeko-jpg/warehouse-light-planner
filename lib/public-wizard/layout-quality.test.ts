@@ -2,12 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   evaluateLayoutQuality,
+  isCompleteRectangularMatrix,
   layoutQualityBeats,
 } from "@/lib/public-wizard/layout-quality";
 import type { Point2D } from "@/types/floor-plan";
 
 function bounds(w: number, h: number) {
   return { minX: 0, maxX: w, minY: 0, maxY: h };
+}
+
+function fullGrid(rows: number, cols: number, w: number, h: number): Point2D[] {
+  const points: Point2D[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      points.push({
+        x: ((c + 1) / (cols + 1)) * w,
+        y: ((r + 1) / (rows + 1)) * h,
+      });
+    }
+  }
+  return points;
 }
 
 function twoWallRows(w: number, h: number, cols: number): Point2D[] {
@@ -22,18 +36,16 @@ function twoWallRows(w: number, h: number, cols: number): Point2D[] {
   return points;
 }
 
-function staggeredFourRows(w: number, h: number): Point2D[] {
-  const counts = [4, 3, 4, 3];
-  const ys = [0.2, 0.4, 0.6, 0.8].map((f) => f * h);
-  const points: Point2D[] = [];
-  for (let r = 0; r < counts.length; r++) {
-    const n = counts[r]!;
-    for (let c = 0; c < n; c++) {
-      points.push({ x: ((c + 1) / (n + 1)) * w, y: ys[r]! });
-    }
-  }
-  return points;
-}
+test("isCompleteRectangularMatrix accepts full 4×4 grid", () => {
+  const points = fullGrid(4, 4, 800, 700);
+  assert.equal(isCompleteRectangularMatrix(points), true);
+});
+
+test("isCompleteRectangularMatrix rejects staggered row counts", () => {
+  const good = fullGrid(4, 4, 800, 700);
+  const staggered = [...good.slice(0, 13), { x: 50, y: 500 }];
+  assert.equal(isCompleteRectangularMatrix(staggered), false);
+});
 
 test("evaluateLayoutQuality rejects two full edge rows with empty middle", () => {
   const b = bounds(800, 600);
@@ -43,10 +55,9 @@ test("evaluateLayoutQuality rejects two full edge rows with empty middle", () =>
   assert.equal(q.rejected, true);
 });
 
-test("staggered 4-row layout beats two edge rows", () => {
-  const b = bounds(800, 600);
-  const bad = twoWallRows(800, 600, 7);
-  const good = staggeredFourRows(800, 600);
+test("full 4×4 matrix beats two edge rows", () => {
+  const b = bounds(800, 700);
+  const bad = twoWallRows(800, 700, 7);
+  const good = fullGrid(4, 4, 800, 700);
   assert.ok(layoutQualityBeats(good, bad, b));
-  assert.ok(evaluateLayoutQuality(good, b).score > evaluateLayoutQuality(bad, b).score);
 });

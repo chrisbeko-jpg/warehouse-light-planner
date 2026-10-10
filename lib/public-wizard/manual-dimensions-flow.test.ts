@@ -4,7 +4,8 @@ import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
 import { calculateRequiredFixtureCount } from "@/lib/public-wizard/calculation";
 import { placeFixturesWithLayoutInfo, createRoomPolygon } from "@/lib/public-wizard/placement";
 import { describeFixtureMatrix } from "@/lib/public-wizard/ceiling-grid";
-import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
+import { evaluateLayoutQuality, isCompleteRectangularMatrix } from "@/lib/public-wizard/layout-quality";
+import { MATRIX_COUNT_SEARCH_DELTA } from "@/lib/public-wizard/distributed-placement";
 import { isPanelFootprintInsideRoom } from "@/lib/public-wizard/placement-constraints";
 
 test("manual 8x5 office scene produces spread panel layout", () => {
@@ -28,7 +29,8 @@ test("manual 8x5 office scene produces spread panel layout", () => {
     },
   );
   assert.ok(layout.fixtures.length > 0);
-  assert.equal(layout.placedCount, count);
+  assert.ok(Math.abs(layout.placedCount - count) <= MATRIX_COUNT_SEARCH_DELTA);
+  assert.equal(isCompleteRectangularMatrix(layout.fixtures), true);
   const xs = scene.vertices.map((v) => v.x);
   const ys = scene.vertices.map((v) => v.y);
   const bounds = {

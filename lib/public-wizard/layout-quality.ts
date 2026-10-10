@@ -18,6 +18,7 @@ export interface LayoutQualityResult {
   coverageRatio: number;
   hollowMiddle: boolean;
   edgeOnlyRows: boolean;
+  isCompleteMatrix: boolean;
   symmetryBalance: number;
   nearestNeighborCv: number;
 }
@@ -43,6 +44,20 @@ function countPerRow(points: Point2D[]): Map<number, number> {
     map.set(y, (map.get(y) ?? 0) + 1);
   }
   return map;
+}
+
+/** Every row has the same fixture count and rows × cols equals panel count. */
+export function isCompleteRectangularMatrix(points: Point2D[]): boolean {
+  if (points.length === 0) return false;
+  const xs = sortedUnique(points.map((p) => p.x));
+  const ys = sortedUnique(points.map((p) => p.y));
+  if (xs.length * ys.length !== points.length) return false;
+  const perRow = countPerRow(points);
+  const cols = xs.length;
+  for (const count of perRow.values()) {
+    if (count !== cols) return false;
+  }
+  return perRow.size === ys.length;
 }
 
 function coverageRatio(points: Point2D[], bounds: RoomBounds, gridDivisions = 8): number {
@@ -85,8 +100,6 @@ function nearestNeighborCoefficientOfVariation(points: Point2D[]): number {
   return Math.sqrt(variance) / mean;
 }
 
-/** Detect two full rows hugging opposite walls with an empty vertical middle band. */
-/** One fixture per row in a wide room → vertical stack instead of a centred row. */
 function detectSingleColumnInWideRoom(points: Point2D[], bounds: RoomBounds): boolean {
   if (points.length < 2) return false;
   const perRow = countPerRow(points);
@@ -120,10 +133,6 @@ function detectHollowMiddle(points: Point2D[], bounds: RoomBounds): boolean {
   return ys.length >= 2 && inMiddle === 0 && points.length >= 10;
 }
 
-/**
- * Geometric quality of a fixture layout (higher is better).
- * Used to reject wall-hugging double rows and other unprofessional patterns.
- */
 export function evaluateLayoutQuality(
   points: Point2D[],
   bounds: RoomBounds,
@@ -141,6 +150,7 @@ export function evaluateLayoutQuality(
       coverageRatio: 0,
       hollowMiddle: false,
       edgeOnlyRows: false,
+      isCompleteMatrix: false,
       symmetryBalance: 0,
       nearestNeighborCv: 0,
     };
@@ -148,6 +158,7 @@ export function evaluateLayoutQuality(
 
   const xs = sortedUnique(points.map((p) => p.x));
   const ys = sortedUnique(points.map((p) => p.y));
+  const completeMatrix = isCompleteRectangularMatrix(points);
   const rowSpacingUniformity = gapUniformity(ys);
   const colSpacingUniformity = gapUniformity(xs);
   const coverage = coverageRatio(points, bounds);
@@ -167,26 +178,35 @@ export function evaluateLayoutQuality(
       Math.max(bounds.maxX - bounds.minX + bounds.maxY - bounds.minY, 1);
 
   let score = 0;
-  score += rowSpacingUniformity * 22;
-  score += colSpacingUniformity * 22;
-  score += coverage * 35;
-  score += symmetryBalance * 12;
+  score += rowSpacingUniformity * 28;
+  score += colSpacingUniformity * 28;
+  score += coverage * 30;
+  score += symmetryBalance * 15;
   score += Math.max(0, 1 - nnCv) * 8;
+  if (completeMatrix) score += 25;
 
   const rowCount = ys.length;
   const roomW = bounds.maxX - bounds.minX;
   const roomH = bounds.maxY - bounds.minY;
-  if (rowCount >= 3) score += 18;
-  else if (rowCount === 2 && points.length >= 8) score -= 25;
+  if (rowCount === 2 && points.length >= 8 && !completeMatrix) score -= 25;
   if (
     rowCount === 1 &&
-    points.length >= 5 &&
-    roomH >= roomW * 0.45 &&
-    points.length >= 6
+    points.length >= 6 &&
+    roomH >= roomW * 0.45
   ) {
-    score -= 20;
+    score -= 15;
   }
 
+  if (!completeMatrix && points.length > 1) {
+    score -= 60;
+    rejectionReasons.push("incomplete_matrix");
+  }
+  const twoRowWideMatrix =
+    completeMatrix && ys.length === 2 && xs.length >= 6 && points.length >= 12;
+  if (twoRowWideMatrix) {
+    score -= 100;
+    rejectionReasons.push("two_row_wall_matrix");
+  }
   if (hollowMiddle) {
     score -= 80;
     rejectionReasons.push("hollow_middle");
@@ -201,8 +221,10 @@ export function evaluateLayoutQuality(
   }
 
   const rejected =
+    !completeMatrix ||
     edgeOnlyRows ||
     singleColumnWide ||
+    twoRowWideMatrix ||
     (hollowMiddle && points.length >= 10);
 
   return {
@@ -216,12 +238,12 @@ export function evaluateLayoutQuality(
     coverageRatio: coverage,
     hollowMiddle,
     edgeOnlyRows,
+    isCompleteMatrix: completeMatrix,
     symmetryBalance,
     nearestNeighborCv: nnCv,
   };
 }
 
-/** Compare two layouts; returns true if `a` is clearly better than `b`. */
 export function layoutQualityBeats(
   a: Point2D[],
   b: Point2D[],

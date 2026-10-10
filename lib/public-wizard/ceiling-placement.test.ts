@@ -5,7 +5,7 @@ import { DEFAULT_WIZARD_CONTENT } from "@/lib/cms/defaults";
 import { calculateIndicativeResult, calculateRequiredFixtureCount } from "@/lib/public-wizard/calculation";
 import { buildCeilingRaster, centeredModuleCentersM } from "@/lib/public-wizard/ceiling-raster";
 import { describeFixtureMatrix } from "@/lib/public-wizard/ceiling-grid";
-import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
+import { evaluateLayoutQuality, isCompleteRectangularMatrix } from "@/lib/public-wizard/layout-quality";
 import { placeDownlightsSymmetrically, placeElongatedPanelsOnModules } from "@/lib/public-wizard/matrix-placement";
 import { placeFixturesWithLayoutInfo } from "@/lib/public-wizard/placement";
 import { minPanelOuterEdgeClearanceM } from "@/lib/public-wizard/placement-constraints";
@@ -139,7 +139,8 @@ test("6.50 × 3.20 m at 250 lux uses the product count in a symmetric matrix", (
 
   assert.ok(required >= 1);
   assert.equal(layout.placedCount, layout.fixtures.length);
-  assertAlignedMatrix(layout.fixtures);
+  assert.equal(isCompleteRectangularMatrix(layout.fixtures), true);
+  assert.ok(layout.placedCount > 0);
   const result = calculateIndicativeResult(areaM2, 250, CEILING_HEIGHT, layout.fixtures, required);
   assert.equal(result.fixtureCount, layout.placedCount);
   if (!result.meetsTarget) {

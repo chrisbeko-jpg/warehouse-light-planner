@@ -17,7 +17,10 @@ import {
   isPanelFootprintInsideRoom,
   isPanelPlacementValid,
 } from "@/lib/public-wizard/placement-constraints";
-import { selectBestDistributedModuleMatrix } from "@/lib/public-wizard/distributed-placement";
+import {
+  MATRIX_COUNT_SEARCH_DELTA,
+  selectBestDistributedModuleMatrix,
+} from "@/lib/public-wizard/distributed-placement";
 import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
 import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import { pointInPolygon } from "@/lib/public-wizard/placement";
@@ -196,8 +199,8 @@ function getSafeBoundsPx(
 }
 
 function enumerateFullMatrixSizes(requiredCount: number): Array<{ rows: number; cols: number }> {
-  const minTotal = Math.max(1, requiredCount - 1);
-  const maxTotal = Math.min(120, Math.ceil(requiredCount * 1.28));
+  const minTotal = Math.max(1, requiredCount - MATRIX_COUNT_SEARCH_DELTA);
+  const maxTotal = Math.min(120, requiredCount + MATRIX_COUNT_SEARCH_DELTA);
   const sizes: Array<{ rows: number; cols: number }> = [];
   for (let rows = 1; rows <= 12; rows++) {
     for (let cols = 1; cols <= 12; cols++) {

@@ -10,7 +10,8 @@ import {
   getSpreadMetrics,
   placePanelsOnCeilingGrid,
 } from "@/lib/public-wizard/ceiling-grid";
-import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
+import { evaluateLayoutQuality, isCompleteRectangularMatrix } from "@/lib/public-wizard/layout-quality";
+import { MATRIX_COUNT_SEARCH_DELTA } from "@/lib/public-wizard/distributed-placement";
 import { calculateMaterialPrice } from "@/lib/public-wizard/pricing";
 import { isPanelFootprintInsideRoom } from "@/lib/public-wizard/placement-constraints";
 import type { Point2D } from "@/types/floor-plan";
@@ -74,11 +75,12 @@ test("7,65 × 6,30 m at 500 lux places required count with room-wide spread", ()
   const { vertices, areaM2, required, layout, ppm } = layoutForRoom(7.65, 6.3, 500);
   assert.ok(required >= 12 && required <= 16);
   assertSpreadLayout(vertices, ppm, layout.fixtures);
-  assert.equal(layout.placedCount, required);
+  assert.ok(Math.abs(layout.placedCount - required) <= MATRIX_COUNT_SEARCH_DELTA);
+  assert.equal(isCompleteRectangularMatrix(layout.fixtures), true);
   const result = calculateIndicativeResult(areaM2, 500, CEILING, layout.fixtures, required);
-  assert.equal(result.fixtureCount, required);
+  assert.equal(result.fixtureCount, layout.placedCount);
   const price = calculateMaterialPrice(layout.fixtures);
-  assert.equal(price.totalEuro, required * 50);
+  assert.equal(price.totalEuro, layout.placedCount * 50);
 });
 
 test("7,65 × 6,30 with 16 panels spreads across the ceiling", () => {
@@ -118,7 +120,8 @@ test("8 × 5 m uses spread layouts for 200, 250 and 500 lux", () => {
   for (const lux of [200, 250, 500] as const) {
     const { vertices, layout, ppm, required } = layoutForRoom(8, 5, lux);
     assertSpreadLayout(vertices, ppm, layout.fixtures);
-    assert.equal(layout.placedCount, required);
+    assert.ok(Math.abs(layout.placedCount - required) <= MATRIX_COUNT_SEARCH_DELTA);
+    assert.equal(isCompleteRectangularMatrix(layout.fixtures), true);
   }
 });
 

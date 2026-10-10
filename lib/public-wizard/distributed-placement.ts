@@ -1,17 +1,6 @@
 import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
 import { getSpreadMetrics } from "@/lib/public-wizard/ceiling-grid";
-
-const MIN_PANEL_CENTER_SPACING_M = 1.2;
-
-function getGridSpacingPx(points: Point2D[]): { rowSpacingPx: number; colSpacingPx: number } {
-  const xs = [...new Set(points.map((p) => Math.round(p.x)))].sort((a, b) => a - b);
-  const ys = [...new Set(points.map((p) => Math.round(p.y)))].sort((a, b) => a - b);
-  return {
-    colSpacingPx: xs.length > 1 ? xs[1]! - xs[0]! : 0,
-    rowSpacingPx: ys.length > 1 ? ys[1]! - ys[0]! : 0,
-  };
-}
-import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
+import { evaluateLayoutQuality, isCompleteRectangularMatrix } from "@/lib/public-wizard/layout-quality";
 import type { PanelLayoutContext } from "@/lib/public-wizard/ceiling-grid";
 import {
   getFixtureFootprintCorners,
@@ -23,9 +12,23 @@ import { getPublicProduct } from "@/lib/public-wizard/products";
 import type { Point2D } from "@/types/floor-plan";
 import type { PlacedPublicFixture, PublicProductId } from "@/types/public-wizard";
 
+const MIN_PANEL_CENTER_SPACING_M = 1.2;
+
+/** Search full matrices within ±delta of the calculated fixture count. */
+export const MATRIX_COUNT_SEARCH_DELTA = 3;
+
 export interface IndexPlacement {
   indices: number[];
   step: number;
+}
+
+function getGridSpacingPx(points: Point2D[]): { rowSpacingPx: number; colSpacingPx: number } {
+  const xs = [...new Set(points.map((p) => Math.round(p.x)))].sort((a, b) => a - b);
+  const ys = [...new Set(points.map((p) => Math.round(p.y)))].sort((a, b) => a - b);
+  return {
+    colSpacingPx: xs.length > 1 ? xs[1]! - xs[0]! : 0,
+    rowSpacingPx: ys.length > 1 ? ys[1]! - ys[0]! : 0,
+  };
 }
 
 /** All ways to pick `pickCount` slots from `slotCount` with constant index step. */
@@ -57,57 +60,22 @@ export function evenlyDistributedIndexSets(slotCount: number, pickCount: number)
   return results;
 }
 
-/** Symmetric per-row fixture counts that sum to `total`. */
-export function symmetricRowCounts(total: number, numRows: number): number[] | null {
-  if (numRows < 1 || total < numRows) return null;
-  const base = Math.floor(total / numRows);
-  const counts = Array<number>(numRows).fill(base);
-  let rem = total - base * numRows;
-  let lo = 0;
-  let hi = numRows - 1;
-  while (rem > 0 && lo <= hi) {
-    counts[lo]! += 1;
-    rem -= 1;
-    if (rem > 0 && lo < hi) {
-      counts[hi]! += 1;
-      rem -= 1;
+export function enumerateFullMatrixSizes(
+  calculatedCount: number,
+  maxMatrixDim = 12,
+  delta = MATRIX_COUNT_SEARCH_DELTA,
+): Array<{ rows: number; cols: number; total: number }> {
+  const minTotal = Math.max(1, calculatedCount - delta);
+  const maxTotal = Math.min(120, calculatedCount + delta);
+  const sizes: Array<{ rows: number; cols: number; total: number }> = [];
+  for (let rows = 1; rows <= maxMatrixDim; rows++) {
+    for (let cols = 1; cols <= maxMatrixDim; cols++) {
+      const total = rows * cols;
+      if (total < minTotal || total > maxTotal) continue;
+      sizes.push({ rows, cols, total });
     }
-    lo += 1;
-    hi -= 1;
   }
-  return counts;
-}
-
-/** Alternating extra counts (e.g. 4-3-4-3 for 14 on 4 rows). */
-export function alternatingRowCounts(total: number, numRows: number): number[] | null {
-  if (numRows < 1 || total < numRows) return null;
-  const base = Math.floor(total / numRows);
-  const counts = Array<number>(numRows).fill(base);
-  let rem = total - base * numRows;
-  for (let i = 0; rem > 0 && i < numRows; i += 2) {
-    counts[i]! += 1;
-    rem -= 1;
-  }
-  for (let i = 1; rem > 0 && i < numRows; i += 2) {
-    counts[i]! += 1;
-    rem -= 1;
-  }
-  return counts;
-}
-
-export function rowCountPatterns(total: number, numRows: number): number[][] {
-  const patterns: number[][] = [];
-  const seen = new Set<string>();
-  const add = (counts: number[] | null) => {
-    if (!counts || counts.reduce((a, b) => a + b, 0) !== total) return;
-    const key = counts.join(",");
-    if (seen.has(key)) return;
-    seen.add(key);
-    patterns.push(counts);
-  };
-  add(symmetricRowCounts(total, numRows));
-  add(alternatingRowCounts(total, numRows));
-  return patterns;
+  return sizes;
 }
 
 function minPanelMinEdgeClearanceM(
@@ -127,7 +95,7 @@ export function scoreDistributedFixtureLayout(options: {
   cols: number;
   rowStep: number;
   colStep: number;
-  requiredCount: number;
+  calculatedCount: number;
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
   vertices: Point2D[];
   pixelsPerMeter: number;
@@ -139,7 +107,7 @@ export function scoreDistributedFixtureLayout(options: {
     points,
     rows,
     cols,
-    requiredCount,
+    calculatedCount,
     bounds,
     vertices,
     pixelsPerMeter,
@@ -148,8 +116,10 @@ export function scoreDistributedFixtureLayout(options: {
     rotation = 0,
   } = options;
 
+  const product = getPublicProduct(productId);
   const placedCount = points.length;
-  if (placedCount === 0) return -Infinity;
+  if (placedCount === 0 || placedCount !== rows * cols) return -Infinity;
+  if (!isCompleteRectangularMatrix(points)) return -Infinity;
 
   const quality = evaluateLayoutQuality(points, bounds);
   if (quality.rejected) return -Infinity;
@@ -159,13 +129,13 @@ export function scoreDistributedFixtureLayout(options: {
   const roomAspect = roomWidth / Math.max(roomHeight, 0.01);
   const matrixAspect = cols / Math.max(rows, 1);
 
-  let score = quality.score * 800;
-  score -= Math.abs(Math.log((matrixAspect + 0.01) / (roomAspect + 0.01))) * 80;
+  let score = quality.score * 900;
+  score -= Math.abs(Math.log((matrixAspect + 0.01) / (roomAspect + 0.01))) * 90;
 
   const spread = getSpreadMetrics(points, bounds);
   const extentAvg = (spread.extentXRatio + spread.extentYRatio) / 2;
-  if (extentAvg >= 0.48 && extentAvg <= 0.92) score += extentAvg * 500;
-  else if (extentAvg < 0.38) score -= 2500;
+  if (extentAvg >= 0.45 && extentAvg <= 0.92) score += extentAvg * 450;
+  else if (extentAvg < 0.35) score -= 2000;
 
   const fixtures: PlacedPublicFixture[] = points.map((point, index) => ({
     id: `score-${index}`,
@@ -180,19 +150,18 @@ export function scoreDistributedFixtureLayout(options: {
     context.targetLux,
     context.ceilingHeightM,
     fixtures,
-    requiredCount,
-  ).indicativeAverageLux;
+    calculatedCount,
+  );
 
-  if (placedCount === requiredCount) score += 4000;
-  else score -= Math.abs(placedCount - requiredCount) * 1500;
-
-  if (lux < context.targetLux * 0.92) {
-    score -= (context.targetLux - lux) * 10;
-  } else if (lux >= context.targetLux * 0.95) {
-    score += 300;
+  if (!lux.meetsTarget) {
+    score -= (context.targetLux - lux.indicativeAverageLux) * 15;
+    if (placedCount < calculatedCount && product.category === "led_panel") return -Infinity;
   }
 
-  const product = getPublicProduct(productId);
+  const countDelta = Math.abs(placedCount - calculatedCount);
+  score -= countDelta * 1400;
+  if (countDelta === 0) score += 3500;
+
   const halfM = getFixtureHalfSizeM(productId);
   let minEdgeM = Infinity;
   for (const point of points) {
@@ -236,6 +205,7 @@ export interface DistributedModuleMatrixInput {
   context: PanelLayoutContext;
   rotation?: number;
   maxMatrixDim?: number;
+  countSearchDelta?: number;
 }
 
 function spacingM(a: Point2D, b: Point2D, pixelsPerMeter: number): number {
@@ -269,6 +239,19 @@ function validatePanelPoints(
   return points.every((point) =>
     isPanelFootprintInsideRoom(point, pixelsPerMeter, vertices, productId, rotation),
   );
+}
+
+function orientMatrixForRoom(
+  rows: number,
+  cols: number,
+  roomAspect: number,
+): [number, number] {
+  if (rows === cols) return [rows, cols];
+  const err = (r: number, c: number) => {
+    const aspect = c / Math.max(r, 1);
+    return Math.abs(Math.log((aspect + 0.01) / (roomAspect + 0.01)));
+  };
+  return err(cols, rows) < err(rows, cols) ? [cols, rows] : [rows, cols];
 }
 
 function tryUniformMatrix(
@@ -317,7 +300,7 @@ function tryUniformMatrix(
         cols: matrixCols,
         rowStep: rowPick.step,
         colStep: colPick.step,
-        requiredCount: input.requiredCount,
+        calculatedCount: input.requiredCount,
         bounds,
         vertices,
         pixelsPerMeter,
@@ -334,120 +317,20 @@ function tryUniformMatrix(
   return best;
 }
 
-function tryStaggeredLayout(input: DistributedModuleMatrixInput, numRows: number): Point2D[] | null {
-  const {
-    sortedRows,
-    colsByRow,
-    requiredCount,
-    bounds,
-    vertices,
-    pixelsPerMeter,
-    productId,
-    rotation = 0,
-  } = input;
-
-  const patterns = rowCountPatterns(requiredCount, numRows);
-  if (patterns.length === 0) return null;
-
-  let bestPoints: Point2D[] | null = null;
-  let bestScore = -Infinity;
-
-  const rowPlacements = evenlyDistributedIndexSets(sortedRows.length, numRows);
-  for (const pattern of patterns) {
-    if (pattern.every((c) => c === 1) && requiredCount > 1) continue;
-    if (Math.min(...pattern) < 2 && numRows >= 3) continue;
-    for (const rowPick of rowPlacements) {
-      const pickedRows = rowPick.indices.map((index) => sortedRows[index]!);
-      const points: Point2D[] = [];
-      let valid = true;
-
-      for (let r = 0; r < numRows; r++) {
-        const colList = colsByRow.get(pickedRows[r]!) ?? [];
-        const needCols = pattern[r]!;
-        if (colList.length < needCols) {
-          valid = false;
-          break;
-        }
-        const colPlacements = evenlyDistributedIndexSets(colList.length, needCols);
-        let rowBest: Point2D[] | null = null;
-        let rowBestScore = -Infinity;
-        for (const colPick of colPlacements) {
-          if (!colIndicesMeetMinGap(colList, colPick.indices, pixelsPerMeter)) continue;
-          const rowPoints: Point2D[] = [];
-          for (const colIndex of colPick.indices) {
-            const entry = colList[colIndex];
-            if (!entry) {
-              rowPoints.length = 0;
-              break;
-            }
-            rowPoints.push(entry.point);
-          }
-          if (rowPoints.length !== needCols) continue;
-          const partial = [...points, ...rowPoints];
-          const q = evaluateLayoutQuality(partial, bounds).score;
-          if (q > rowBestScore) {
-            rowBestScore = q;
-            rowBest = rowPoints;
-          }
-        }
-        if (!rowBest) {
-          valid = false;
-          break;
-        }
-        points.push(...rowBest);
-      }
-
-      if (!valid || points.length !== requiredCount) continue;
-      if (!validatePanelPoints(points, vertices, pixelsPerMeter, productId, rotation)) continue;
-
-      const maxCols = Math.max(...pattern);
-      const score = scoreDistributedFixtureLayout({
-        points,
-        rows: numRows,
-        cols: maxCols,
-        rowStep: rowPick.step,
-        colStep: 1,
-        requiredCount,
-        bounds,
-        vertices,
-        pixelsPerMeter,
-        productId,
-        context: input.context,
-        rotation,
-      });
-      if (score > bestScore) {
-        bestScore = score;
-        bestPoints = points;
-      }
-    }
-  }
-  return bestPoints;
-}
-
 export function selectBestDistributedModuleMatrix(
   input: DistributedModuleMatrixInput,
 ): { points: Point2D[]; rows: number; cols: number; rowStep: number; colStep: number } | null {
   const {
-    requiredCount,
+    requiredCount: calculatedCount,
     roomAspect,
     maxMatrixDim = 12,
+    countSearchDelta = MATRIX_COUNT_SEARCH_DELTA,
   } = input;
 
-  const allSizes: Array<{ rows: number; cols: number; total: number }> = [];
-  for (let rows = 1; rows <= maxMatrixDim; rows++) {
-    for (let cols = 1; cols <= maxMatrixDim; cols++) {
-      const total = rows * cols;
-      if (total < Math.max(1, requiredCount - 1) || total > Math.min(80, Math.ceil(requiredCount * 1.25))) {
-        continue;
-      }
-      allSizes.push({ rows, cols, total });
-    }
-  }
-
-  const sortSizes = (items: typeof allSizes) =>
-    [...items].sort((a, b) => {
-      const deltaA = Math.abs(a.total - requiredCount);
-      const deltaB = Math.abs(b.total - requiredCount);
+  const sizes = enumerateFullMatrixSizes(calculatedCount, maxMatrixDim, countSearchDelta).sort(
+    (a, b) => {
+      const deltaA = Math.abs(a.total - calculatedCount);
+      const deltaB = Math.abs(b.total - calculatedCount);
       if (deltaA !== deltaB) return deltaA - deltaB;
       const aspectA = a.cols / Math.max(a.rows, 1);
       const aspectB = b.cols / Math.max(b.rows, 1);
@@ -455,9 +338,11 @@ export function selectBestDistributedModuleMatrix(
         Math.abs(Math.log((aspectA + 0.01) / (roomAspect + 0.01))) -
         Math.abs(Math.log((aspectB + 0.01) / (roomAspect + 0.01)))
       );
-    });
+    },
+  );
 
-  let best: { points: Point2D[]; rows: number; cols: number; rowStep: number; colStep: number } | null = null;
+  let best: { points: Point2D[]; rows: number; cols: number; rowStep: number; colStep: number } | null =
+    null;
   let bestScore = -Infinity;
 
   const maxModuleCols = Math.max(
@@ -467,20 +352,51 @@ export function selectBestDistributedModuleMatrix(
   const preferSingleRow =
     getPublicProduct(input.productId).category === "downlight" &&
     roomAspect >= 1.1 &&
-    maxModuleCols >= requiredCount;
+    maxModuleCols >= calculatedCount;
 
-  const consider = (candidate: typeof best, allowCountMismatch = false) => {
-    if (!candidate) return;
-    if (candidate.points.length !== requiredCount) {
-      if (!allowCountMismatch || candidate.points.length > requiredCount) return;
+  if (preferSingleRow) {
+    const uniform = tryUniformMatrix(input, 1, calculatedCount);
+    if (uniform) {
+      const score = scoreDistributedFixtureLayout({
+        points: uniform.points,
+        rows: 1,
+        cols: calculatedCount,
+        rowStep: uniform.rowStep,
+        colStep: uniform.colStep,
+        calculatedCount,
+        bounds: input.bounds,
+        vertices: input.vertices,
+        pixelsPerMeter: input.pixelsPerMeter,
+        productId: input.productId,
+        context: input.context,
+        rotation: input.rotation,
+      });
+      if (score > bestScore) {
+        bestScore = score;
+        best = {
+          points: uniform.points,
+          rows: 1,
+          cols: calculatedCount,
+          rowStep: uniform.rowStep,
+          colStep: uniform.colStep,
+        };
+      }
     }
+  }
+
+  for (const size of sizes) {
+    if (preferSingleRow && size.rows > 1) continue;
+    const [matrixRows, matrixCols] = orientMatrixForRoom(size.rows, size.cols, roomAspect);
+    const uniform = tryUniformMatrix(input, matrixRows, matrixCols);
+    if (!uniform) continue;
+
     const score = scoreDistributedFixtureLayout({
-      points: candidate.points,
-      rows: candidate.rows,
-      cols: candidate.cols,
-      rowStep: candidate.rowStep,
-      colStep: candidate.colStep,
-      requiredCount,
+      points: uniform.points,
+      rows: matrixRows,
+      cols: matrixCols,
+      rowStep: uniform.rowStep,
+      colStep: uniform.colStep,
+      calculatedCount,
       bounds: input.bounds,
       vertices: input.vertices,
       pixelsPerMeter: input.pixelsPerMeter,
@@ -490,92 +406,13 @@ export function selectBestDistributedModuleMatrix(
     });
     if (score > bestScore) {
       bestScore = score;
-      best = candidate;
-    }
-  };
-
-  if (preferSingleRow) {
-    const uniform = tryUniformMatrix(input, 1, requiredCount);
-    if (uniform) {
-      consider({
-        points: uniform.points,
-        rows: 1,
-        cols: requiredCount,
-        rowStep: uniform.rowStep,
-        colStep: uniform.colStep,
-      });
-    }
-  }
-
-  for (const size of sortSizes(allSizes.filter((s) => s.total === requiredCount))) {
-    if (preferSingleRow && size.rows > 1) continue;
-    let matrixRows = size.rows;
-    let matrixCols = size.cols;
-    if (matrixRows !== matrixCols) {
-      const err = (r: number, c: number) => {
-        const aspect = c / Math.max(r, 1);
-        return Math.abs(Math.log((aspect + 0.01) / (roomAspect + 0.01)));
-      };
-      if (err(matrixCols, matrixRows) < err(matrixRows, matrixCols)) {
-        [matrixRows, matrixCols] = [matrixCols, matrixRows];
-      }
-    }
-    const uniform = tryUniformMatrix(input, matrixRows, matrixCols);
-    if (uniform) {
-      consider({
+      best = {
         points: uniform.points,
         rows: matrixRows,
         cols: matrixCols,
         rowStep: uniform.rowStep,
         colStep: uniform.colStep,
-      });
-    }
-  }
-
-  const minStaggerRows = Math.max(2, Math.ceil(Math.sqrt(requiredCount)) - 1);
-  const maxStaggerRows = Math.min(input.sortedRows.length, maxMatrixDim, requiredCount);
-  const skipStagger =
-    preferSingleRow || getPublicProduct(input.productId).category === "downlight";
-  if (!skipStagger) for (let numRows = minStaggerRows; numRows <= maxStaggerRows; numRows++) {
-    const points = tryStaggeredLayout(input, numRows);
-    if (!points) continue;
-    const ys = [...new Set(points.map((p) => Math.round(p.y)))];
-    const xs = [...new Set(points.map((p) => Math.round(p.x)))];
-    consider({
-      points,
-      rows: ys.length,
-      cols: xs.length,
-      rowStep: 1,
-      colStep: 1,
-    });
-  }
-
-  if (!best) {
-    for (const size of sortSizes(allSizes.filter((s) => s.total !== requiredCount))) {
-    let matrixRows = size.rows;
-    let matrixCols = size.cols;
-    if (matrixRows !== matrixCols) {
-      const err = (r: number, c: number) => {
-        const aspect = c / Math.max(r, 1);
-        return Math.abs(Math.log((aspect + 0.01) / (roomAspect + 0.01)));
       };
-      if (err(matrixCols, matrixRows) < err(matrixRows, matrixCols)) {
-        [matrixRows, matrixCols] = [matrixCols, matrixRows];
-      }
-    }
-    const uniform = tryUniformMatrix(input, matrixRows, matrixCols);
-    if (uniform) {
-      consider(
-        {
-          points: uniform.points,
-          rows: matrixRows,
-          cols: matrixCols,
-          rowStep: uniform.rowStep,
-          colStep: uniform.colStep,
-        },
-        true,
-      );
-    }
     }
   }
 

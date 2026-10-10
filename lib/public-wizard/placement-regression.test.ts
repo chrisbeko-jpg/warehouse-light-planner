@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateRequiredFixtureCount } from "@/lib/public-wizard/calculation";
-import { describeFixtureMatrix, getSpreadMetrics } from "@/lib/public-wizard/ceiling-grid";
-import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
+import {
+  calculateIndicativeResult,
+  calculateRequiredFixtureCount,
+} from "@/lib/public-wizard/calculation";
+import { describeFixtureMatrix } from "@/lib/public-wizard/ceiling-grid";
+import { isCompleteRectangularMatrix } from "@/lib/public-wizard/layout-quality";
 import { placeFixturesWithLayoutInfo } from "@/lib/public-wizard/placement";
 import { placeElongatedPanelsOnModules } from "@/lib/public-wizard/matrix-placement";
 import type { Point2D } from "@/types/floor-plan";
@@ -20,72 +23,79 @@ function rect(lengthM: number, widthM: number): Point2D[] {
   ];
 }
 
-function boundsOf(vertices: Point2D[]) {
-  const xs = vertices.map((v) => v.x);
-  const ys = vertices.map((v) => v.y);
-  return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+function assertCompleteMatrix(fixtures: Array<{ x: number; y: number }>) {
+  assert.equal(isCompleteRectangularMatrix(fixtures), true);
+  const matrix = describeFixtureMatrix(fixtures);
+  assert.equal(matrix.isComplete, true);
+  assert.equal(matrix.panelCount, matrix.rows * matrix.cols);
 }
 
-function rowCounts(fixtures: Array<{ y: number }>): number[] {
-  const map = new Map<number, number>();
-  for (const f of fixtures) {
-    const y = Math.round(f.y);
-    map.set(y, (map.get(y) ?? 0) + 1);
-  }
-  return [...map.values()].sort((a, b) => a - b);
-}
-
-test("8×6 m with 14 panels avoids 7+7 edge rows", () => {
-  const vertices = rect(8, 6);
-  const layout = placeFixturesWithLayoutInfo(vertices, PPM, 14, "led_panel_4000", {
-    areaM2: 48,
+test("A: 8×7 m with 16 panels forms a 4×4 matrix", () => {
+  const vertices = rect(8, 7);
+  const layout = placeFixturesWithLayoutInfo(vertices, PPM, 16, "led_panel_4000", {
+    areaM2: 56,
     targetLux: 500,
     ceilingHeightM: CEILING,
     ceilingType: "grid_600",
   });
-  assert.equal(layout.placedCount, 14);
-  const quality = evaluateLayoutQuality(layout.fixtures, boundsOf(vertices));
-  assert.equal(quality.rejected, false);
-  assert.equal(quality.edgeOnlyRows, false);
-  assert.ok(quality.rowCount >= 3, `expected >=3 rows, got ${quality.rowCount}`);
-  const counts = rowCounts(layout.fixtures);
-  assert.notDeepEqual(counts, [7, 7]);
+  assert.equal(layout.placedCount, 16);
+  assertCompleteMatrix(layout.fixtures);
+  const matrix = describeFixtureMatrix(layout.fixtures);
+  assert.equal(matrix.rows, 4);
+  assert.equal(matrix.cols, 4);
 });
 
-test("10×7.5 m with 21 elongated panels stays distributed", () => {
+test("B: 8×7 m calculated count picks a full matrix meeting lux", () => {
+  const vertices = rect(8, 7);
+  const areaM2 = 56;
+  const calculated = calculateRequiredFixtureCount(areaM2, 500, "led_panel_4000", CEILING);
+  const layout = placeFixturesWithLayoutInfo(vertices, PPM, calculated, "led_panel_4000", {
+    areaM2,
+    targetLux: 500,
+    ceilingHeightM: CEILING,
+    ceilingType: "grid_600",
+  });
+  assertCompleteMatrix(layout.fixtures);
+  assert.ok(Math.abs(layout.placedCount - calculated) <= 3);
+  const lux = calculateIndicativeResult(areaM2, 500, CEILING, layout.fixtures, calculated);
+  assert.ok(lux.meetsTarget);
+});
+
+test("C: 10×7.5 m with 21 calculated uses a complete elongated matrix", () => {
   const vertices = rect(10, 7.5);
+  const areaM2 = 75;
+  const calculated = 21;
   const layout = placeElongatedPanelsOnModules(
     vertices,
     PPM,
-    21,
+    calculated,
     "led_panel_1200x300_4000",
-    { areaM2: 75, targetLux: 500, ceilingHeightM: CEILING, ceilingType: "grid_1200_600" },
+    { areaM2, targetLux: 500, ceilingHeightM: CEILING, ceilingType: "grid_1200_600" },
     "grid_1200_600",
   );
-  assert.equal(layout.placedCount, 21);
-  const quality = evaluateLayoutQuality(layout.fixtures, boundsOf(vertices));
-  assert.equal(quality.rejected, false);
-  const spread = getSpreadMetrics(layout.fixtures, boundsOf(vertices));
-  assert.ok(Math.max(spread.extentXRatio, spread.extentYRatio) >= 0.55);
+  assertCompleteMatrix(layout.fixtures);
+  assert.ok(Math.abs(layout.placedCount - calculated) <= 3);
 });
 
-test("8×5 m with 12 panels uses regular matrix", () => {
-  const vertices = rect(8, 5);
-  const required = calculateRequiredFixtureCount(40, 500, "led_panel_4000", CEILING);
-  const layout = placeFixturesWithLayoutInfo(vertices, PPM, required, "led_panel_4000", {
-    areaM2: 40,
+test("D: 8×6 m calculated 14 compares nearby full matrices", () => {
+  const vertices = rect(8, 6);
+  const areaM2 = 48;
+  const calculated = calculateRequiredFixtureCount(areaM2, 500, "led_panel_4000", CEILING);
+  const layout = placeFixturesWithLayoutInfo(vertices, PPM, calculated, "led_panel_4000", {
+    areaM2,
     targetLux: 500,
     ceilingHeightM: CEILING,
     ceilingType: "grid_600",
   });
-  assert.ok(layout.placedCount >= 11);
+  assertCompleteMatrix(layout.fixtures);
+  assert.ok(layout.placedCount >= calculated - 3 && layout.placedCount <= calculated + 3);
+  const lux = calculateIndicativeResult(areaM2, 500, CEILING, layout.fixtures, calculated);
+  assert.ok(lux.meetsTarget);
   const matrix = describeFixtureMatrix(layout.fixtures);
-  const quality = evaluateLayoutQuality(layout.fixtures, boundsOf(vertices));
-  assert.equal(quality.rejected, false);
-  assert.ok(quality.rowCount >= 2 || (matrix.rows >= 2 && matrix.cols >= 2));
+  assert.ok(!(matrix.rows === 2 && matrix.cols >= 6));
 });
 
-test("6.5×3.2 m with 3 downlights in one centred row", () => {
+test("E: 6.5×3.2 m downlights in one straight row", () => {
   const vertices = rect(6.5, 3.2);
   const layout = placeFixturesWithLayoutInfo(vertices, PPM, 3, "downlight_4000", {
     areaM2: 6.5 * 3.2,
@@ -94,28 +104,21 @@ test("6.5×3.2 m with 3 downlights in one centred row", () => {
     ceilingType: "grid_600",
   });
   assert.equal(layout.placedCount, 3);
-  const ys = [...new Set(layout.fixtures.map((f) => Math.round(f.y)))];
-  assert.equal(ys.length, 1);
-  const quality = evaluateLayoutQuality(layout.fixtures, boundsOf(vertices));
-  assert.equal(quality.rejected, false);
+  assertCompleteMatrix(layout.fixtures);
+  assert.equal(describeFixtureMatrix(layout.fixtures).rows, 1);
 });
 
-const RANDOM_COUNTS = [5, 7, 11, 13, 14, 17, 19, 21, 23];
-
-for (const count of RANDOM_COUNTS) {
-  test(`8×6 m ${count} panels passes layout quality gate`, () => {
-    const vertices = rect(8, 6);
-    const layout = placeFixturesWithLayoutInfo(vertices, PPM, count, "led_panel_4000", {
-      areaM2: 48,
-      targetLux: 500,
-      ceilingHeightM: CEILING,
-      ceilingType: "grid_600",
-    });
-    assert.ok(layout.placedCount >= count - 1 && layout.placedCount <= count + 1);
-    const quality = evaluateLayoutQuality(layout.fixtures, boundsOf(vertices));
-    assert.equal(quality.edgeOnlyRows, false);
-    if (layout.placedCount >= 10) {
-      assert.equal(quality.rejected, false);
-    }
-  });
-}
+test("F: 1200×300 panels stay on grid with complete matrix", () => {
+  const vertices = rect(10, 7.5);
+  const layout = placeElongatedPanelsOnModules(
+    vertices,
+    PPM,
+    20,
+    "led_panel_1200x300_4000",
+    { areaM2: 75, targetLux: 500, ceilingHeightM: CEILING, ceilingType: "grid_1200_600" },
+    "grid_1200_600",
+  );
+  assertCompleteMatrix(layout.fixtures);
+  assert.equal(layout.placedCount, 20);
+  assert.equal(describeFixtureMatrix(layout.fixtures).rows * describeFixtureMatrix(layout.fixtures).cols, 20);
+});
