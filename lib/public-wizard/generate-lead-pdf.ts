@@ -6,6 +6,7 @@ import {
   MATERIAL_PRICE_FOOTNOTE,
 } from "@/lib/public-wizard/pricing";
 import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
+import { getCeilingType } from "@/lib/public-wizard/ceiling-types";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import type { PublicLeadRecord } from "@/types/public-wizard";
 
@@ -74,7 +75,13 @@ export function generatePublicLeadPdf(record: PublicLeadRecord): string {
     y += 5;
   }
   y += 4;
-  doc.text(`Ruimte: ${room.name} · Sfeer: ${atmosphere.title} · Plafond: ${wizard.ceilingHeightM} m`, MARGIN, y);
+  const ceilingLabel = wizard.ceilingType ? getCeilingType(wizard.ceilingType).title : "—";
+  const roomLine = doc.splitTextToSize(
+    `Ruimte: ${room.name} · Sfeer: ${atmosphere.title} · Plafondtype: ${ceilingLabel} · Hoogte: ${wizard.ceilingHeightM} m`,
+    180,
+  );
+  doc.text(roomLine, MARGIN, y);
+  y += (roomLine.length - 1) * 5;
   y += 5;
   const inputLabel =
     wizard.inputMethod === "dimensions"

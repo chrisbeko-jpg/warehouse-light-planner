@@ -67,6 +67,7 @@ export async function GET() {
     {
       roomChoices: mapRoomChoices(site),
       atmosphereChoices: mapAtmosphereChoices(site),
+      products: site.wizard.products,
     },
     {
       headers: {

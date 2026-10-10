@@ -9,6 +9,8 @@ import type { LeadContactForm } from "../types/public-wizard";
 import {
   advanceRoom,
   advanceAtmosphere,
+  advanceCeiling,
+  advanceInputMethodFloorplan,
   uploadFloorPlan,
   setupEditor,
   generateAndOpenResult,
@@ -107,6 +109,8 @@ test.describe("Lead form logic", () => {
 async function openRequestStep(page: import("@playwright/test").Page) {
   await advanceRoom(page);
   await advanceAtmosphere(page);
+  await advanceCeiling(page);
+  await advanceInputMethodFloorplan(page);
   await uploadFloorPlan(page);
   await setupEditor(page);
   await generateAndOpenResult(page);

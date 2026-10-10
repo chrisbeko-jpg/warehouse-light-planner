@@ -60,6 +60,7 @@ export const SCALE_RESET_PRESERVE_KEYS = [
   "ceilingHeightM",
   "targetLux",
   "atmosphere",
+  "ceilingType",
   "preferredProductId",
   "backgroundDataUrl",
   "backgroundFileName",

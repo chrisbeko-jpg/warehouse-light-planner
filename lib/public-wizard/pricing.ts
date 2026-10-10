@@ -1,13 +1,10 @@
-import { PUBLIC_PRODUCT_BY_ID } from "@/lib/public-wizard/products";
+import { getPublicProduct, getUnitPrice, PUBLIC_PRODUCTS } from "@/lib/public-wizard/products";
 import type { MaterialPriceIndication, PlacedPublicFixture, PublicProductId } from "@/types/public-wizard";
 
-/** Central public material pricing — change here only. */
-export const PUBLIC_PRICING: Record<PublicProductId, number> = {
-  led_panel_3000: 50,
-  led_panel_4000: 50,
-  downlight_3000: 15,
-  downlight_4000: 15,
-};
+/** Default catalogue prices. A published CMS price replaces these at runtime via getUnitPrice. */
+export const PUBLIC_PRICING: Record<PublicProductId, number> = Object.fromEntries(
+  PUBLIC_PRODUCTS.map((product) => [product.id, product.unitPriceEuro]),
+) as Record<PublicProductId, number>;
 
 export const MATERIAL_PRICE_DISCLAIMER =
   "Exclusief btw, verzending, montage en eventuele aanvullende materialen.";
@@ -24,8 +21,8 @@ export function calculateMaterialPrice(
   }
 
   const lines = [...qtyByProduct.entries()].map(([productId, quantity]) => {
-    const unitEuro = PUBLIC_PRICING[productId] ?? 0;
-    const name = PUBLIC_PRODUCT_BY_ID[productId]?.name ?? productId;
+    const unitEuro = getUnitPrice(productId);
+    const name = getPublicProduct(productId).name;
     return {
       productId,
       name,
@@ -59,7 +56,7 @@ export function formatPriceRange(price: MaterialPriceIndication): string {
 export function countProducts(fixtures: PlacedPublicFixture[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const f of fixtures) {
-    const name = PUBLIC_PRODUCT_BY_ID[f.productId]?.name ?? f.productId;
+    const name = getPublicProduct(f.productId).name;
     counts[name] = (counts[name] ?? 0) + 1;
   }
   return counts;

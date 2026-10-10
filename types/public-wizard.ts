@@ -3,12 +3,16 @@ import type { Point2D } from "@/types/floor-plan";
 export type WizardStepId =
   | "room"
   | "atmosphere"
+  | "ceiling"
   | "inputMethod"
   | "floorplan"
   | "dimensions"
   | "editor"
   | "result"
   | "request";
+
+/** Suspended ceiling or a solid slab. Drives fixture family, grid and price. */
+export type CeilingTypeId = "grid_600" | "grid_1200_600" | "concrete";
 
 export type WizardInputMethod = "floorplan" | "dimensions";
 
@@ -25,8 +29,16 @@ export type AtmosphereId = "warm" | "neutraal" | "premium_architectural";
 export type PublicProductId =
   | "led_panel_3000"
   | "led_panel_4000"
+  | "led_panel_1200x300_3000"
+  | "led_panel_1200x300_4000"
+  | "led_panel_surface_3000"
+  | "led_panel_surface_4000"
   | "downlight_3000"
-  | "downlight_4000";
+  | "downlight_4000"
+  | "downlight_surface_3000"
+  | "downlight_surface_4000";
+
+export type FixtureMounting = "recessed" | "surface";
 
 export type PublicFixtureCategory = "led_panel" | "downlight";
 
@@ -57,6 +69,7 @@ export interface PublicWizardState {
   ceilingHeightM: number;
   targetLux: number;
   atmosphere: AtmosphereId | null;
+  ceilingType: CeilingTypeId | null;
   preferredProductId: PublicProductId;
   backgroundDataUrl: string | null;
   backgroundFileName: string | null;
@@ -128,6 +141,7 @@ export interface PublicLeadRecord {
     ceilingHeightM: number;
     targetLux: number;
     atmosphere: AtmosphereId;
+    ceilingType: CeilingTypeId | null;
     preferredProductId: PublicProductId;
     fixtures: PlacedPublicFixture[];
     roomVertices: Point2D[];

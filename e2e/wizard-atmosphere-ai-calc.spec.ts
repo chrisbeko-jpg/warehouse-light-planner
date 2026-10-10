@@ -41,19 +41,19 @@ test.describe("Atmosphere step", () => {
     await openAtmosphereStep(page);
     await page.getByTestId("atmosphere-option-warm").click();
     await page.getByTestId("wizard-next-button").click();
-    await expect(page.getByText(/plattegrond/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welk type plafond heeft uw ruimte?" })).toBeVisible();
   });
 
   test("next works after neutraal selection", async ({ page }) => {
     await openAtmosphereStep(page);
     await page.getByTestId("atmosphere-option-neutraal").click();
     await page.getByTestId("wizard-next-button").click();
-    await expect(page.getByText(/plattegrond/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welk type plafond heeft uw ruimte?" })).toBeVisible();
   });
 
   test("next label mentions upload plattegrond", async ({ page }) => {
     await openAtmosphereStep(page);
-    await expect(page.getByTestId("wizard-next-button")).toContainText("Volgende: upload plattegrond");
+    await expect(page.getByTestId("wizard-next-button")).toContainText("Volgende");
   });
 
   test("wizard CMS serves premium disabled", async ({ request }) => {

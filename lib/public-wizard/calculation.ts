@@ -7,7 +7,7 @@ export const UTILISATION_FACTOR = 0.6;
 export const MAINTENANCE_FACTOR = 0.8;
 
 export const CALCULATION_DISCLAIMER =
-  "Deze berekening is indicatief en gebaseerd op de lumenmethode. De definitieve projectspecificatie wordt door Lightsale gecontroleerd.";
+  "Deze berekening is indicatief en gebaseerd op de lumenmethode. Het is geen formele EN 12464-1-validatie. De definitieve projectspecificatie wordt door Lightsale gecontroleerd.";
 
 export function effectiveLumensPerFixture(
   productId: PublicProductId,

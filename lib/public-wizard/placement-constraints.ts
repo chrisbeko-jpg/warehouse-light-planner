@@ -50,17 +50,32 @@ export function minDistanceToPolygonBoundaryM(
   return minDistPx / pixelsPerMeter;
 }
 
+export function orientedFixtureSizeM(
+  productId: PublicProductId,
+  rotation = 0,
+): { widthM: number; heightM: number } {
+  const product = getPublicProduct(productId);
+  const quarterTurns = Math.abs(Math.round(rotation / 90)) % 2;
+  if (quarterTurns === 1) {
+    return { widthM: product.heightM, heightM: product.widthM };
+  }
+  return { widthM: product.widthM, heightM: product.heightM };
+}
+
 export function getFixtureFootprintCorners(
   center: Point2D,
   pixelsPerMeter: number,
   productId: PublicProductId,
+  rotation = 0,
 ): Point2D[] {
-  const halfPx = getFixtureHalfSizeM(productId) * pixelsPerMeter;
+  const { widthM, heightM } = orientedFixtureSizeM(productId, rotation);
+  const halfX = (widthM / 2) * pixelsPerMeter;
+  const halfY = (heightM / 2) * pixelsPerMeter;
   return [
-    { x: center.x - halfPx, y: center.y - halfPx },
-    { x: center.x + halfPx, y: center.y - halfPx },
-    { x: center.x + halfPx, y: center.y + halfPx },
-    { x: center.x - halfPx, y: center.y + halfPx },
+    { x: center.x - halfX, y: center.y - halfY },
+    { x: center.x + halfX, y: center.y - halfY },
+    { x: center.x + halfX, y: center.y + halfY },
+    { x: center.x - halfX, y: center.y + halfY },
   ];
 }
 
@@ -69,6 +84,7 @@ export function isPanelPlacementValid(
   pixelsPerMeter: number,
   vertices: Point2D[],
   productId: PublicProductId,
+  rotation = 0,
 ): boolean {
   const product = getPublicProduct(productId);
   if (product.category !== "led_panel") {
@@ -76,7 +92,7 @@ export function isPanelPlacementValid(
   }
 
   const clearanceM = getMinWallClearanceM(productId);
-  const corners = getFixtureFootprintCorners(center, pixelsPerMeter, productId);
+  const corners = getFixtureFootprintCorners(center, pixelsPerMeter, productId, rotation);
   if (!corners.every((corner) => pointInPolygon(corner, vertices))) {
     return false;
   }
@@ -94,10 +110,11 @@ export function isFixtureCenterValid(
   pixelsPerMeter: number,
   vertices: Point2D[],
   productId: PublicProductId,
+  rotation = 0,
 ): boolean {
   const product = getPublicProduct(productId);
   if (product.category === "led_panel") {
-    return isPanelPlacementValid(center, pixelsPerMeter, vertices, productId);
+    return isPanelPlacementValid(center, pixelsPerMeter, vertices, productId, rotation);
   }
   return pointInPolygon(center, vertices);
 }
@@ -107,7 +124,8 @@ export function minPanelOuterEdgeClearanceM(
   pixelsPerMeter: number,
   vertices: Point2D[],
   productId: PublicProductId,
+  rotation = 0,
 ): number {
-  const corners = getFixtureFootprintCorners(center, pixelsPerMeter, productId);
+  const corners = getFixtureFootprintCorners(center, pixelsPerMeter, productId, rotation);
   return Math.min(...corners.map((c) => minDistanceToPolygonBoundaryM(c, vertices, pixelsPerMeter)));
 }

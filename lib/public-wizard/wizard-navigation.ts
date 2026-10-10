@@ -1,6 +1,6 @@
 import type { WizardInputMethod, WizardStepId } from "@/types/public-wizard";
 
-const BASE_STEPS: WizardStepId[] = ["room", "atmosphere", "inputMethod"];
+const BASE_STEPS: WizardStepId[] = ["room", "atmosphere", "ceiling", "inputMethod"];
 
 export function getWizardFlowSteps(inputMethod: WizardInputMethod | null): WizardStepId[] {
   const tail: WizardStepId[] = ["editor", "result", "request"];
@@ -61,6 +61,7 @@ export function isWizardFlowStep(step: WizardStepId, inputMethod: WizardInputMet
 export const WIZARD_PROGRESS_STEP_IDS: WizardStepId[] = [
   "room",
   "atmosphere",
+  "ceiling",
   "inputMethod",
   "floorplan",
   "dimensions",
@@ -75,6 +76,7 @@ export const WIZARD_STEP_LABELS: {
 }[] = [
   { id: "room", label: "Ruimte", showInProgress: true },
   { id: "atmosphere", label: "Sfeer", showInProgress: true },
+  { id: "ceiling", label: "Plafond", showInProgress: true },
   { id: "inputMethod", label: "Invoer", showInProgress: true },
   { id: "floorplan", label: "Plattegrond", showInProgress: true },
   { id: "dimensions", label: "Afmetingen", showInProgress: true },

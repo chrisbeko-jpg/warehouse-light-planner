@@ -1,6 +1,7 @@
 import type { CmsPage, CmsSiteContent, CmsWizardContent } from "@/types/cms";
 import { KANTOORVERLICHTING_SEED } from "@/lib/cms/seeds/kantoorverlichting";
 import { ATMOSPHERES } from "@/lib/public-wizard/atmospheres";
+import { PUBLIC_PRODUCTS } from "@/lib/public-wizard/products";
 import { ROOM_FUNCTIONS } from "@/lib/public-wizard/room-functions";
 import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
 
@@ -150,6 +151,17 @@ export const DEFAULT_WIZARD_CONTENT: CmsWizardContent = {
     enabled: item.id !== "premium_architectural",
     badgeText: item.id === "premium_architectural" ? "ONLY PREMIUM" : undefined,
     flow: "standard" as const,
+  })),
+  products: PUBLIC_PRODUCTS.map((product) => ({
+    id: product.id,
+    name: product.name,
+    lumens: product.lumens,
+    watts: product.watts,
+    beamAngleDeg: product.beamAngleDeg,
+    widthM: product.widthM,
+    heightM: product.heightM,
+    diameterM: product.diameterM,
+    unitPriceEuro: product.unitPriceEuro,
   })),
 };
 

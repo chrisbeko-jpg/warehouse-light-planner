@@ -5,6 +5,7 @@ const SECTIONS = [
   { href: "/internal/content/homepage", title: "Homepage", desc: "Hero, stappen, voordelen en homepage-secties." },
   { href: "/internal/content/wizard/rooms", title: "AI Lichtadvies – Ruimtes", desc: "Afbeeldingen en teksten voor ruimtekeuzes." },
   { href: "/internal/content/wizard/atmospheres", title: "AI Lichtadvies – Sferen", desc: "Warm, helder en Premium-teaser (disabled)." },
+  { href: "/internal/content/wizard/products", title: "AI Lichtadvies – Producten", desc: "Prijzen, lumen, vermogen, bundelhoek en afmetingen." },
   { href: "/internal/content/pages/ai-calculator", title: "AI Calculator (B2B)", desc: "Landingspagina, SEO en formulier voor eigen AI-calculator." },
   { href: "/internal/content/media", title: "Afbeeldingen / Media", desc: "Uploaden, vervangen en alt-teksten beheren." },
   { href: "/internal/content/pages/kantoorverlichting", title: "SEO – Kantoorverlichting", desc: "SEO title, meta description en landingspagina." },

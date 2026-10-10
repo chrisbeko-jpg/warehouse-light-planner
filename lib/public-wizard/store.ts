@@ -4,7 +4,12 @@ import {
   calculateIndicativeResult,
   calculateRequiredFixtureCount,
 } from "@/lib/public-wizard/calculation";
-import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
+import {
+  cctFromAtmosphere,
+  selectConfiguredProduct,
+  selectDownlightProduct,
+  selectPanelProduct,
+} from "@/lib/public-wizard/product-selection";
 import {
   createRoomPolygon,
   duplicateFixture,
@@ -14,7 +19,8 @@ import {
   removeFixture,
   snapFixtureCenter,
 } from "@/lib/public-wizard/placement";
-import { getPublicProduct } from "@/lib/public-wizard/products";
+import { panelRotationForRoom } from "@/lib/public-wizard/matrix-placement";
+import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
 import {
@@ -25,6 +31,7 @@ import {
 import type { Point2D } from "@/types/floor-plan";
 import type {
   AtmosphereId,
+  CeilingTypeId,
   ManualDimensions,
   PlacedPublicFixture,
   PublicProductId,
@@ -52,6 +59,7 @@ export interface PublicWizardStore {
   ceilingHeightM: number;
   targetLux: number;
   atmosphere: AtmosphereId | null;
+  ceilingType: CeilingTypeId | null;
   preferredProductId: PublicProductId;
   backgroundDataUrl: string | null;
   backgroundFileName: string | null;
@@ -93,6 +101,7 @@ export interface PublicWizardStore {
   setCeilingHeightM: (value: number) => void;
   setTargetLux: (value: number) => void;
   selectAtmosphere: (id: AtmosphereId) => void;
+  selectCeilingType: (id: CeilingTypeId) => void;
   setBackground: (dataUrl: string, fileName: string, width: number, height: number) => void;
   setEditorMode: (mode: PublicEditorMode) => void;
   setCalibrationDistanceMm: (value: string) => void;
@@ -145,6 +154,7 @@ const initialState = {
   ceilingHeightM: 2.7,
   targetLux: 500,
   atmosphere: null as AtmosphereId | null,
+  ceilingType: null as CeilingTypeId | null,
   preferredProductId: "led_panel_4000" as PublicProductId,
   backgroundDataUrl: null as string | null,
   backgroundFileName: null as string | null,
@@ -182,6 +192,18 @@ function cloneFixtures(fixtures: PlacedPublicFixture[]): PlacedPublicFixture[] {
   return fixtures.map((f) => ({ ...f }));
 }
 
+function resolvedProducts(state: {
+  roomFunction: RoomFunctionId | null;
+  ceilingType: CeilingTypeId | null;
+  atmosphere: AtmosphereId | null;
+}): { preferredProductId: PublicProductId; downlightProductId: PublicProductId } | null {
+  if (!state.roomFunction || !state.ceilingType || !state.atmosphere) return null;
+  return {
+    preferredProductId: selectConfiguredProduct(state.roomFunction, state.ceilingType, state.atmosphere),
+    downlightProductId: selectDownlightProduct(state.ceilingType, cctFromAtmosphere(state.atmosphere)),
+  };
+}
+
 export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   ...initialState,
 
@@ -208,7 +230,12 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
 
   selectRoomFunction: (id) => {
     const def = getRoomFunction(id);
-    set({ roomFunction: id, targetLux: def.suggestedLux });
+    const next = { ...get(), roomFunction: id, targetLux: def.suggestedLux };
+    set({
+      roomFunction: id,
+      targetLux: def.suggestedLux,
+      ...resolvedProducts(next),
+    });
   },
 
   selectInputMethod: (method) => {
@@ -227,9 +254,10 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   },
 
   applyManualDimensions: (dimensions) => {
-    const { atmosphere, roomFunction } = get();
+    const { atmosphere, roomFunction, ceilingType } = get();
     if (!roomFunction) return false;
     if (!atmosphere) return false;
+    if (!ceilingType) return false;
 
     const scene = buildManualRoomScene({
       lengthM: dimensions.lengthM,
@@ -295,10 +323,18 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
 
   selectAtmosphere: (id) => {
     if (id === "premium_architectural") return;
-    const atmosphere = getAtmosphere(id);
+    const next = { ...get(), atmosphere: id };
     set({
       atmosphere: id,
-      preferredProductId: atmosphere.preferredProductId,
+      ...resolvedProducts(next),
+    });
+  },
+
+  selectCeilingType: (id) => {
+    const next = { ...get(), ceilingType: id };
+    set({
+      ceilingType: id,
+      ...resolvedProducts(next),
     });
   },
 
@@ -402,33 +438,53 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       targetLux,
       ceilingHeightM,
       preferredProductId,
+      roomFunction,
+      ceilingType,
+      atmosphere,
     } = get();
-    if (roomVertices.length < 3 || !pixelsPerMeter) return false;
+    if (roomVertices.length < 3 || !pixelsPerMeter || !ceilingType) return false;
+    const resolved = resolvedProducts({ roomFunction, ceilingType, atmosphere });
+    const productId = resolved?.preferredProductId ?? preferredProductId;
     const room = createRoomPolygon(roomVertices, pixelsPerMeter);
     const count = calculateRequiredFixtureCount(
       room.areaM2,
       targetLux,
-      preferredProductId,
+      productId,
       ceilingHeightM,
     );
     const layout = placeFixturesWithLayoutInfo(
       roomVertices,
       pixelsPerMeter,
       count,
-      preferredProductId,
+      productId,
       {
         areaM2: room.areaM2,
         targetLux,
         ceilingHeightM,
+        ceilingType,
       },
     );
+    const indicative = calculateIndicativeResult(
+      room.areaM2,
+      targetLux,
+      ceilingHeightM,
+      layout.fixtures,
+      count,
+    );
+    let layoutWarning = layout.warning ?? null;
+    if (!indicative.meetsTarget) {
+      const note = `De nette indeling haalt het luxdoel indicatief niet: ${indicative.indicativeAverageLux} lux bij een doel van ${targetLux} lux.`;
+      layoutWarning = layoutWarning ? `${layoutWarning} ${note}` : note;
+    }
     set({
+      preferredProductId: productId,
+      downlightProductId: resolved?.downlightProductId ?? get().downlightProductId,
       fixtures: layout.fixtures,
       historyPast: [],
       historyFuture: [],
       selectedFixtureId: null,
       lightingPlanGenerated: true,
-      layoutWarning: layout.warning ?? null,
+      layoutWarning,
       requiredFixtureCount: count,
       editorMode: "select",
       editorPhase: "plan",
@@ -492,6 +548,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       previous,
       fixtures,
       id,
+      { ceilingType: get().ceilingType ?? undefined, rotation: fixture.rotation },
     );
     if (!snapped) {
       set({ editorMessage: "Geen geldige rasterpositie. Armatuur teruggezet." });
@@ -543,13 +600,28 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   },
 
   addPanel: () => {
-    const { fixtures, preferredProductId, pixelsPerMeter, roomVertices } = get();
+    const { fixtures, preferredProductId, pixelsPerMeter, roomVertices, ceilingType, atmosphere } = get();
     if (!pixelsPerMeter || roomVertices.length < 3) return false;
+    const panelId =
+      getPublicProduct(preferredProductId).category === "led_panel"
+        ? preferredProductId
+        : ceilingType && atmosphere
+          ? selectPanelProduct(ceilingType, cctFromAtmosphere(atmosphere))
+          : preferredProductId;
+    const xs = roomVertices.map((vertex) => vertex.x);
+    const ys = roomVertices.map((vertex) => vertex.y);
+    const roomWidthM = (Math.max(...xs) - Math.min(...xs)) / pixelsPerMeter;
+    const roomHeightM = (Math.max(...ys) - Math.min(...ys)) / pixelsPerMeter;
+    const rotation = isElongatedPanel(panelId)
+      ? panelRotationForRoom(roomWidthM, roomHeightM, panelId)
+      : 0;
     const position = findFreeGridPosition(
       roomVertices,
       pixelsPerMeter,
       fixtures,
-      preferredProductId,
+      panelId,
+      undefined,
+      { ceilingType: ceilingType ?? undefined, rotation },
     );
     if (!position) {
       set({
@@ -561,10 +633,10 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     get().pushHistory();
     const newFixture = {
       id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      productId: preferredProductId,
+      productId: panelId,
       x: position.x,
       y: position.y,
-      rotation: 0,
+      rotation,
     };
     set({
       fixtures: [...fixtures, newFixture],
@@ -583,6 +655,8 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       pixelsPerMeter,
       fixtures,
       downlightProductId,
+      undefined,
+      { ceilingType: get().ceilingType ?? undefined },
     );
     if (!position) {
       set({
@@ -611,7 +685,9 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     const { selectedFixtureId, fixtures, pixelsPerMeter, roomVertices } = get();
     if (!selectedFixtureId || !pixelsPerMeter) return;
     get().pushHistory();
-    const next = duplicateFixture(fixtures, selectedFixtureId, pixelsPerMeter, roomVertices);
+    const next = duplicateFixture(fixtures, selectedFixtureId, pixelsPerMeter, roomVertices, {
+      ceilingType: get().ceilingType ?? undefined,
+    });
     if (next.length === fixtures.length) {
       set({
         editorMessage: "Er is geen vrije rasterpositie beschikbaar. Verplaats eerst een bestaand armatuur.",

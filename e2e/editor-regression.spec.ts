@@ -22,6 +22,8 @@ import { calculateIndicativeResult } from "../lib/public-wizard/calculation";
 import { calculateMaterialPrice } from "../lib/public-wizard/pricing";
 import {
   advanceAtmosphere,
+  advanceCeiling,
+  advanceInputMethodFloorplan,
   advanceRoom,
   calibrateScale,
   drawRoomPolygon,
@@ -167,6 +169,8 @@ test.describe("Public editor regression", () => {
   test.beforeEach(async ({ page }) => {
     await advanceRoom(page);
     await advanceAtmosphere(page);
+    await advanceCeiling(page);
+    await advanceInputMethodFloorplan(page);
     await uploadFloorPlan(page);
   });
 

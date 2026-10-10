@@ -18,8 +18,14 @@ export const FALLBACK_IMAGES = {
   products: {
     led_panel_3000: imagePath("led-paneel-595x595-3000k.webp"),
     led_panel_4000: imagePath("led-paneel-595x595-4000k.webp"),
+    led_panel_1200x300_3000: imagePath("led-paneel-595x595-3000k.webp"),
+    led_panel_1200x300_4000: imagePath("led-paneel-595x595-4000k.webp"),
+    led_panel_surface_3000: imagePath("led-paneel-595x595-3000k.webp"),
+    led_panel_surface_4000: imagePath("led-paneel-595x595-4000k.webp"),
     downlight_3000: imagePath("downlight-rond-3000k.webp"),
     downlight_4000: imagePath("downlight-rond-4000k.webp"),
+    downlight_surface_3000: imagePath("downlight-rond-3000k.webp"),
+    downlight_surface_4000: imagePath("downlight-rond-4000k.webp"),
   } satisfies Record<PublicProductId, string>,
   atmospheres: {
     warm: imagePath("kantoorverlichting-warm.webp"),

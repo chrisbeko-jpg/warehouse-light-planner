@@ -39,6 +39,7 @@ export function StepRequest() {
   const ceilingHeightM = usePublicWizardStore((s) => s.ceilingHeightM);
   const targetLux = usePublicWizardStore((s) => s.targetLux);
   const atmosphere = usePublicWizardStore((s) => s.atmosphere);
+  const ceilingType = usePublicWizardStore((s) => s.ceilingType);
   const preferredProductId = usePublicWizardStore((s) => s.preferredProductId);
   const fixtures = usePublicWizardStore((s) => s.fixtures);
   const requiredFixtureCount = usePublicWizardStore((s) => s.requiredFixtureCount);
@@ -87,7 +88,7 @@ export function StepRequest() {
       setError(validationError);
       return;
     }
-    if (!roomFunction || !atmosphere || !pixelsPerMeter || !backgroundDataUrl || !inputMethod) {
+    if (!roomFunction || !atmosphere || !ceilingType || !pixelsPerMeter || !backgroundDataUrl || !inputMethod) {
       setError("Wizardgegevens ontbreken. Start opnieuw.");
       return;
     }
@@ -115,6 +116,7 @@ export function StepRequest() {
           ceilingHeightM,
           targetLux,
           atmosphere,
+          ceilingType,
           preferredProductId,
           fixtures,
           requiredFixtureCount,

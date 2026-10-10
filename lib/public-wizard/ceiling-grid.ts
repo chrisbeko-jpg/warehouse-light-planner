@@ -1,3 +1,4 @@
+import { listModuleCenterPoints, placeElongatedPanelsOnModules } from "@/lib/public-wizard/matrix-placement";
 import { CEILING_GRID_M, snapPointToGridPx, uniqueGridPoints } from "@/lib/public-wizard/grid";
 import {
   calculateIndicativeResult,
@@ -7,10 +8,10 @@ import {
   isFixtureCenterValid,
   isPanelPlacementValid,
 } from "@/lib/public-wizard/placement-constraints";
-import { getPublicProduct } from "@/lib/public-wizard/products";
+import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import { pointInPolygon } from "@/lib/public-wizard/placement";
 import type { Point2D } from "@/types/floor-plan";
-import type { PlacedPublicFixture, PublicProductId } from "@/types/public-wizard";
+import type { CeilingTypeId, PlacedPublicFixture, PublicProductId } from "@/types/public-wizard";
 
 export const PANEL_SIZE_M = 0.595;
 
@@ -27,6 +28,7 @@ export interface PanelLayoutContext {
   areaM2: number;
   targetLux: number;
   ceilingHeightM: number;
+  ceilingType?: CeilingTypeId;
 }
 
 export interface SpreadMetrics {
@@ -568,6 +570,17 @@ export function placePanelsOnCeilingGrid(
     ceilingHeightM: 2.7,
   };
 
+  if (isElongatedPanel(productId)) {
+    return placeElongatedPanelsOnModules(
+      vertices,
+      pixelsPerMeter,
+      targetCount,
+      productId,
+      context,
+      context.ceilingType ?? "grid_1200_600",
+    );
+  }
+
   const layout = computeBestCompleteMatrixLayout(
     vertices,
     pixelsPerMeter,
@@ -619,14 +632,38 @@ function positionOccupied(
   );
 }
 
+export interface SnapFrame {
+  ceilingType?: CeilingTypeId;
+  rotation?: number;
+}
+
+function snapCandidates(
+  vertices: Point2D[],
+  pixelsPerMeter: number,
+  productId: PublicProductId,
+  frame?: SnapFrame,
+): Point2D[] {
+  if (isElongatedPanel(productId)) {
+    return listModuleCenterPoints(
+      vertices,
+      pixelsPerMeter,
+      productId,
+      frame?.ceilingType ?? "grid_1200_600",
+      frame?.rotation ?? 0,
+    );
+  }
+  return buildValidGridCenters(vertices, pixelsPerMeter, productId);
+}
+
 export function findNearestFreeGridPosition(
   vertices: Point2D[],
   pixelsPerMeter: number,
   occupied: PlacedPublicFixture[],
   preferNear: Point2D,
   productId: PublicProductId,
+  frame?: SnapFrame,
 ): Point2D | null {
-  const candidates = buildValidGridCenters(vertices, pixelsPerMeter, productId);
+  const candidates = snapCandidates(vertices, pixelsPerMeter, productId, frame);
   const free = candidates.filter((c) => !positionOccupied(c, occupied));
   if (free.length === 0) return null;
   free.sort(
@@ -646,13 +683,24 @@ export function snapFixtureToGrid(
   previous?: Point2D,
   occupied: PlacedPublicFixture[] = [],
   excludeId?: string,
+  frame?: SnapFrame,
 ): Point2D | null {
   const gridPx = CEILING_GRID_M * pixelsPerMeter;
+  const rotation = frame?.rotation ?? 0;
 
   const isValid = (candidate: Point2D) => {
-    if (!isFixtureCenterValid(candidate, pixelsPerMeter, vertices, productId)) return false;
+    if (!isFixtureCenterValid(candidate, pixelsPerMeter, vertices, productId, rotation)) return false;
     return !positionOccupied(candidate, occupied, excludeId);
   };
+
+  if (isElongatedPanel(productId)) {
+    const candidates = snapCandidates(vertices, pixelsPerMeter, productId, frame).filter(isValid);
+    if (candidates.length === 0) return previous ?? null;
+    candidates.sort(
+      (a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y),
+    );
+    return candidates[0] ?? previous ?? null;
+  }
 
   const snapped = snapPointToGridPx({ x, y }, pixelsPerMeter);
   if (isValid(snapped)) return snapped;

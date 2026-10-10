@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
   advanceAtmosphere,
+  advanceCeiling,
   advanceInputMethodDimensions,
   advanceInputMethodFloorplan,
   advanceRoom,
@@ -59,6 +60,7 @@ test.describe("Public LED site & wizard", () => {
   test("manual dimensions route generates plan", async ({ page }) => {
     await advanceRoom(page);
     await advanceAtmosphere(page);
+    await advanceCeiling(page);
     await advanceInputMethodDimensions(page);
     await fillManualDimensions(page);
     await generateAndOpenResult(page);
@@ -89,6 +91,9 @@ test.describe("Public LED site & wizard", () => {
     await expect(premium).toBeVisible();
     await expect(premium).toHaveAttribute("data-disabled", "true");
     await page.getByTestId("atmosphere-option-warm").click();
+    await page.getByTestId("wizard-next-button").click();
+    await expect(page.getByRole("heading", { name: "Welk type plafond heeft uw ruimte?" })).toBeVisible();
+    await page.getByTestId("ceiling-option-grid_600").click();
     await page.getByTestId("wizard-next-button").click();
     await expect(page.getByText("Hoe wilt u de ruimte invoeren?")).toBeVisible();
     await advanceInputMethodFloorplan(page);

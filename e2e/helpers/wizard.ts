@@ -39,6 +39,13 @@ export async function advanceAtmosphere(page: Page) {
   await page.getByTestId("wizard-next-button").click();
 }
 
+export async function advanceCeiling(page: Page, ceilingId = "grid_600") {
+  const option = page.getByTestId(`ceiling-option-${ceilingId}`);
+  await expect(option).toBeVisible();
+  await option.click();
+  await page.getByTestId("wizard-next-button").click();
+}
+
 export async function advanceInputMethodFloorplan(page: Page) {
   await page.getByTestId("input-method-floorplan").click();
   await page.getByTestId("wizard-next-button").click();
@@ -52,6 +59,7 @@ export async function advanceInputMethodDimensions(page: Page) {
 export async function advanceToFloorplanUpload(page: Page, roomId = "workplace_office") {
   await advanceRoom(page, roomId);
   await advanceAtmosphere(page);
+  await advanceCeiling(page);
   await advanceInputMethodFloorplan(page);
 }
 

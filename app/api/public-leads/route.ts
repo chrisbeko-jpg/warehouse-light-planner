@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
+import { loadCmsSite } from "@/lib/cms/content-store";
+import { getCeilingType } from "@/lib/public-wizard/ceiling-types";
 import { generatePublicLeadPdf } from "@/lib/public-wizard/generate-lead-pdf";
+import { setActiveProductCatalog } from "@/lib/public-wizard/products";
 import {
   generateReference,
   saveLead,
@@ -26,6 +29,7 @@ import type {
   PlacedPublicFixture,
   RoomFunctionId,
   AtmosphereId,
+  CeilingTypeId,
   WizardInputMethod,
 } from "@/types/public-wizard";
 
@@ -40,6 +44,7 @@ interface SubmitBody {
   ceilingHeightM: number;
   targetLux: number;
   atmosphere: AtmosphereId;
+  ceilingType?: CeilingTypeId | null;
   preferredProductId: PublicProductId;
   fixtures: PlacedPublicFixture[];
   roomVertices: { x: number; y: number }[];
@@ -85,6 +90,9 @@ export async function POST(request: Request) {
       return jsonError("Wizardgegevens ontbreken.", 400);
     }
 
+    const site = await loadCmsSite();
+    setActiveProductCatalog(site.wizard.products ?? null);
+
     const areaM2 = createRoomPolygon(body.roomVertices, body.pixelsPerMeter).areaM2;
     const result = calculateIndicativeResult(
       areaM2,
@@ -107,6 +115,7 @@ export async function POST(request: Request) {
         ceilingHeightM: body.ceilingHeightM,
         targetLux: body.targetLux,
         atmosphere: body.atmosphere,
+        ceilingType: body.ceilingType ?? null,
         preferredProductId: body.preferredProductId,
         fixtures: body.fixtures,
         roomVertices: body.roomVertices,
@@ -159,6 +168,7 @@ export async function POST(request: Request) {
         "",
         `Ruimtefunctie: ${body.roomFunction}`,
         `Sfeer: ${body.atmosphere}`,
+        `Plafondtype: ${body.ceilingType ? getCeilingType(body.ceilingType).title : "—"}`,
         `Plafondhoogte: ${body.ceilingHeightM} m`,
         `Doel lux: ${body.targetLux}`,
         `Indicatief lux: ${result.indicativeAverageLux}`,

@@ -5,7 +5,9 @@ import {
   snapFixtureToGrid,
   type CeilingLayoutResult,
   type PanelLayoutContext,
+  type SnapFrame,
 } from "@/lib/public-wizard/ceiling-grid";
+import { placeDownlightsSymmetrically } from "@/lib/public-wizard/matrix-placement";
 import { CEILING_GRID_M, snapPointToGridPx, uniqueGridPoints } from "@/lib/public-wizard/grid";
 import { getPublicProduct } from "@/lib/public-wizard/products";
 import type { Point2D } from "@/types/floor-plan";
@@ -98,23 +100,14 @@ export function placeFixturesInPolygon(
     return placePanelsOnCeilingGrid(vertices, pixelsPerMeter, count, productId, ctx).fixtures;
   }
 
-  const candidates = generateGridCandidates(vertices, pixelsPerMeter);
-  const bounds = polygonBounds(vertices);
-  const center = {
-    x: (bounds.minX + bounds.maxX) / 2,
-    y: (bounds.minY + bounds.maxY) / 2,
-  };
-  const sorted = [...candidates].sort(
-    (a, b) =>
-      Math.hypot(a.x - center.x, a.y - center.y) - Math.hypot(b.x - center.x, b.y - center.y),
-  );
-  return sorted.slice(0, count).map((point) => ({
-    id: nextId(),
-    productId,
-    x: point.x,
-    y: point.y,
-    rotation: 0,
-  }));
+  const ctx =
+    layoutContext ??
+    ({
+      areaM2: createRoomPolygon(vertices, pixelsPerMeter).areaM2,
+      targetLux: 250,
+      ceilingHeightM: 2.7,
+    } as const);
+  return placeDownlightsSymmetrically(vertices, pixelsPerMeter, count, productId, ctx).fixtures;
 }
 
 export function placeFixturesWithLayoutInfo(
@@ -135,12 +128,14 @@ export function placeFixturesWithLayoutInfo(
       } as const);
     return placePanelsOnCeilingGrid(vertices, pixelsPerMeter, count, productId, ctx);
   }
-  const fixtures = placeFixturesInPolygon(vertices, pixelsPerMeter, count, productId);
-  return {
-    fixtures,
-    requestedCount: count,
-    placedCount: fixtures.length,
-  };
+  const ctx =
+    layoutContext ??
+    ({
+      areaM2: createRoomPolygon(vertices, pixelsPerMeter).areaM2,
+      targetLux: 250,
+      ceilingHeightM: 2.7,
+    } as const);
+  return placeDownlightsSymmetrically(vertices, pixelsPerMeter, count, productId, ctx);
 }
 
 export function createRoomPolygon(
@@ -162,6 +157,7 @@ export function snapFixtureCenter(
   previous?: Point2D,
   fixtures: PlacedPublicFixture[] = [],
   excludeId?: string,
+  frame?: SnapFrame,
 ): Point2D | null {
   return snapFixtureToGrid(
     x,
@@ -172,6 +168,7 @@ export function snapFixtureCenter(
     previous,
     fixtures,
     excludeId,
+    frame,
   );
 }
 
@@ -181,6 +178,7 @@ export function findFreeGridPosition(
   fixtures: PlacedPublicFixture[],
   productId: PublicProductId,
   preferNear?: Point2D,
+  frame?: SnapFrame,
 ): Point2D | null {
   const bounds = polygonBounds(vertices);
   const center = preferNear ?? {
@@ -193,6 +191,7 @@ export function findFreeGridPosition(
     fixtures,
     center,
     productId,
+    frame,
   );
 }
 
@@ -229,6 +228,7 @@ export function duplicateFixture(
   id: string,
   pixelsPerMeter: number,
   vertices: Point2D[],
+  frame?: SnapFrame,
 ): PlacedPublicFixture[] {
   const source = fixtures.find((f) => f.id === id);
   if (!source) return fixtures;
@@ -239,6 +239,7 @@ export function duplicateFixture(
     fixtures,
     source.productId,
     { x: source.x + offsetPx, y: source.y },
+    { rotation: source.rotation, ceilingType: frame?.ceilingType },
   );
   if (!free) return fixtures;
   return [

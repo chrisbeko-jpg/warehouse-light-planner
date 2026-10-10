@@ -15,6 +15,7 @@ import type {
   ProductsBlock,
   ContentBlock,
   WizardAtmosphereChoiceCms,
+  WizardProductCms,
   WizardRoomChoiceCms,
   HeroBlock,
   TextImageBlock,
@@ -116,6 +117,29 @@ function mergeRoomChoices(
   });
 }
 
+function finiteNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function mergeProducts(defaults: WizardProductCms[], stored?: WizardProductCms[]): WizardProductCms[] {
+  const byId = new Map((stored ?? []).map((item) => [item.id, item]));
+  return defaults.map((item) => {
+    const saved = byId.get(item.id);
+    if (!saved) return item;
+    return {
+      ...item,
+      name: saved.name?.trim() ? saved.name : item.name,
+      lumens: finiteNumber(saved.lumens, item.lumens),
+      watts: finiteNumber(saved.watts, item.watts),
+      beamAngleDeg: finiteNumber(saved.beamAngleDeg, item.beamAngleDeg),
+      widthM: finiteNumber(saved.widthM, item.widthM),
+      heightM: finiteNumber(saved.heightM, item.heightM),
+      diameterM: saved.diameterM != null ? finiteNumber(saved.diameterM, item.diameterM ?? 0) : item.diameterM,
+      unitPriceEuro: finiteNumber(saved.unitPriceEuro, item.unitPriceEuro),
+    };
+  });
+}
+
 export function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizardContent {
   const defaults = DEFAULT_CMS_SITE.wizard;
   if (!stored) return defaults;
@@ -123,6 +147,7 @@ export function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizar
   return {
     roomChoices: mergeRoomChoices(defaults.roomChoices, stored.roomChoices),
     atmosphereChoices: mergeAtmosphereChoices(defaults.atmosphereChoices, stored.atmosphereChoices),
+    products: mergeProducts(defaults.products, stored.products),
   };
 }
 

@@ -272,9 +272,23 @@ export interface WizardAtmosphereChoiceCms {
   ctaText?: string;
 }
 
+/** Editable catalogue row. CMS values override the code defaults everywhere prices and photometry are read. */
+export interface WizardProductCms {
+  id: string;
+  name: string;
+  lumens: number;
+  watts: number;
+  beamAngleDeg: number;
+  widthM: number;
+  heightM: number;
+  diameterM?: number;
+  unitPriceEuro: number;
+}
+
 export interface CmsWizardContent {
   roomChoices: WizardRoomChoiceCms[];
   atmosphereChoices: WizardAtmosphereChoiceCms[];
+  products: WizardProductCms[];
 }
 
 export interface CmsNavigationItem {

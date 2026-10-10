@@ -12,7 +12,10 @@ import {
   HEATMAP_GRADIENT_STOPS,
   PUBLIC_HEATMAP_DISCLAIMER,
 } from "@/lib/public-wizard/heatmap";
-import { CEILING_GRID_M, snapPointToGridPx } from "@/lib/public-wizard/grid";
+import { buildCeilingRaster } from "@/lib/public-wizard/ceiling-raster";
+import { getCeilingType } from "@/lib/public-wizard/ceiling-types";
+import { CEILING_GRID_M } from "@/lib/public-wizard/grid";
+import { snapFixtureCenter } from "@/lib/public-wizard/placement";
 import { getPublicProduct } from "@/lib/public-wizard/products";
 import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
@@ -36,6 +39,7 @@ export function StepEditor() {
   const ceilingHeightM = usePublicWizardStore((s) => s.ceilingHeightM);
   const targetLux = usePublicWizardStore((s) => s.targetLux);
   const atmosphere = usePublicWizardStore((s) => s.atmosphere);
+  const ceilingType = usePublicWizardStore((s) => s.ceilingType);
   const backgroundDataUrl = usePublicWizardStore((s) => s.backgroundDataUrl);
   const backgroundWidth = usePublicWizardStore((s) => s.backgroundWidth);
   const backgroundHeight = usePublicWizardStore((s) => s.backgroundHeight);
@@ -227,6 +231,11 @@ export function StepEditor() {
 
   const isPanning = editorMode === "pan" || spacePanning;
   const gridStepPx = (pixelsPerMeter ?? 50) * CEILING_GRID_M;
+  const ceilingRaster = useMemo(() => {
+    if (!pixelsPerMeter || !ceilingType || roomVertices.length < 3) return null;
+    return buildCeilingRaster(roomVertices, pixelsPerMeter, ceilingType);
+  }, [pixelsPerMeter, ceilingType, roomVertices]);
+  const ceilingLabel = ceilingType ? getCeilingType(ceilingType).title : null;
 
   const handleWheel = useCallback(
     (event: KonvaEventObject<WheelEvent>) => {
@@ -331,9 +340,25 @@ export function StepEditor() {
       const node = event.target as Konva.Rect;
       const centerX = node.x() + node.width() / 2;
       const centerY = node.y() + node.height() / 2;
-      setSnapPreview(snapPointToGridPx({ x: centerX, y: centerY }, pixelsPerMeter));
+      const fixture = fixtures.find((item) => item.id === node.name());
+      if (!fixture) {
+        setSnapPreview(null);
+        return;
+      }
+      const snapped = snapFixtureCenter(
+        centerX,
+        centerY,
+        pixelsPerMeter,
+        roomVertices,
+        fixture.productId,
+        { x: fixture.x, y: fixture.y },
+        fixtures,
+        fixture.id,
+        { ceilingType: ceilingType ?? undefined, rotation: fixture.rotation },
+      );
+      setSnapPreview(snapped);
     },
-    [pixelsPerMeter],
+    [pixelsPerMeter, fixtures, roomVertices, ceilingType],
   );
 
   const handleFixtureDragEnd = useCallback(
@@ -543,6 +568,19 @@ export function StepEditor() {
               Klik opnieuw op het eerste punt om de ruimte af te sluiten.
             </div>
           )}
+          {ceilingRaster?.helper && roomVertices.length >= 3 && (
+            <p
+              className="pointer-events-none absolute left-3 top-14 z-10 max-w-xs rounded-lg bg-slate-800/90 px-3 py-2 text-xs text-white"
+              data-testid="ceiling-helper-note"
+            >
+              Hulpraster voor de indeling van {ceilingLabel}. Dit is geen aanwezig systeemplafond.
+            </p>
+          )}
+          {ceilingType === "grid_1200_600" && roomVertices.length >= 3 && (
+            <p className="pointer-events-none absolute left-3 top-14 z-10 max-w-sm rounded-lg bg-slate-800/90 px-3 py-2 text-xs text-white">
+              Raster van 120×60 cm. Een 1200×300 paneel ligt in een inbouwvoorziening en vult de plafondplaat niet volledig.
+            </p>
+          )}
           {showHeatmap && (
             <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-slate-800/90 px-3 py-2 text-xs text-white">
               <p className="mb-1 font-semibold">Indicatieve lichtverdeling</p>
@@ -607,6 +645,20 @@ export function StepEditor() {
                         />
                       );
                     })}
+                  </Group>
+                )}
+                {ceilingRaster && roomVertices.length >= 3 && (
+                  <Group clipFunc={roomClipFunc} listening={false}>
+                    {ceilingRaster.segments.map((segment, index) => (
+                      <Line
+                        key={`grid-${index}`}
+                        points={[segment.x1, segment.y1, segment.x2, segment.y2]}
+                        stroke={ceilingRaster.helper ? "rgba(71,85,105,0.28)" : "rgba(15,23,42,0.16)"}
+                        strokeWidth={1 / viewState.scale}
+                        dash={ceilingRaster.helper ? [8, 8] : undefined}
+                        listening={false}
+                      />
+                    ))}
                   </Group>
                 )}
                 {roomVertices.length >= 3 && (
@@ -706,21 +758,26 @@ export function StepEditor() {
                 {fixtures.map((fixture) => {
                   const product = getPublicProduct(fixture.productId);
                   const ppm = pixelsPerMeter ?? 50;
-                  const sizePx = product.widthM * ppm;
+                  const swapped = Math.abs(Math.round(fixture.rotation / 90)) % 2 === 1;
+                  const widthM = swapped ? product.heightM : product.widthM;
+                  const heightM = swapped ? product.widthM : product.heightM;
+                  const widthPx = widthM * ppm;
+                  const heightPx = heightM * ppm;
                   const isSelected = fixture.id === selectedFixtureId;
                   const canDrag = !isPanning && editorMode === "select";
                   return (
                     <Rect
                       key={fixture.id}
+                      name={fixture.id}
                       data-testid={`fixture-${fixture.id}`}
-                      x={fixture.x - sizePx / 2}
-                      y={fixture.y - sizePx / 2}
-                      width={sizePx}
-                      height={sizePx}
+                      x={fixture.x - widthPx / 2}
+                      y={fixture.y - heightPx / 2}
+                      width={widthPx}
+                      height={heightPx}
                       fill={product.category === "downlight" ? "#94a3b8" : "#18A66A"}
                       stroke={isSelected ? "#ffffff" : "#087A4C"}
                       strokeWidth={(isSelected ? 3 : 1) / viewState.scale}
-                      cornerRadius={product.category === "downlight" ? sizePx / 2 : 4}
+                      cornerRadius={product.category === "downlight" ? Math.min(widthPx, heightPx) / 2 : 4}
                       draggable={canDrag}
                       onDragStart={(e) => {
                         e.cancelBubble = true;
@@ -810,8 +867,8 @@ export function StepEditor() {
             </h2>
             <p className="mb-5 text-sm leading-relaxed text-[var(--lp-text-secondary)]">
               Als u de schaal wijzigt, wordt het huidige lichtplan verwijderd en begint u opnieuw vanaf
-              de schaalinstelling. Uw gekozen ruimtefunctie, sfeer en geüploade plattegrond blijven
-              behouden.
+              de schaalinstelling. Uw gekozen ruimtefunctie, sfeer, plafondtype en geüploade plattegrond
+              blijven behouden.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
@@ -1025,6 +1082,14 @@ function SidePanel({
                     Dupliceren
                   </button>
                 </div>
+                <button
+                  type="button"
+                  data-testid="regenerate-light-plan-button"
+                  className="lp-btn-primary w-full py-3 text-sm font-bold"
+                  onClick={onGenerate}
+                >
+                  Lichtplan opnieuw genereren
+                </button>
                 <button
                   type="button"
                   data-testid="add-panel-button"

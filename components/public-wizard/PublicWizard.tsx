@@ -2,10 +2,13 @@
 
 import dynamic from "next/dynamic";
 import { LedpaneelLogo } from "@/components/ledpaneel/LedpaneelLogo";
+import { useEffect } from "react";
+import { setActiveProductCatalog } from "@/lib/public-wizard/products";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardProgress } from "@/components/public-wizard/WizardShell";
 import { StepRoom } from "@/components/public-wizard/StepRoom";
 import { StepAtmosphere } from "@/components/public-wizard/StepAtmosphere";
+import { StepCeiling } from "@/components/public-wizard/StepCeiling";
 import { StepInputMethod } from "@/components/public-wizard/StepInputMethod";
 import { StepManualDimensions } from "@/components/public-wizard/StepManualDimensions";
 import { StepFloorPlanUpload } from "@/components/public-wizard/StepFloorPlanUpload";
@@ -27,6 +30,15 @@ const StepEditor = dynamic(
 export function PublicWizard() {
   const step = usePublicWizardStore((s) => s.step);
 
+  useEffect(() => {
+    void fetch("/api/cms/wizard", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { products?: Parameters<typeof setActiveProductCatalog>[0] } | null) => {
+        if (data?.products?.length) setActiveProductCatalog(data.products);
+      })
+      .catch(() => undefined);
+  }, []);
+
   if (step === "editor") {
     return <StepEditor />;
   }
@@ -47,6 +59,7 @@ export function PublicWizard() {
       </div>
       {step === "room" && <StepRoom />}
       {step === "atmosphere" && <StepAtmosphere />}
+      {step === "ceiling" && <StepCeiling />}
       {step === "inputMethod" && <StepInputMethod />}
       {step === "dimensions" && <StepManualDimensions />}
       {step === "floorplan" && <StepFloorPlanUpload />}

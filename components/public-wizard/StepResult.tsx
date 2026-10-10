@@ -9,6 +9,7 @@ import {
   MATERIAL_PRICE_FOOTNOTE,
 } from "@/lib/public-wizard/pricing";
 import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
+import { getCeilingType } from "@/lib/public-wizard/ceiling-types";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import { createRoomPolygon } from "@/lib/public-wizard/placement";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
@@ -18,6 +19,7 @@ import { WizardCard, WizardNav } from "@/components/public-wizard/WizardShell";
 export function StepResult() {
   const roomFunction = usePublicWizardStore((s) => s.roomFunction);
   const atmosphere = usePublicWizardStore((s) => s.atmosphere);
+  const ceilingType = usePublicWizardStore((s) => s.ceilingType);
   const manualDimensions = usePublicWizardStore((s) => s.manualDimensions);
   const roomVertices = usePublicWizardStore((s) => s.roomVertices);
   const pixelsPerMeter = usePublicWizardStore((s) => s.pixelsPerMeter);
@@ -53,9 +55,7 @@ export function StepResult() {
       : null;
 
   const requiredCount = result.requiredFixtureCount ?? requiredFixtureCount;
-  const placedBelowRequired =
-    requiredCount != null && result.fixtureCount < requiredCount;
-  const luxShortfall = placedBelowRequired && !result.meetsTarget;
+  const luxShortfall = !result.meetsTarget;
 
   return (
     <div>
@@ -67,14 +67,15 @@ export function StepResult() {
       <WizardCard className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           {roomMeta && <Stat label="Ruimte" value={roomMeta.name} />}
+          {ceilingType && <Stat label="Plafond" value={getCeilingType(ceilingType).title} />}
           {dimensionLabel && <Stat label="Afmetingen" value={dimensionLabel} />}
           <Stat label="Oppervlakte" value={`${formatMetersNl(result.areaM2, 1)} m²`} />
           <Stat label="Plafondhoogte" value={`${formatMetersNl(ceilingHeightM)} m`} />
           <Stat label="Doel lux" value={`${result.targetLux} lux`} />
           {requiredCount != null && (
             <>
-              <Stat label="Theoretisch benodigd" value={`${requiredCount} panelen`} />
-              <Stat label="Gekozen nette verdeling" value={`${result.fixtureCount} panelen`} />
+              <Stat label="Theoretisch benodigd" value={`${requiredCount} armaturen`} />
+              <Stat label="Gekozen nette verdeling" value={`${result.fixtureCount} armaturen`} />
             </>
           )}
           {atmosphereMeta && (
@@ -86,9 +87,9 @@ export function StepResult() {
           <Stat label="Totaal vermogen" value={`${result.totalWattage} W`} />
           <Stat label="Indicatieve gemiddelde verlichting" value={`${result.indicativeAverageLux} lux`} />
           {luxShortfall && (
-            <p className="col-span-full text-sm text-[var(--lp-warn)]">
-              Doelwaarde {result.targetLux} lux wordt met deze nette plaatsing indicatief niet volledig
-              gehaald.
+            <p className="col-span-full text-sm text-[var(--lp-warn)]" data-testid="lux-shortfall">
+              De gekozen nette indeling haalt het luxdoel indicatief niet: {result.indicativeAverageLux} lux
+              bij een doel van {result.targetLux} lux. Dit is geen formele EN 12464-1-validatie.
             </p>
           )}
           <Stat

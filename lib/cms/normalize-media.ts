@@ -116,6 +116,7 @@ export function normalizeWizard(wizard: CmsWizardContent): CmsWizardContent {
   return {
     roomChoices: wizard.roomChoices.map(normalizeWizardChoice),
     atmosphereChoices: wizard.atmosphereChoices.map(normalizeWizardChoice),
+    products: wizard.products ?? [],
   };
 }
 
