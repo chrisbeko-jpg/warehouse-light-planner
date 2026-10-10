@@ -19,6 +19,9 @@ export const SCALE_RESET_PATCH: Pick<
   | "layoutWarning"
   | "requiredFixtureCount"
   | "editorMessage"
+  | "primaryPanelFixtures"
+  | "alternativeMixedFixtures"
+  | "lightingPlanVariant"
   | "aiRecognitionAttempted"
   | "aiRecognitionFailed"
   | "submitReference"
@@ -43,6 +46,9 @@ export const SCALE_RESET_PATCH: Pick<
   layoutWarning: null,
   requiredFixtureCount: null,
   editorMessage: null,
+  primaryPanelFixtures: null,
+  alternativeMixedFixtures: null,
+  lightingPlanVariant: "panels",
   aiRecognitionAttempted: false,
   aiRecognitionFailed: false,
   submitReference: null,

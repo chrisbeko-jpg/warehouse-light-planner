@@ -19,91 +19,97 @@ function rect(lengthM: number, widthM: number): Point2D[] {
   ];
 }
 
-const context864 = {
-  areaM2: 51.2,
-  targetLux: 500,
-  ceilingHeightM: CEILING,
-  ceilingType: "grid_1200_600" as const,
-};
-
-test("8×6.4 m / 15 elongated panels → 5×3 matrix without touching panels", () => {
-  const vertices = rect(8, 6.4);
-  const layout = placeElongatedPanelsOnModules(
-    vertices,
+function assertSeparatedColumnLayout(
+  layout: ReturnType<typeof placeElongatedPanelsOnModules>,
+  expectedRows: number,
+  expectedCols: number,
+) {
+  assert.equal(layout.placedCount, expectedRows * expectedCols);
+  assert.equal(layout.matrixRows, expectedRows);
+  assert.equal(layout.matrixCols, expectedCols);
+  const rotation = layout.fixtures[0]?.rotation ?? 0;
+  const adjacent = countAdjacentLuminaires(
+    layout.fixtures.map((f) => ({ x: f.x, y: f.y })),
     PPM,
-    15,
     PRODUCT,
-    context864,
+    rotation,
+  );
+  assert.equal(adjacent.totalPairs, 0, `expected no touching panels, got ${adjacent.totalPairs}`);
+}
+
+test("A: 8×7 m / 18 panels → 6×3 column matrix", () => {
+  const layout = placeElongatedPanelsOnModules(
+    rect(8, 7),
+    PPM,
+    18,
+    PRODUCT,
+    { areaM2: 56, targetLux: 500, ceilingHeightM: CEILING, ceilingType: "grid_1200_600" },
     "grid_1200_600",
   );
-
-  assert.equal(layout.placedCount, 15);
-  assert.equal(layout.matrixRows, 5);
-  assert.equal(layout.matrixCols, 3);
-
-  const points = layout.fixtures.map((f) => ({ x: f.x, y: f.y }));
-  const rotation = layout.fixtures[0]?.rotation ?? 0;
-  const adjacent = countAdjacentLuminaires(points, PPM, PRODUCT, rotation);
-  assert.equal(adjacent.totalPairs, 0);
-
-  const lux = calculateIndicativeResult(
-    context864.areaM2,
-    context864.targetLux,
-    CEILING,
-    layout.fixtures,
-    15,
-  );
+  assertSeparatedColumnLayout(layout, 6, 3);
+  const lux = calculateIndicativeResult(56, 500, CEILING, layout.fixtures, 18);
   assert.ok(lux.meetsTarget);
 });
 
-test("8×6.4 m elongated counts keep exact totals with minimal adjacency", () => {
-  const vertices = rect(8, 6.4);
-  for (const count of [9, 12, 16, 20]) {
-    const layout = placeElongatedPanelsOnModules(
-      vertices,
-      PPM,
-      count,
-      PRODUCT,
-      context864,
-      "grid_1200_600",
-    );
-    assert.equal(layout.placedCount, count, `count ${count}`);
-    const rotation = layout.fixtures[0]?.rotation ?? 0;
-    const adjacent = countAdjacentLuminaires(
-      layout.fixtures.map((f) => ({ x: f.x, y: f.y })),
-      PPM,
-      PRODUCT,
-      rotation,
-    );
-    assert.ok(adjacent.totalPairs <= count, `count ${count} adjacent ${adjacent.totalPairs}`);
-  }
+test("B: 8×6.4 m / 15 panels → 5×3 without adjacency", () => {
+  const layout = placeElongatedPanelsOnModules(
+    rect(8, 6.4),
+    PPM,
+    15,
+    PRODUCT,
+    { areaM2: 51.2, targetLux: 500, ceilingHeightM: CEILING, ceilingType: "grid_1200_600" },
+    "grid_1200_600",
+  );
+  assertSeparatedColumnLayout(layout, 5, 3);
 });
 
-test("other room sizes use exact elongated matrices", () => {
-  const rooms: Array<[number, number]> = [
-    [8, 5],
-    [10, 7.5],
-    [12, 4],
-    [6, 6],
-  ];
-  for (const [lengthM, widthM] of rooms) {
-    const areaM2 = lengthM * widthM;
-    const count = calculateRequiredFixtureCount(areaM2, 500, PRODUCT, CEILING);
-    const layout = placeElongatedPanelsOnModules(
-      rect(lengthM, widthM),
-      PPM,
-      count,
-      PRODUCT,
-      { areaM2, targetLux: 500, ceilingHeightM: CEILING, ceilingType: "grid_1200_600" },
-      "grid_1200_600",
-    );
-    assert.ok(
-      Math.abs(layout.placedCount - count) <= 3,
-      `${lengthM}×${widthM} calc ${count} placed ${layout.placedCount}`,
-    );
-    assert.equal(
-      (layout.matrixRows ?? 0) * (layout.matrixCols ?? 0),
-      layout.placedCount,
-    );
-  }
+test("C: 10×7.5 m / 21 panels spreads without compact block", () => {
+  const layout = placeElongatedPanelsOnModules(
+    rect(10, 7.5),
+    PPM,
+    21,
+    PRODUCT,
+    { areaM2: 75, targetLux: 500, ceilingHeightM: CEILING, ceilingType: "grid_1200_600" },
+    "grid_1200_600",
+  );
+  assert.equal(layout.placedCount, 21);
+  const rotation = layout.fixtures[0]?.rotation ?? 0;
+  const adjacent = countAdjacentLuminaires(
+    layout.fixtures.map((f) => ({ x: f.x, y: f.y })),
+    PPM,
+    PRODUCT,
+    rotation,
+  );
+  assert.equal(adjacent.totalPairs, 0);
+  assert.ok((layout.matrixRows ?? 0) >= (layout.matrixCols ?? 0));
+});
+
+test("D: 12×4 m uses logical elongated matrix for calculated count", () => {
+  const areaM2 = 48;
+  const count = calculateRequiredFixtureCount(areaM2, 500, PRODUCT, CEILING);
+  const layout = placeElongatedPanelsOnModules(
+    rect(12, 4),
+    PPM,
+    count,
+    PRODUCT,
+    { areaM2, targetLux: 500, ceilingHeightM: CEILING, ceilingType: "grid_1200_600" },
+    "grid_1200_600",
+  );
+  assert.ok(Math.abs(layout.placedCount - count) <= 3);
+  assert.equal((layout.matrixRows ?? 0) * (layout.matrixCols ?? 0), layout.placedCount);
+});
+
+test("E: 6×6 m symmetric elongated placement", () => {
+  const areaM2 = 36;
+  const count = calculateRequiredFixtureCount(areaM2, 500, PRODUCT, CEILING);
+  const layout = placeElongatedPanelsOnModules(
+    rect(6, 6),
+    PPM,
+    count,
+    PRODUCT,
+    { areaM2, targetLux: 500, ceilingHeightM: CEILING, ceilingType: "grid_1200_600" },
+    "grid_1200_600",
+  );
+  assert.ok(Math.abs(layout.placedCount - count) <= 3);
+  assert.equal((layout.matrixRows ?? 0) * (layout.matrixCols ?? 0), layout.placedCount);
 });

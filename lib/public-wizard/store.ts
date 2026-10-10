@@ -20,6 +20,7 @@ import {
   snapFixtureCenter,
 } from "@/lib/public-wizard/placement";
 import { panelRotationForRoom } from "@/lib/public-wizard/matrix-placement";
+import { proposeMixedPanelDownlightPlan } from "@/lib/public-wizard/mixed-lighting-plan";
 import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
@@ -91,6 +92,9 @@ export interface PublicWizardStore {
   layoutWarning: string | null;
   requiredFixtureCount: number | null;
   editorMessage: string | null;
+  primaryPanelFixtures: PlacedPublicFixture[] | null;
+  alternativeMixedFixtures: PlacedPublicFixture[] | null;
+  lightingPlanVariant: "panels" | "mixed";
 
   setStep: (step: WizardStepId) => void;
   nextStep: () => boolean;
@@ -140,6 +144,7 @@ export interface PublicWizardStore {
   resetScaleDependentState: () => void;
   reopenRoomDrawing: () => void;
   getIndicativeResult: () => ReturnType<typeof calculateIndicativeResult> | null;
+  setLightingPlanVariant: (variant: "panels" | "mixed") => void;
   setSubmitResult: (reference: string, email: string) => void;
   resetWizard: () => void;
 }
@@ -186,6 +191,9 @@ const initialState = {
   layoutWarning: null as string | null,
   requiredFixtureCount: null as number | null,
   editorMessage: null as string | null,
+  primaryPanelFixtures: null as PlacedPublicFixture[] | null,
+  alternativeMixedFixtures: null as PlacedPublicFixture[] | null,
+  lightingPlanVariant: "panels" as "panels" | "mixed",
 };
 
 function cloneFixtures(fixtures: PlacedPublicFixture[]): PlacedPublicFixture[] {
@@ -476,10 +484,42 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       const note = `De nette indeling haalt het luxdoel indicatief niet: ${indicative.indicativeAverageLux} lux bij een doel van ${targetLux} lux.`;
       layoutWarning = layoutWarning ? `${layoutWarning} ${note}` : note;
     }
+
+    const downlightProductId = resolved?.downlightProductId ?? get().downlightProductId;
+    let alternativeMixedFixtures: PlacedPublicFixture[] | null = null;
+    if (
+      !indicative.meetsTarget &&
+      isElongatedPanel(productId) &&
+      ceilingType === "grid_1200_600"
+    ) {
+      const mixed = proposeMixedPanelDownlightPlan({
+        panelFixtures: layout.fixtures,
+        vertices: roomVertices,
+        pixelsPerMeter,
+        ceilingType,
+        downlightProductId,
+        context: {
+          areaM2: room.areaM2,
+          targetLux,
+          ceilingHeightM,
+          ceilingType,
+        },
+        requiredFixtureCount: count,
+      });
+      if (mixed) {
+        alternativeMixedFixtures = mixed.fixtures;
+      }
+    }
+
     set({
       preferredProductId: productId,
-      downlightProductId: resolved?.downlightProductId ?? get().downlightProductId,
+      downlightProductId,
       fixtures: layout.fixtures,
+      primaryPanelFixtures: cloneFixtures(layout.fixtures),
+      alternativeMixedFixtures: alternativeMixedFixtures
+        ? cloneFixtures(alternativeMixedFixtures)
+        : null,
+      lightingPlanVariant: "panels",
       historyPast: [],
       historyFuture: [],
       selectedFixtureId: null,
@@ -756,6 +796,28 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       showHeatmap: false,
       selectedFixtureId: null,
     }),
+
+  setLightingPlanVariant: (variant) => {
+    const { primaryPanelFixtures, alternativeMixedFixtures } = get();
+    if (variant === "mixed") {
+      if (!alternativeMixedFixtures?.length) return;
+      set({
+        lightingPlanVariant: "mixed",
+        fixtures: cloneFixtures(alternativeMixedFixtures),
+        selectedFixtureId: null,
+      });
+      return;
+    }
+    if (primaryPanelFixtures?.length) {
+      set({
+        lightingPlanVariant: "panels",
+        fixtures: cloneFixtures(primaryPanelFixtures),
+        selectedFixtureId: null,
+      });
+      return;
+    }
+    set({ lightingPlanVariant: "panels" });
+  },
 
   getIndicativeResult: () => {
     const { roomVertices, pixelsPerMeter, targetLux, ceilingHeightM, fixtures, requiredFixtureCount } =

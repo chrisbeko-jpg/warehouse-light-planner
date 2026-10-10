@@ -29,6 +29,9 @@ export function StepResult() {
   const ceilingHeightM = usePublicWizardStore((s) => s.ceilingHeightM);
   const fixtures = usePublicWizardStore((s) => s.fixtures);
   const requiredFixtureCount = usePublicWizardStore((s) => s.requiredFixtureCount);
+  const alternativeMixedFixtures = usePublicWizardStore((s) => s.alternativeMixedFixtures);
+  const lightingPlanVariant = usePublicWizardStore((s) => s.lightingPlanVariant);
+  const setLightingPlanVariant = usePublicWizardStore((s) => s.setLightingPlanVariant);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
   const goToEditor = usePublicWizardStore((s) => s.goToEditor);
 
@@ -43,6 +46,30 @@ export function StepResult() {
       requiredFixtureCount ?? undefined,
     );
   }, [roomVertices, pixelsPerMeter, targetLux, ceilingHeightM, fixtures, requiredFixtureCount]);
+
+  const alternativeResult = useMemo(() => {
+    if (!alternativeMixedFixtures?.length || roomVertices.length < 3 || !pixelsPerMeter) return null;
+    const areaM2 = createRoomPolygon(roomVertices, pixelsPerMeter).areaM2;
+    return calculateIndicativeResult(
+      areaM2,
+      targetLux,
+      ceilingHeightM,
+      alternativeMixedFixtures,
+      requiredFixtureCount ?? undefined,
+    );
+  }, [
+    alternativeMixedFixtures,
+    roomVertices,
+    pixelsPerMeter,
+    targetLux,
+    ceilingHeightM,
+    requiredFixtureCount,
+  ]);
+
+  const alternativePrice = useMemo(
+    () => (alternativeMixedFixtures?.length ? calculateMaterialPrice(alternativeMixedFixtures) : null),
+    [alternativeMixedFixtures],
+  );
 
   if (!result) {
     return <p>Geen resultaat beschikbaar. Ga terug en genereer een lichtplan.</p>;
@@ -92,6 +119,40 @@ export function StepResult() {
               De gekozen nette indeling haalt het luxdoel indicatief niet: {result.indicativeAverageLux} lux
               bij een doel van {result.targetLux} lux. Dit is geen formele EN 12464-1-validatie.
             </p>
+          )}
+          {alternativeMixedFixtures && alternativeResult && alternativePrice && (
+            <div className="col-span-full rounded-lg border border-[var(--lp-border)] bg-[var(--lp-surface-muted)] p-4 text-sm">
+              <p className="mb-3 font-semibold">Alternatief lichtplan: LED-panelen + downlights</p>
+              <p className="mb-3 text-[var(--lp-text-secondary)]">
+                Optionele aanvulling met downlights op vrije plafondmodules (niet automatisch actief).
+                Standaard blijft de nette LED-paneelverdeling.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${
+                    lightingPlanVariant === "panels"
+                      ? "bg-[var(--lp-primary)] text-white"
+                      : "bg-white border border-[var(--lp-border)]"
+                  }`}
+                  onClick={() => setLightingPlanVariant("panels")}
+                >
+                  Alleen LED-panelen ({result.indicativeAverageLux} lux · {formatMaterialPrice(price)})
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${
+                    lightingPlanVariant === "mixed"
+                      ? "bg-[var(--lp-primary)] text-white"
+                      : "bg-white border border-[var(--lp-border)]"
+                  }`}
+                  onClick={() => setLightingPlanVariant("mixed")}
+                >
+                  Gecombineerd ({alternativeResult.indicativeAverageLux} lux ·{" "}
+                  {formatMaterialPrice(alternativePrice)})
+                </button>
+              </div>
+            </div>
           )}
         </div>
 

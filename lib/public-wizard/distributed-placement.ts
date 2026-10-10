@@ -7,6 +7,7 @@ import {
   getFixtureHalfSizeM,
   isPanelFootprintInsideRoom,
   minDistanceToPolygonBoundaryM,
+  orientedFixtureSizeM,
 } from "@/lib/public-wizard/placement-constraints";
 import { countAdjacentLuminaires, minEdgeToEdgeGapM } from "@/lib/public-wizard/luminaire-adjacency";
 import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
@@ -131,7 +132,19 @@ export function scoreDistributedFixtureLayout(options: {
   const matrixAspect = cols / Math.max(rows, 1);
 
   let score = quality.score * 900;
-  score -= Math.abs(Math.log((matrixAspect + 0.01) / (roomAspect + 0.01))) * 90;
+  if (!isElongatedPanel(productId)) {
+    score -= Math.abs(Math.log((matrixAspect + 0.01) / (roomAspect + 0.01))) * 90;
+  } else {
+    if (rows >= cols) score += 4500;
+    else score -= 9000;
+    const roomW = bounds.maxX - bounds.minX;
+    const roomH = bounds.maxY - bounds.minY;
+    const idealCols = Math.min(
+      6,
+      Math.max(2, Math.round(Math.sqrt(placedCount * (roomH / Math.max(roomW, 1))))),
+    );
+    score -= Math.abs(cols - idealCols) * 900;
+  }
 
   const spread = getSpreadMetrics(points, bounds);
   const extentAvg = (spread.extentXRatio + spread.extentYRatio) / 2;
@@ -180,10 +193,12 @@ export function scoreDistributedFixtureLayout(options: {
   }
 
   if (product.category === "led_panel" && placedCount >= 2) {
-    const { rowSpacingPx, colSpacingPx } = getGridSpacingPx(points);
-    const minGap = MIN_PANEL_CENTER_SPACING_M - 0.02;
-    if (cols > 1 && colSpacingPx > 0 && colSpacingPx / pixelsPerMeter < minGap) return -Infinity;
-    if (rows > 1 && rowSpacingPx > 0 && rowSpacingPx / pixelsPerMeter < minGap) return -Infinity;
+    if (!isElongatedPanel(productId)) {
+      const { rowSpacingPx, colSpacingPx } = getGridSpacingPx(points);
+      const minGap = MIN_PANEL_CENTER_SPACING_M - 0.02;
+      if (cols > 1 && colSpacingPx > 0 && colSpacingPx / pixelsPerMeter < minGap) return -Infinity;
+      if (rows > 1 && rowSpacingPx > 0 && rowSpacingPx / pixelsPerMeter < minGap) return -Infinity;
+    }
 
     const adjacent = countAdjacentLuminaires(points, pixelsPerMeter, productId, rotation);
     if (adjacent.totalPairs > 0) {
@@ -288,7 +303,22 @@ function matrixOrientationsToTry(
   return [orientMatrixForRoom(rows, cols, roomAspect, productId)];
 }
 
-function tryUniformMatrix(
+export function elongatedStepCreatesLightBand(
+  productId: PublicProductId,
+  rotation: number,
+  matrixRows: number,
+  matrixCols: number,
+  rowStep: number,
+  colStep: number,
+): boolean {
+  if (!isElongatedPanel(productId)) return false;
+  const { widthM, heightM } = orientedFixtureSizeM(productId, rotation);
+  if (matrixCols > 1 && colStep === 1 && widthM >= heightM * 1.01) return true;
+  if (matrixRows > 1 && rowStep === 1 && heightM >= widthM * 1.01) return true;
+  return false;
+}
+
+export function tryUniformMatrix(
   input: DistributedModuleMatrixInput,
   matrixRows: number,
   matrixCols: number,
@@ -327,6 +357,18 @@ function tryUniformMatrix(
       }
       if (!valid || points.length !== matrixRows * matrixCols) continue;
       if (!validatePanelPoints(points, vertices, pixelsPerMeter, productId, rotation)) continue;
+      if (
+        elongatedStepCreatesLightBand(
+          productId,
+          rotation,
+          matrixRows,
+          matrixCols,
+          rowPick.step,
+          colPick.step,
+        )
+      ) {
+        continue;
+      }
 
       const score = scoreDistributedFixtureLayout({
         points,
@@ -375,9 +417,16 @@ export function selectBestDistributedModuleMatrix(
     },
   );
 
-  let best: { points: Point2D[]; rows: number; cols: number; rowStep: number; colStep: number } | null =
-    null;
-  let bestScore = -Infinity;
+  type MatrixCandidate = {
+    points: Point2D[];
+    rows: number;
+    cols: number;
+    rowStep: number;
+    colStep: number;
+    score: number;
+  };
+
+  const candidates: MatrixCandidate[] = [];
 
   const maxModuleCols = Math.max(
     0,
@@ -405,16 +454,14 @@ export function selectBestDistributedModuleMatrix(
         context: input.context,
         rotation: input.rotation,
       });
-      if (score > bestScore) {
-        bestScore = score;
-        best = {
-          points: uniform.points,
-          rows: 1,
-          cols: calculatedCount,
-          rowStep: uniform.rowStep,
-          colStep: uniform.colStep,
-        };
-      }
+      candidates.push({
+        points: uniform.points,
+        rows: 1,
+        cols: calculatedCount,
+        rowStep: uniform.rowStep,
+        colStep: uniform.colStep,
+        score,
+      });
     }
   }
 
@@ -452,24 +499,70 @@ export function selectBestDistributedModuleMatrix(
           context: input.context,
           rotation: input.rotation,
         });
-        if (score > bestScore) {
-          bestScore = score;
-          best = {
-            points: uniform.points,
-            rows: matrixRows,
-            cols: matrixCols,
-            rowStep: uniform.rowStep,
-            colStep: uniform.colStep,
-          };
-        }
+        candidates.push({
+          points: uniform.points,
+          rows: matrixRows,
+          cols: matrixCols,
+          rowStep: uniform.rowStep,
+          colStep: uniform.colStep,
+          score,
+        });
       }
     }
   };
 
+  const pickBestFromCandidates = (pool: MatrixCandidate[]) => {
+    const viable = pool.filter((c) => c.score > -Infinity && c.points.length > 0);
+    if (viable.length === 0) return null;
+
+    const rotation = input.rotation ?? 0;
+    const scored = viable.map((c) => ({
+      ...c,
+      adjacent: countAdjacentLuminaires(
+        c.points,
+        input.pixelsPerMeter,
+        input.productId,
+        rotation,
+      ).totalPairs,
+    }));
+
+    const zeroAdjacent = scored.filter((c) => c.adjacent === 0);
+    const shortlist =
+      zeroAdjacent.length > 0 && isElongatedPanel(input.productId) ? zeroAdjacent : scored;
+
+    shortlist.sort((a, b) => {
+      if (isElongatedPanel(input.productId) && a.adjacent !== b.adjacent) {
+        return a.adjacent - b.adjacent;
+      }
+      if (b.score !== a.score) return b.score - a.score;
+      if (isElongatedPanel(input.productId)) {
+        if (a.cols !== b.cols) return a.cols - b.cols;
+        return b.rows - a.rows;
+      }
+      return 0;
+    });
+
+    const top = shortlist[0]!;
+    return {
+      points: top.points,
+      rows: top.rows,
+      cols: top.cols,
+      rowStep: top.rowStep,
+      colStep: top.colStep,
+    };
+  };
+
   const exactSizes = sizes.filter((size) => size.total === calculatedCount);
+  const exactStart = candidates.length;
   evaluateSizes(exactSizes);
+  let best = pickBestFromCandidates(candidates.slice(exactStart));
   if (!best) {
+    const fallbackStart = candidates.length;
     evaluateSizes(sizes.filter((size) => size.total !== calculatedCount));
+    best = pickBestFromCandidates(candidates.slice(fallbackStart));
+  }
+  if (!best) {
+    best = pickBestFromCandidates(candidates);
   }
 
   return best;
