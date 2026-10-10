@@ -42,6 +42,36 @@ export function selectEvenlySpacedIndices(
   return null;
 }
 
+/** All index sets with uniform step; includes centered and offset starts for wall-margin tuning. */
+export function enumerateEvenlySpacedIndexSets(
+  slotCount: number,
+  pickCount: number,
+  minStep = 1,
+): number[][] {
+  if (pickCount <= 0) return [];
+  if (pickCount === 1) return [[Math.floor((slotCount - 1) / 2)]];
+  if (pickCount > slotCount) return [];
+
+  const sets: number[][] = [];
+  const maxStep = Math.floor((slotCount - 1) / (pickCount - 1));
+  for (let step = maxStep; step >= Math.max(1, minStep); step--) {
+    const need = (pickCount - 1) * step + 1;
+    if (need > slotCount) continue;
+    const maxStart = slotCount - need;
+    const centeredStart = Math.floor((slotCount - need) / 2);
+    for (let start = 0; start <= maxStart; start++) {
+      sets.push(Array.from({ length: pickCount }, (_, index) => start + index * step));
+    }
+    void centeredStart;
+  }
+  const unique = new Map<string, number[]>();
+  for (const set of sets) unique.set(set.join(","), set);
+  const centeredStart = Math.floor((slotCount - ((pickCount - 1) * minStep + 1)) / 2);
+  return [...unique.values()]
+    .sort((a, b) => Math.abs(a[0]! - centeredStart) - Math.abs(b[0]! - centeredStart))
+    .slice(0, 16);
+}
+
 export function enumerateMatrixFactors(count: number, maxDim = 12): Array<{ rows: number; cols: number }> {
   const sizes: Array<{ rows: number; cols: number }> = [];
   for (let rows = 1; rows <= maxDim; rows++) {

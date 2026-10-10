@@ -44,12 +44,12 @@ test("mixed plan adds downlights on empty modules when lux falls short", () => {
   const layout = placeElongatedPanelsOnModules(
     vertices,
     PPM,
-    12,
+    8,
     "led_panel_1200x300_4000",
     { areaM2: 56, targetLux: 500, ceilingHeightM: 2.7, ceilingType: "grid_1200_600" },
     "grid_1200_600",
   );
-  const panelLux = calculateIndicativeResult(56, 500, 2.7, layout.fixtures, 12);
+  const panelLux = calculateIndicativeResult(56, 500, 2.7, layout.fixtures, 8);
   assert.ok(!panelLux.meetsTarget);
 
   const mixed = proposeMixedPanelDownlightPlan({
@@ -59,7 +59,7 @@ test("mixed plan adds downlights on empty modules when lux falls short", () => {
     ceilingType: "grid_1200_600",
     downlightProductId: "downlight_4000",
     context: { areaM2: 56, targetLux: 500, ceilingHeightM: 2.7, ceilingType: "grid_1200_600" },
-    requiredFixtureCount: 12,
+    requiredFixtureCount: 8,
   });
   assert.ok(mixed);
   assert.ok(mixed.addedDownlightCount > 0);

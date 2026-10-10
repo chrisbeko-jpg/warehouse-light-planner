@@ -162,6 +162,44 @@ test("8×7 m / 18 panels — 3×6 separated (6 rows × 3 cols)", () => {
   assert.equal(adj.totalPairs, 0);
 });
 
+test("8×12 m / 27 calculated — prefers balanced 4×7 over 3×9", () => {
+  const scene = buildManualRoomScene({ lengthM: 8, widthM: 12 });
+  const count = calculateRequiredFixtureCount(scene.areaM2, 500, PRODUCT, CEILING);
+  assert.equal(count, 27);
+  const layout = placeFixturesWithLayoutInfo(
+    scene.vertices,
+    scene.pixelsPerMeter,
+    count,
+    PRODUCT,
+    { areaM2: scene.areaM2, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
+  );
+  assert.ok(layout.placedCount >= 27 && layout.placedCount <= 30);
+  assert.equal(layout.matrixCols, 4);
+  assert.equal(layout.matrixRows, 7);
+  const adj = countAdjacentLuminaires(
+    layout.fixtures.map((f) => ({ x: f.x, y: f.y })),
+    scene.pixelsPerMeter,
+    PRODUCT,
+    layout.fixtures[0]?.rotation ?? 0,
+  );
+  assert.equal(adj.totalPairs, 0);
+});
+
+test("10×12 m calculated count uses balanced elongated matrix", () => {
+  const scene = buildManualRoomScene({ lengthM: 10, widthM: 12 });
+  const count = calculateRequiredFixtureCount(scene.areaM2, 500, PRODUCT, CEILING);
+  const layout = placeFixturesWithLayoutInfo(
+    scene.vertices,
+    scene.pixelsPerMeter,
+    count,
+    PRODUCT,
+    { areaM2: scene.areaM2, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
+  );
+  assert.ok(layout.placedCount >= count);
+  assert.ok(layout.matrixCols! >= 3);
+  assert.ok(layout.matrixRows! >= 3);
+});
+
 test("G: 600×600 panels still use distributed matrix path", () => {
   const layout = placeFixturesWithLayoutInfo(rect(8, 5), PPM, 12, "led_panel_4000", {
     areaM2: 40,

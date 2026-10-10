@@ -8,8 +8,9 @@ import { countAdjacentLuminaires } from "@/lib/public-wizard/luminaire-adjacency
 import {
   enumerateMatrixFactors,
   minModuleIndexStepForAxis,
-  selectEvenlySpacedIndices,
+  enumerateEvenlySpacedIndexSets,
 } from "@/lib/public-wizard/module-spacing";
+import { computeMatrixSpacingMetrics } from "@/lib/public-wizard/matrix-spacing-metrics";
 import { isPanelFootprintInsideRoom } from "@/lib/public-wizard/placement-constraints";
 import {
   buildRoomCeilingGrid,
@@ -64,6 +65,7 @@ interface ModuleMatrixCandidate {
   rotation: number;
   placedCount: number;
   adjacentPairs: number;
+  meetsLuxTarget: boolean;
   score: number;
 }
 
@@ -101,71 +103,98 @@ function tryModuleMatrix(
     grid.cellHeightM,
   );
 
-  const rowSlots = selectEvenlySpacedIndices(validRows.length, matrixRows, minRowStep);
-  const colSlots = selectEvenlySpacedIndices(validCols.length, matrixCols, minColStep);
-  if (!rowSlots || !colSlots) return null;
+  const rowSlotOptions = enumerateEvenlySpacedIndexSets(validRows.length, matrixRows, minRowStep);
+  const colSlotOptions = enumerateEvenlySpacedIndexSets(validCols.length, matrixCols, minColStep);
+  if (rowSlotOptions.length === 0 || colSlotOptions.length === 0) return null;
 
   const validSet = new Set(validModules.map((m) => `${m.col},${m.row}`));
-  const modules: ModuleIndex[] = [];
-  const points: Point2D[] = [];
 
-  for (const rowSlot of rowSlots) {
-    const row = validRows[rowSlot]!;
-    for (const colSlot of colSlots) {
-      const col = validCols[colSlot]!;
-      if (!validSet.has(`${col},${row}`)) return null;
-      modules.push({ col, row });
-      points.push(elongatedPanelCenterPx(grid, col, row, productId, rotation));
+  let best: ModuleMatrixCandidate | null = null;
+
+  for (const rowSlots of rowSlotOptions) {
+    for (const colSlots of colSlotOptions) {
+      const modules: ModuleIndex[] = [];
+      const points: Point2D[] = [];
+
+      let layoutValid = true;
+      for (const rowSlot of rowSlots) {
+        const row = validRows[rowSlot]!;
+        for (const colSlot of colSlots) {
+          const col = validCols[colSlot]!;
+          if (!validSet.has(`${col},${row}`)) {
+            layoutValid = false;
+            break;
+          }
+          modules.push({ col, row });
+          points.push(elongatedPanelCenterPx(grid, col, row, productId, rotation));
+        }
+        if (!layoutValid) break;
+      }
+
+      if (!layoutValid || points.length !== total) continue;
+
+      const adjacent = countAdjacentLuminaires(points, pixelsPerMeter, productId, rotation).totalPairs;
+
+      const fixtures: PlacedPublicFixture[] = points.map((point, index) => ({
+        id: `score-${index}`,
+        productId,
+        x: point.x,
+        y: point.y,
+        rotation,
+      }));
+
+      const lux = calculateIndicativeResult(
+        context.areaM2,
+        context.targetLux,
+        context.ceilingHeightM,
+        fixtures,
+        requiredCount,
+      );
+
+      const spacing = computeMatrixSpacingMetrics(
+        points,
+        pixelsPerMeter,
+        productId,
+        rotation,
+        bounds,
+        vertices,
+      );
+
+      const scored = scoreElongatedMatrixCandidate({
+        points,
+        bounds,
+        pixelsPerMeter,
+        matrixRows,
+        matrixCols,
+        roomWidthM,
+        roomHeightM,
+        placedCount: total,
+        requiredCount,
+        adjacentPairs: adjacent,
+        meetsLuxTarget: lux.meetsTarget,
+        indicativeLux: lux.indicativeAverageLux,
+        targetLux: context.targetLux,
+        rotation,
+        spacing,
+      });
+
+      const candidate: ModuleMatrixCandidate = {
+        points,
+        modules,
+        rows: matrixRows,
+        cols: matrixCols,
+        rotation,
+        placedCount: total,
+        adjacentPairs: adjacent,
+        meetsLuxTarget: lux.meetsTarget,
+        score: scored.score,
+      };
+
+      if (!best || candidate.score > best.score) best = candidate;
     }
   }
 
-  if (points.length !== total) return null;
-
-  const adjacent = countAdjacentLuminaires(points, pixelsPerMeter, productId, rotation).totalPairs;
-
-  const fixtures: PlacedPublicFixture[] = points.map((point, index) => ({
-    id: `score-${index}`,
-    productId,
-    x: point.x,
-    y: point.y,
-    rotation,
-  }));
-
-  const lux = calculateIndicativeResult(
-    context.areaM2,
-    context.targetLux,
-    context.ceilingHeightM,
-    fixtures,
-    requiredCount,
-  );
-
-  const scored = scoreElongatedMatrixCandidate({
-    points,
-    bounds,
-    pixelsPerMeter,
-    matrixRows,
-    matrixCols,
-    roomWidthM,
-    roomHeightM,
-    placedCount: total,
-    requiredCount,
-    adjacentPairs: adjacent,
-    meetsLuxTarget: lux.meetsTarget,
-    indicativeLux: lux.indicativeAverageLux,
-    targetLux: context.targetLux,
-    rotation,
-  });
-
-  return {
-    points,
-    modules,
-    rows: matrixRows,
-    cols: matrixCols,
-    rotation,
-    placedCount: total,
-    adjacentPairs: adjacent,
-    score: scored.score,
-  };
+  return best;
 }
 
 function collectCandidates(
@@ -227,16 +256,21 @@ function collectCandidates(
 }
 
 function pickBest(candidates: ModuleMatrixCandidate[], requiredCount: number): ModuleMatrixCandidate | null {
-  const exact = candidates.filter((c) => c.placedCount === requiredCount);
-  const pool = exact.length > 0 ? exact : candidates;
+  const pool = candidates;
   if (pool.length === 0) return null;
 
   const zeroAdj = pool.filter((c) => c.adjacentPairs === 0);
-  const shortlist = zeroAdj.length > 0 ? zeroAdj : pool;
+  let shortlist = zeroAdj.length > 0 ? zeroAdj : pool;
+
+  const luxOk = shortlist.filter((c) => c.meetsLuxTarget);
+  if (luxOk.length > 0) shortlist = luxOk;
 
   shortlist.sort((a, b) => {
     if (a.adjacentPairs !== b.adjacentPairs) return a.adjacentPairs - b.adjacentPairs;
     if (b.score !== a.score) return b.score - a.score;
+    const aCount = Math.abs(a.placedCount - requiredCount);
+    const bCount = Math.abs(b.placedCount - requiredCount);
+    if (aCount !== bCount) return aCount - bCount;
     if (Math.abs(b.score - a.score) < 12_000 && a.rotation !== b.rotation) {
       return a.rotation - b.rotation;
     }

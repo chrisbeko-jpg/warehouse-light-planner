@@ -1,4 +1,5 @@
 import { evaluateLayoutQuality, type RoomBounds } from "@/lib/public-wizard/layout-quality";
+import type { MatrixSpacingMetrics } from "@/lib/public-wizard/matrix-spacing-metrics";
 import type { Point2D } from "@/types/floor-plan";
 
 export interface ElongatedMatrixScoreInput {
@@ -16,6 +17,7 @@ export interface ElongatedMatrixScoreInput {
   indicativeLux: number;
   targetLux: number;
   rotation: number;
+  spacing?: MatrixSpacingMetrics;
 }
 
 export interface ElongatedMatrixScoreResult {
@@ -38,7 +40,11 @@ export function scoreElongatedMatrixCandidate(input: ElongatedMatrixScoreInput):
   if (quality.rejected) score -= 250_000;
 
   score -= input.adjacentPairs * 50_000;
-  score -= Math.abs(input.placedCount - input.requiredCount) * 6000;
+
+  const countDelta = Math.abs(input.placedCount - input.requiredCount);
+  if (!input.meetsLuxTarget) score -= countDelta * 6000;
+  else if (input.placedCount < input.requiredCount) score -= countDelta * 4500;
+  else score -= countDelta * 900;
 
   if (input.meetsLuxTarget) score += 12_000;
   else score += input.indicativeLux * 0.6;
@@ -55,6 +61,16 @@ export function scoreElongatedMatrixCandidate(input: ElongatedMatrixScoreInput):
   const colGaps = gapSpreadPx(input.points.map((p) => p.x));
   const rowGaps = gapSpreadPx(input.points.map((p) => p.y));
   score -= (colGaps + rowGaps) * 0.02;
+
+  if (input.spacing) {
+    score -= input.spacing.spacingImbalance * 4200;
+    score -= input.spacing.wallMarginBalance * 320;
+    const extreme =
+      input.spacing.spacingImbalance > 0.35 &&
+      input.matrixCols >= 2 &&
+      input.matrixRows >= 2;
+    if (extreme) score -= 8000;
+  }
 
   return {
     score,
