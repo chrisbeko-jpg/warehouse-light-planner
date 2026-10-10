@@ -284,6 +284,30 @@ function pickBest(candidates: ModuleMatrixCandidate[], requiredCount: number): M
   return shortlist[0] ?? null;
 }
 
+/** Exposed for placement QA scripts: all scored matrix candidates before pickBest. */
+export function enumerateElongatedModuleMatrixCandidates(
+  vertices: Point2D[],
+  pixelsPerMeter: number,
+  requiredCount: number,
+  productId: PublicProductId,
+  context: PanelLayoutContext,
+  ceilingType: CeilingTypeId = "grid_1200_600",
+): ModuleMatrixCandidate[] {
+  const grid = buildRoomCeilingGrid(vertices, pixelsPerMeter, ceilingType);
+  if (!grid || vertices.length < 3 || requiredCount <= 0 || pixelsPerMeter <= 0) {
+    return [];
+  }
+  return collectCandidates(
+    grid,
+    vertices,
+    pixelsPerMeter,
+    productId,
+    context,
+    requiredCount,
+    MATRIX_COUNT_SEARCH_DELTA,
+  );
+}
+
 /**
  * Module-first placement for 1200×300 panels on 1200×600 grids.
  * Selects evenly spaced ceiling modules, then places fixtures on those modules.

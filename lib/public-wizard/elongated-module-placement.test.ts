@@ -200,6 +200,48 @@ test("10×12 m calculated count uses balanced elongated matrix", () => {
   assert.ok(layout.matrixRows! >= 3);
 });
 
+test("12×15 m calculated count uses scalable balanced matrix", () => {
+  const scene = buildManualRoomScene({ lengthM: 12, widthM: 15 });
+  const count = calculateRequiredFixtureCount(scene.areaM2, 500, PRODUCT, CEILING);
+  const layout = placeFixturesWithLayoutInfo(
+    scene.vertices,
+    scene.pixelsPerMeter,
+    count,
+    PRODUCT,
+    { areaM2: scene.areaM2, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
+  );
+  assert.ok(layout.placedCount >= count);
+  assert.equal(countAdjacentLuminaires(
+    layout.fixtures.map((f) => ({ x: f.x, y: f.y })),
+    scene.pixelsPerMeter,
+    PRODUCT,
+    layout.fixtures[0]?.rotation ?? 0,
+  ).totalPairs, 0);
+  const cols = layout.matrixCols ?? 0;
+  const rows = layout.matrixRows ?? 0;
+  assert.ok(cols >= 3 && rows >= 3);
+  assert.ok(Math.abs(cols - rows) <= Math.max(cols, rows) - 2);
+});
+
+test("15×20 m calculated count uses scalable balanced matrix", () => {
+  const scene = buildManualRoomScene({ lengthM: 15, widthM: 20 });
+  const count = calculateRequiredFixtureCount(scene.areaM2, 500, PRODUCT, CEILING);
+  const layout = placeFixturesWithLayoutInfo(
+    scene.vertices,
+    scene.pixelsPerMeter,
+    count,
+    PRODUCT,
+    { areaM2: scene.areaM2, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
+  );
+  assert.ok(layout.placedCount >= count);
+  assert.equal(countAdjacentLuminaires(
+    layout.fixtures.map((f) => ({ x: f.x, y: f.y })),
+    scene.pixelsPerMeter,
+    PRODUCT,
+    layout.fixtures[0]?.rotation ?? 0,
+  ).totalPairs, 0);
+});
+
 test("G: 600×600 panels still use distributed matrix path", () => {
   const layout = placeFixturesWithLayoutInfo(rect(8, 5), PPM, 12, "led_panel_4000", {
     areaM2: 40,
