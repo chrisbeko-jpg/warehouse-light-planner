@@ -55,6 +55,21 @@ test("evaluateLayoutQuality rejects two full edge rows with empty middle", () =>
   assert.equal(q.rejected, true);
 });
 
+test("evaluateLayoutQuality rejects two edge columns in wide room", () => {
+  const b = bounds(800, 500);
+  const points: Point2D[] = [];
+  const xLeft = 800 * 0.1;
+  const xRight = 800 * 0.9;
+  for (let r = 0; r < 6; r++) {
+    const y = ((r + 1) / 7) * 500;
+    points.push({ x: xLeft, y });
+    points.push({ x: xRight, y });
+  }
+  const q = evaluateLayoutQuality(points, b);
+  assert.equal(q.edgeOnlyColumns, true);
+  assert.equal(q.rejected, true);
+});
+
 test("full 4×4 matrix beats two edge rows", () => {
   const b = bounds(800, 700);
   const bad = twoWallRows(800, 700, 7);

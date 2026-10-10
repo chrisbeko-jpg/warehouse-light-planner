@@ -109,6 +109,56 @@ export function downlightCenterPx(grid: RoomCeilingGrid, col: number, row: numbe
 /**
  * 1200×300 in a 1200×600 module: full module length, 300 mm depth, flush to module start (top/left).
  */
+const MODULE_FIT_TOLERANCE_M = 0.002;
+
+/** Axis-aligned 1200×300 footprint inside a ceiling module (metres, room-local). */
+export function elongatedPanelFootprintBoundsM(
+  grid: RoomCeilingGrid,
+  col: number,
+  row: number,
+  productId: PublicProductId,
+  rotation: number,
+): { leftM: number; topM: number; rightM: number; bottomM: number } {
+  const { leftM, topM } = moduleLeftTopM(grid, col, row);
+  const oriented = orientedFixtureSizeM(productId, rotation);
+  if (Math.abs(oriented.widthM - grid.cellWidthM) < 1e-4) {
+    return {
+      leftM,
+      topM,
+      rightM: leftM + grid.cellWidthM,
+      bottomM: topM + oriented.heightM,
+    };
+  }
+  if (Math.abs(oriented.heightM - grid.cellHeightM) < 1e-4) {
+    return {
+      leftM,
+      topM,
+      rightM: leftM + oriented.widthM,
+      bottomM: topM + grid.cellHeightM,
+    };
+  }
+  return moduleBoundsM(grid, col, row);
+}
+
+export function isElongatedPanelContainedInModule(
+  grid: RoomCeilingGrid,
+  col: number,
+  row: number,
+  productId: PublicProductId,
+  rotation: number,
+  toleranceM = MODULE_FIT_TOLERANCE_M,
+): boolean {
+  if (col < 0 || row < 0 || col >= grid.cols || row >= grid.rows) return false;
+  const tile = moduleBoundsM(grid, col, row);
+  const panel = elongatedPanelFootprintBoundsM(grid, col, row, productId, rotation);
+  return (
+    panel.leftM >= tile.leftM - toleranceM &&
+    panel.topM >= tile.topM - toleranceM &&
+    panel.rightM <= tile.rightM + toleranceM &&
+    panel.bottomM <= tile.bottomM + toleranceM
+  );
+}
+
 export function elongatedPanelCenterPx(
   grid: RoomCeilingGrid,
   col: number,
@@ -236,11 +286,10 @@ export function listModuleSnapCenters(
   const points: Point2D[] = [];
   for (const { col, row } of listAllModuleIndices(grid)) {
     const center = fixtureCenterForModule(grid, col, row, productId, rotation);
-    if (!pointInPolygon(center, vertices)) continue;
-    if (product.category === "downlight") {
-      points.push(center);
-      continue;
+    if (isElongatedPanel(productId) && !grid.helper) {
+      if (!isElongatedPanelContainedInModule(grid, col, row, productId, rotation)) continue;
     }
+    if (!pointInPolygon(center, vertices)) continue;
     points.push(center);
   }
   return points;

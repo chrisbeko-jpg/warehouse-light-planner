@@ -18,6 +18,7 @@ export interface LayoutQualityResult {
   coverageRatio: number;
   hollowMiddle: boolean;
   edgeOnlyRows: boolean;
+  edgeOnlyColumns: boolean;
   isCompleteMatrix: boolean;
   symmetryBalance: number;
   nearestNeighborCv: number;
@@ -126,11 +127,40 @@ function detectEdgeOnlyRows(points: Point2D[], bounds: RoomBounds): boolean {
 
 function detectHollowMiddle(points: Point2D[], bounds: RoomBounds): boolean {
   if (points.length < 8) return false;
+  const roomW = bounds.maxX - bounds.minX;
+  const roomH = bounds.maxY - bounds.minY;
   const midY = (bounds.minY + bounds.maxY) / 2;
-  const band = (bounds.maxY - bounds.minY) * 0.32;
-  const inMiddle = points.filter((p) => Math.abs(p.y - midY) < band / 2).length;
+  const midX = (bounds.minX + bounds.maxX) / 2;
+  const bandY = roomH * 0.32;
+  const bandX = roomW * 0.32;
+  const inMiddleY = points.filter((p) => Math.abs(p.y - midY) < bandY / 2).length;
+  const inMiddleX = points.filter((p) => Math.abs(p.x - midX) < bandX / 2).length;
   const ys = sortedUnique(points.map((p) => p.y));
-  return ys.length >= 2 && inMiddle === 0 && points.length >= 10;
+  const xs = sortedUnique(points.map((p) => p.x));
+  if (ys.length >= 2 && inMiddleY === 0 && points.length >= 10) return true;
+  if (xs.length >= 2 && inMiddleX === 0 && points.length >= 8 && roomW > roomH * 1.05) return true;
+  return false;
+}
+
+function detectEdgeOnlyColumns(points: Point2D[], bounds: RoomBounds): boolean {
+  const xs = sortedUnique(points.map((p) => p.x));
+  if (xs.length !== 2 || points.length < 8) return false;
+  const roomW = bounds.maxX - bounds.minX;
+  const roomH = bounds.maxY - bounds.minY;
+  if (roomW <= roomH * 1.05) return false;
+  const colGap = Math.abs(xs[1]! - xs[0]!);
+  if (colGap < roomW * 0.55) return false;
+  const perCol = new Map<number, number>();
+  for (const p of points) {
+    const x = Math.round(p.x);
+    perCol.set(x, (perCol.get(x) ?? 0) + 1);
+  }
+  const counts = [...perCol.values()];
+  if (counts.some((c) => c < 3)) return false;
+  const midX = (bounds.minX + bounds.maxX) / 2;
+  const band = roomW * 0.28;
+  const inMiddle = points.filter((p) => Math.abs(p.x - midX) < band).length;
+  return inMiddle === 0;
 }
 
 export function evaluateLayoutQuality(
@@ -150,6 +180,7 @@ export function evaluateLayoutQuality(
       coverageRatio: 0,
       hollowMiddle: false,
       edgeOnlyRows: false,
+      edgeOnlyColumns: false,
       isCompleteMatrix: false,
       symmetryBalance: 0,
       nearestNeighborCv: 0,
@@ -164,6 +195,7 @@ export function evaluateLayoutQuality(
   const coverage = coverageRatio(points, bounds);
   const hollowMiddle = detectHollowMiddle(points, bounds);
   const edgeOnlyRows = detectEdgeOnlyRows(points, bounds);
+  const edgeOnlyColumns = detectEdgeOnlyColumns(points, bounds);
   const singleColumnWide = detectSingleColumnInWideRoom(points, bounds);
   const nnCv = nearestNeighborCoefficientOfVariation(points);
 
@@ -215,6 +247,10 @@ export function evaluateLayoutQuality(
     score -= 120;
     rejectionReasons.push("edge_only_rows");
   }
+  if (edgeOnlyColumns) {
+    score -= 140;
+    rejectionReasons.push("edge_only_columns");
+  }
   if (singleColumnWide) {
     score -= 100;
     rejectionReasons.push("single_column_wide_room");
@@ -223,9 +259,10 @@ export function evaluateLayoutQuality(
   const rejected =
     !completeMatrix ||
     edgeOnlyRows ||
+    edgeOnlyColumns ||
     singleColumnWide ||
     twoRowWideMatrix ||
-    (hollowMiddle && points.length >= 10);
+    (hollowMiddle && points.length >= 8);
 
   return {
     score,
@@ -238,6 +275,7 @@ export function evaluateLayoutQuality(
     coverageRatio: coverage,
     hollowMiddle,
     edgeOnlyRows,
+    edgeOnlyColumns,
     isCompleteMatrix: completeMatrix,
     symmetryBalance,
     nearestNeighborCv: nnCv,

@@ -189,7 +189,7 @@ test("1200×300 panels spread across large 120×60 rooms", () => {
   assert.equal(quality.rejected, false, quality.rejectionReasons.join(", "));
   const product = getPublicProduct(productId);
   for (const fixture of layout.fixtures) {
-    assert.equal(fixture.rotation, 0);
+    assert.ok(fixture.rotation === 0 || fixture.rotation === 90);
     assert.ok(
       minPanelOuterEdgeClearanceM(
         { x: fixture.x, y: fixture.y },

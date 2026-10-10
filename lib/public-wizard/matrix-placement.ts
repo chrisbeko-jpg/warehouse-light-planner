@@ -10,6 +10,7 @@ import {
   downlightCenterPx,
   elongatedPanelCenterPx,
   listAllModuleIndices,
+  type ModuleIndex,
 } from "@/lib/public-wizard/room-ceiling-grid";
 import type { PanelLayoutContext } from "@/lib/public-wizard/ceiling-grid";
 import {
@@ -27,6 +28,7 @@ export interface MatrixPlacementResult {
   placedCount: number;
   matrixRows?: number;
   matrixCols?: number;
+  moduleIndices?: ModuleIndex[];
   warning?: string;
 }
 
@@ -298,6 +300,7 @@ export function placeElongatedPanelsOnModules(
     placedCount: result.placedCount,
     matrixRows: result.matrixRows,
     matrixCols: result.matrixCols,
+    moduleIndices: result.moduleIndices,
     warning: result.warning,
   };
 }

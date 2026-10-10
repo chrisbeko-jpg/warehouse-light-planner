@@ -4,6 +4,7 @@ import {
   buildRoomCeilingGrid,
   downlightCenterPx,
   elongatedPanelCenterPx,
+  isElongatedPanelContainedInModule,
   fixtureCenterForModule,
   gridPanelCenterPx,
   moduleBoundsM,
@@ -51,6 +52,21 @@ test("downlight sits at module centre for 600×600 and 1200×600 grids", () => {
   const bounds1200 = moduleBoundsM(grid1200, 0, 0);
   assert.ok(Math.abs(center1200.x - (40 + (bounds1200.leftM + 0.6) * 100)) < 0.5);
   assert.ok(Math.abs(center1200.y - (40 + (bounds1200.topM + 0.3) * 100)) < 0.5);
+});
+
+test("1200×300 footprint stays inside assigned module bounds", () => {
+  const vertices = rect(8, 5);
+  const grid = buildRoomCeilingGrid(vertices, 100, "grid_1200_600");
+  assert.ok(grid);
+  for (const rot of [0, 90] as const) {
+    for (let col = 0; col < grid.cols; col++) {
+      for (let row = 0; row < grid.rows; row++) {
+        assert.ok(
+          isElongatedPanelContainedInModule(grid, col, row, "led_panel_1200x300_4000", rot),
+        );
+      }
+    }
+  }
 });
 
 test("1200×300 panel aligns to module long edge start", () => {

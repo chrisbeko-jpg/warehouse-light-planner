@@ -3,6 +3,8 @@ import test from "node:test";
 import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
 import { countAdjacentLuminaires } from "@/lib/public-wizard/luminaire-adjacency";
 import { placeElongatedPanelsModuleFirst } from "@/lib/public-wizard/elongated-module-placement";
+import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
+import { calculateRequiredFixtureCount } from "@/lib/public-wizard/calculation";
 import { placeElongatedPanelsOnModules } from "@/lib/public-wizard/matrix-placement";
 import { placeFixturesWithLayoutInfo } from "@/lib/public-wizard/placement";
 import type { Point2D } from "@/types/floor-plan";
@@ -97,6 +99,60 @@ test("B: 8×7 m / 18 panels separated", () => {
     "grid_1200_600",
   );
   assert.equal(layout.placedCount, 18);
+  const adj = countAdjacentLuminaires(
+    layout.fixtures.map((f) => ({ x: f.x, y: f.y })),
+    PPM,
+    PRODUCT,
+    layout.fixtures[0]?.rotation ?? 0,
+  );
+  assert.equal(adj.totalPairs, 0);
+});
+
+test("8×5 m / 12 panels — 3×4 matrix, no edge columns", () => {
+  const layout = placeElongatedPanelsOnModules(
+    rect(8, 5),
+    PPM,
+    12,
+    PRODUCT,
+    { areaM2: 40, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
+    "grid_1200_600",
+  );
+  assert.equal(layout.placedCount, 12);
+  assert.equal(layout.matrixCols, 3, "expected 3 columns");
+  assert.equal(layout.matrixRows, 4, "expected 4 rows");
+  assertSeparated(layout);
+  const cols = [...new Set(layout.moduleIndices.map((m) => m.col))];
+  assert.equal(cols.length, 3);
+  assert.ok(cols[1]! > cols[0]! + 0 && cols[2]! > cols[1]! + 0);
+});
+
+test("8×5 m manual scene matches 3×4 for calculated count", () => {
+  const scene = buildManualRoomScene({ lengthM: 8, widthM: 5 });
+  const count = calculateRequiredFixtureCount(scene.areaM2, 500, PRODUCT, CEILING);
+  const layout = placeFixturesWithLayoutInfo(
+    scene.vertices,
+    scene.pixelsPerMeter,
+    count,
+    PRODUCT,
+    { areaM2: scene.areaM2, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
+  );
+  assert.equal(layout.matrixCols, 3);
+  assert.equal(layout.matrixRows, 4);
+});
+
+test("8×7 m / 18 panels — 3×6 separated (6 rows × 3 cols)", () => {
+  const layout = placeElongatedPanelsOnModules(
+    rect(8, 7),
+    PPM,
+    18,
+    PRODUCT,
+    { areaM2: 56, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
+    "grid_1200_600",
+  );
+  assert.equal(layout.placedCount, 18);
+  assert.equal(layout.matrixCols, 3);
+  assert.equal(layout.matrixRows, 6);
+  assert.equal(layout.fixtures[0]?.rotation ?? 0, 0);
   const adj = countAdjacentLuminaires(
     layout.fixtures.map((f) => ({ x: f.x, y: f.y })),
     PPM,

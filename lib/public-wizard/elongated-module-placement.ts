@@ -1,5 +1,9 @@
 import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
 import type { PanelLayoutContext } from "@/lib/public-wizard/ceiling-grid";
+import {
+  polygonBoundsFromVertices,
+  scoreElongatedMatrixCandidate,
+} from "@/lib/public-wizard/elongated-matrix-score";
 import { countAdjacentLuminaires } from "@/lib/public-wizard/luminaire-adjacency";
 import {
   enumerateMatrixFactors,
@@ -10,6 +14,7 @@ import { isPanelFootprintInsideRoom } from "@/lib/public-wizard/placement-constr
 import {
   buildRoomCeilingGrid,
   elongatedPanelCenterPx,
+  isElongatedPanelContainedInModule,
   listAllModuleIndices,
   type ModuleIndex,
   type RoomCeilingGrid,
@@ -42,6 +47,7 @@ function validModulesForRotation(
 ): ModuleIndex[] {
   const valid: ModuleIndex[] = [];
   for (const { col, row } of listAllModuleIndices(grid)) {
+    if (!isElongatedPanelContainedInModule(grid, col, row, productId, rotation)) continue;
     const center = elongatedPanelCenterPx(grid, col, row, productId, rotation);
     if (isPanelFootprintInsideRoom(center, pixelsPerMeter, vertices, productId, rotation)) {
       valid.push({ col, row });
@@ -74,6 +80,9 @@ function tryModuleMatrix(
   pixelsPerMeter: number,
   context: PanelLayoutContext,
   requiredCount: number,
+  bounds: ReturnType<typeof polygonBoundsFromVertices>,
+  roomWidthM: number,
+  roomHeightM: number,
 ): ModuleMatrixCandidate | null {
   const total = matrixRows * matrixCols;
 
@@ -130,10 +139,22 @@ function tryModuleMatrix(
     requiredCount,
   );
 
-  let score = lux.meetsTarget ? 10_000 : lux.indicativeAverageLux;
-  score -= Math.abs(total - requiredCount) * 5000;
-  if (matrixRows >= matrixCols) score += 1500;
-  score -= adjacent * 50_000;
+  const scored = scoreElongatedMatrixCandidate({
+    points,
+    bounds,
+    pixelsPerMeter,
+    matrixRows,
+    matrixCols,
+    roomWidthM,
+    roomHeightM,
+    placedCount: total,
+    requiredCount,
+    adjacentPairs: adjacent,
+    meetsLuxTarget: lux.meetsTarget,
+    indicativeLux: lux.indicativeAverageLux,
+    targetLux: context.targetLux,
+    rotation,
+  });
 
   return {
     points,
@@ -143,7 +164,7 @@ function tryModuleMatrix(
     rotation,
     placedCount: total,
     adjacentPairs: adjacent,
-    score,
+    score: scored.score,
   };
 }
 
@@ -157,6 +178,7 @@ function collectCandidates(
   countDelta: number,
 ): ModuleMatrixCandidate[] {
   const candidates: ModuleMatrixCandidate[] = [];
+  const bounds = polygonBoundsFromVertices(vertices);
   const rotations = [0, 90] as const;
 
   const counts = new Set<number>();
@@ -191,6 +213,9 @@ function collectCandidates(
             pixelsPerMeter,
             context,
             requiredCount,
+            bounds,
+            grid.roomWidthM,
+            grid.roomHeightM,
           );
           if (candidate) candidates.push(candidate);
         }
@@ -212,7 +237,13 @@ function pickBest(candidates: ModuleMatrixCandidate[], requiredCount: number): M
   shortlist.sort((a, b) => {
     if (a.adjacentPairs !== b.adjacentPairs) return a.adjacentPairs - b.adjacentPairs;
     if (b.score !== a.score) return b.score - a.score;
-    if (a.cols !== b.cols) return a.cols - b.cols;
+    if (Math.abs(b.score - a.score) < 12_000 && a.rotation !== b.rotation) {
+      return a.rotation - b.rotation;
+    }
+    const aBalance = Math.abs(a.rows - a.cols);
+    const bBalance = Math.abs(b.rows - b.cols);
+    if (aBalance !== bBalance) return aBalance - bBalance;
+    if (a.cols !== b.cols) return b.cols - a.cols;
     return b.rows - a.rows;
   });
 
