@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import type { CmsSiteContent, CmsWizardContent, WizardAtmosphereChoiceCms, WizardRoomChoiceCms } from "@/types/cms";
+import type {
+  CmsSiteContent,
+  CmsWizardContent,
+  WizardAtmosphereChoiceCms,
+  WizardCeilingChoiceCms,
+  WizardRoomChoiceCms,
+} from "@/types/cms";
 import { PublishBar } from "@/components/cms/PublishBar";
 import { MediaPicker } from "@/components/cms/MediaPicker";
 import { applyMediaId, readMediaId } from "@/lib/cms/media";
@@ -28,12 +34,22 @@ export function WizardAtmospheresEditor() {
   );
 }
 
+export function WizardCeilingsEditor() {
+  return (
+    <WizardEditor
+      mode="ceilings"
+      previewHref="/lichtadvies"
+      publishSuccessMessage="Plafondkeuzes gepubliceerd"
+    />
+  );
+}
+
 function WizardEditor({
   mode,
   previewHref,
   publishSuccessMessage,
 }: {
-  mode: "rooms" | "atmospheres";
+  mode: "rooms" | "atmospheres" | "ceilings";
   previewHref: string;
   publishSuccessMessage: string;
 }) {
@@ -95,7 +111,11 @@ function WizardEditor({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold">
-            {mode === "rooms" ? "AI Lichtadvies – Ruimtes" : "AI Lichtadvies – Sferen"}
+            {mode === "rooms"
+              ? "AI Lichtadvies – Ruimtes"
+              : mode === "ceilings"
+                ? "AI Lichtadvies – Plafondtypes"
+                : "AI Lichtadvies – Sferen"}
           </h2>
           <p className="text-sm text-[var(--lp-text-secondary)]">
             Technische IDs blijven stabiel. Afbeeldingen worden gekoppeld via persistente media-ID (
@@ -160,15 +180,99 @@ function WizardEditor({
           />
         ))}
 
-      {mode === "atmospheres" && (
+      {mode === "ceilings" &&
+        wizard.ceilingChoices.map((choice, index) => (
+          <CeilingChoiceForm
+            key={choice.id}
+            choice={choice}
+            images={images}
+            onImagesChange={setImages}
+            onChange={(next) => {
+              const ceilingChoices = [...wizard.ceilingChoices];
+              ceilingChoices[index] = next;
+              setWizard({ ...wizard, ceilingChoices });
+            }}
+          />
+        ))}
+
+      {(mode === "atmospheres" || mode === "ceilings") && (
         <p className="text-sm text-[var(--lp-text-secondary)]">
-          Preview sfeerkeuzes op de live wizard:{" "}
+          Preview op de live wizard:{" "}
           <Link href="/lichtadvies" className="lp-link" target="_blank">
             /lichtadvies
           </Link>
         </p>
       )}
     </div>
+  );
+}
+
+function CeilingChoiceForm({
+  choice,
+  images,
+  onImagesChange,
+  onChange,
+}: {
+  choice: WizardCeilingChoiceCms;
+  images: CmsSiteContent["images"];
+  onImagesChange?: (images: CmsSiteContent["images"]) => void;
+  onChange: (choice: WizardCeilingChoiceCms) => void;
+}) {
+  return (
+    <article className="lp-card space-y-3 p-4" data-testid={`ceiling-choice-${choice.id}`}>
+      <p className="text-xs font-semibold text-[var(--lp-text-secondary)]">ID: {choice.id}</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="text-sm">
+          Titel
+          <input
+            className="mt-1 w-full rounded border px-2 py-1"
+            value={choice.title}
+            onChange={(e) => onChange({ ...choice, title: e.target.value })}
+          />
+        </label>
+        <label className="text-sm md:col-span-2">
+          Omschrijving
+          <textarea
+            className="mt-1 w-full rounded border px-2 py-1"
+            rows={2}
+            value={choice.description}
+            onChange={(e) => onChange({ ...choice, description: e.target.value })}
+          />
+        </label>
+        <MediaPicker
+          images={images}
+          onImagesChange={onImagesChange}
+          value={readMediaId(choice)}
+          onChange={(mediaId) => onChange(applyMediaId(choice, mediaId))}
+          label="Afbeelding (mediaId)"
+        />
+        <label className="text-sm">
+          Alt-tekst
+          <input
+            className="mt-1 w-full rounded border px-2 py-1"
+            value={choice.imageAlt}
+            onChange={(e) => onChange({ ...choice, imageAlt: e.target.value })}
+          />
+        </label>
+        <label className="text-sm">
+          Sortering
+          <input
+            type="number"
+            className="mt-1 w-full rounded border px-2 py-1"
+            value={choice.sortOrder}
+            onChange={(e) => onChange({ ...choice, sortOrder: Number(e.target.value) })}
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={choice.active}
+            onChange={(e) => onChange({ ...choice, active: e.target.checked })}
+          />
+          Actief
+        </label>
+      </div>
+    </article>
   );
 }
 

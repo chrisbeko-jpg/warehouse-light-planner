@@ -11,6 +11,7 @@ import type {
   TextImageBlock,
   WideImageBlock,
   WizardAtmosphereChoiceCms,
+  WizardCeilingChoiceCms,
   WizardRoomChoiceCms,
 } from "@/types/cms";
 
@@ -103,7 +104,9 @@ export function normalizePage(page: CmsPage): CmsPage {
   };
 }
 
-function normalizeWizardChoice<T extends WizardRoomChoiceCms | WizardAtmosphereChoiceCms>(choice: T): T {
+function normalizeWizardChoice<
+  T extends WizardRoomChoiceCms | WizardAtmosphereChoiceCms | WizardCeilingChoiceCms,
+>(choice: T): T {
   const mediaId = readMediaId(choice);
   return {
     ...choice,
@@ -116,6 +119,7 @@ export function normalizeWizard(wizard: CmsWizardContent): CmsWizardContent {
   return {
     roomChoices: wizard.roomChoices.map(normalizeWizardChoice),
     atmosphereChoices: wizard.atmosphereChoices.map(normalizeWizardChoice),
+    ceilingChoices: (wizard.ceilingChoices ?? []).map(normalizeWizardChoice),
     products: wizard.products ?? [],
   };
 }

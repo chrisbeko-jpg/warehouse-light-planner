@@ -17,6 +17,7 @@ import type {
   WizardAtmosphereChoiceCms,
   WizardProductCms,
   WizardRoomChoiceCms,
+  WizardCeilingChoiceCms,
   HeroBlock,
   TextImageBlock,
   WideImageBlock,
@@ -121,6 +122,29 @@ function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function mergeCeilingChoices(
+  defaultItems: WizardCeilingChoiceCms[],
+  stored?: WizardCeilingChoiceCms[],
+): WizardCeilingChoiceCms[] {
+  const byId = new Map((stored ?? []).map((item) => [item.id, item]));
+  return defaultItems.map((defaultItem) => {
+    const storedItem = byId.get(defaultItem.id);
+    if (!storedItem) return defaultItem;
+    const mediaId = readMediaId(storedItem) ?? null;
+    return {
+      ...defaultItem,
+      title: storedItem.title?.trim() ? storedItem.title : defaultItem.title,
+      description: storedItem.description?.trim() ? storedItem.description : defaultItem.description,
+      imageAlt: storedItem.imageAlt?.trim() ? storedItem.imageAlt : defaultItem.imageAlt,
+      sortOrder: storedItem.sortOrder ?? defaultItem.sortOrder,
+      active: storedItem.active ?? defaultItem.active,
+      altTextOverride: storedItem.altTextOverride,
+      mediaId,
+      imageId: mediaId ?? undefined,
+    };
+  });
+}
+
 function mergeProducts(defaults: WizardProductCms[], stored?: WizardProductCms[]): WizardProductCms[] {
   const byId = new Map((stored ?? []).map((item) => [item.id, item]));
   return defaults.map((item) => {
@@ -147,6 +171,7 @@ export function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizar
   return {
     roomChoices: mergeRoomChoices(defaults.roomChoices, stored.roomChoices),
     atmosphereChoices: mergeAtmosphereChoices(defaults.atmosphereChoices, stored.atmosphereChoices),
+    ceilingChoices: mergeCeilingChoices(defaults.ceilingChoices, stored.ceilingChoices),
     products: mergeProducts(defaults.products, stored.products),
   };
 }

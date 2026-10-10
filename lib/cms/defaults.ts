@@ -1,4 +1,5 @@
 import type { CmsPage, CmsSiteContent, CmsWizardContent } from "@/types/cms";
+import { CEILING_TYPES } from "@/lib/public-wizard/ceiling-types";
 import { KANTOORVERLICHTING_SEED } from "@/lib/cms/seeds/kantoorverlichting";
 import { ATMOSPHERES } from "@/lib/public-wizard/atmospheres";
 import { PUBLIC_PRODUCTS } from "@/lib/public-wizard/products";
@@ -151,6 +152,14 @@ export const DEFAULT_WIZARD_CONTENT: CmsWizardContent = {
     enabled: item.id !== "premium_architectural",
     badgeText: item.id === "premium_architectural" ? "ONLY PREMIUM" : undefined,
     flow: "standard" as const,
+  })),
+  ceilingChoices: CEILING_TYPES.map((item, index) => ({
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    imageAlt: item.imageAlt,
+    sortOrder: index,
+    active: true,
   })),
   products: PUBLIC_PRODUCTS.map((product) => ({
     id: product.id,

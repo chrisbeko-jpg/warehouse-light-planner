@@ -252,6 +252,20 @@ export interface WizardRoomChoiceCms {
   active: boolean;
 }
 
+export interface WizardCeilingChoiceCms {
+  id: string;
+  title: string;
+  description: string;
+  mediaId?: string | null;
+  altTextOverride?: string;
+  /** @deprecated use mediaId */
+  imageId?: string;
+  /** @deprecated use altTextOverride */
+  imageAlt: string;
+  sortOrder: number;
+  active: boolean;
+}
+
 export interface WizardAtmosphereChoiceCms {
   id: string;
   title: string;
@@ -288,6 +302,7 @@ export interface WizardProductCms {
 export interface CmsWizardContent {
   roomChoices: WizardRoomChoiceCms[];
   atmosphereChoices: WizardAtmosphereChoiceCms[];
+  ceilingChoices: WizardCeilingChoiceCms[];
   products: WizardProductCms[];
 }
 

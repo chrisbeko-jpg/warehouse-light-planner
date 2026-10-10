@@ -42,6 +42,9 @@ export function collectReferencedImageIds(payload: CmsSitePayload): string[] {
   for (const choice of payload.wizard.atmosphereChoices) {
     collectMediaId(readMediaId(choice), ids);
   }
+  for (const choice of payload.wizard.ceilingChoices ?? []) {
+    collectMediaId(readMediaId(choice), ids);
+  }
   return [...ids];
 }
 

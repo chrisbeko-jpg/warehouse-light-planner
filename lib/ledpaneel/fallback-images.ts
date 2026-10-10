@@ -1,4 +1,4 @@
-import type { AtmosphereId, PublicProductId, RoomFunctionId } from "@/types/public-wizard";
+import type { AtmosphereId, CeilingTypeId, PublicProductId, RoomFunctionId } from "@/types/public-wizard";
 import { normalizeRoomFunctionId } from "@/lib/public-wizard/room-functions";
 
 const IMAGE_ROOT = "/ledpaneel/images";
@@ -37,6 +37,11 @@ export const FALLBACK_IMAGES = {
     reception_hall: imagePath("entree-verlichting.webp"),
     other_spaces: imagePath("overig-ruimte-verlichting.webp"),
   } satisfies Record<RoomFunctionId, string>,
+  ceilings: {
+    grid_600: "/images/ceiling-types/plafond-60x60.webp",
+    grid_1200_600: "/images/ceiling-types/plafond-120x60.webp",
+    concrete: "/images/ceiling-types/plafond-beton.webp",
+  } satisfies Record<CeilingTypeId, string>,
   kantoorverlichting: {
     hero: imagePath("kantoorverlichting-hero.webp"),
     lichtkleur: imagePath("kantoor-functioneel-verlichting.webp"),
@@ -72,6 +77,9 @@ export const FALLBACK_IMAGE_ALTS: Record<string, string> = {
   [FALLBACK_IMAGES.rooms.workplace_office]: "Werkplek kantoor met professionele LED-verlichting",
   [FALLBACK_IMAGES.rooms.reception_hall]: "Ontvangst of halzone met representatieve verlichting",
   [FALLBACK_IMAGES.rooms.other_spaces]: "Neutrale zakelijke nevenruimte met professionele verlichting",
+  [FALLBACK_IMAGES.ceilings.grid_600]: "Systeemplafond met vierkante platen van 60 bij 60 centimeter",
+  [FALLBACK_IMAGES.ceilings.grid_1200_600]: "Systeemplafond met platen van 120 bij 60 centimeter",
+  [FALLBACK_IMAGES.ceilings.concrete]: "Vast betonnen plafond met opbouwverlichting",
   [FALLBACK_IMAGES.kantoorverlichting.hero]: "Kantoorverlichting met LED-panelen in systeemplafond",
   [FALLBACK_IMAGES.kantoorverlichting.lichtkleur]: "Functionele kantoorverlichting met neutrale LED-panelen",
   [FALLBACK_IMAGES.kantoorverlichting.examples[0]!]: "Voorbeeld lichtplan kantoorverlichting",
@@ -105,6 +113,13 @@ export function getRoomFallback(roomId: string): string | null {
   const normalized = normalizeRoomFunctionId(roomId);
   if (!normalized) return null;
   return FALLBACK_IMAGES.rooms[normalized];
+}
+
+export function getCeilingFallback(ceilingId: string): string | null {
+  if (ceilingId in FALLBACK_IMAGES.ceilings) {
+    return FALLBACK_IMAGES.ceilings[ceilingId as CeilingTypeId];
+  }
+  return null;
 }
 
 export function getAtmosphereFallback(atmosphereId: string): string | null {

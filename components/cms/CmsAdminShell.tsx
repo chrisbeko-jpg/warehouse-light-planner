@@ -9,6 +9,7 @@ const NAV = [
   { href: "/internal/content/homepage", label: "Homepage" },
   { href: "/internal/content/wizard/rooms", label: "AI Ruimtes" },
   { href: "/internal/content/wizard/atmospheres", label: "AI Sferen" },
+  { href: "/internal/content/wizard/ceilings", label: "AI Plafonds" },
   { href: "/internal/content/wizard/products", label: "AI Producten" },
   { href: "/internal/content/media", label: "Media" },
   { href: "/internal/content/pages/kantoorverlichting", label: "SEO" },

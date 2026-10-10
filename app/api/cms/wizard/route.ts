@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { loadCmsSite } from "@/lib/cms/content-store";
 import { readMediaId } from "@/lib/cms/media";
-import { getAtmosphereFallback, getRoomFallback } from "@/lib/ledpaneel/fallback-images";
+import { getAtmosphereFallback, getCeilingFallback, getRoomFallback } from "@/lib/ledpaneel/fallback-images";
+import { isCeilingTypeId } from "@/lib/public-wizard/ceiling-types";
+import type { CeilingTypeId } from "@/types/public-wizard";
 import { resolveMediaUrlWithFallback } from "@/lib/ledpaneel/resolve-fallback-media";
 import { normalizeRoomFunctionId } from "@/lib/public-wizard/room-functions";
 import type { RoomFunctionId } from "@/types/public-wizard";
@@ -41,6 +43,37 @@ function mapRoomChoices(site: Awaited<ReturnType<typeof loadCmsSite>>) {
     });
 }
 
+function mapCeilingChoices(site: Awaited<ReturnType<typeof loadCmsSite>>) {
+  const seen = new Set<CeilingTypeId>();
+  return (site.wizard.ceilingChoices ?? [])
+    .filter((choice) => choice.active && isCeilingTypeId(choice.id))
+    .filter((choice) => {
+      const id = choice.id as CeilingTypeId;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((choice) => {
+      const mediaId = readMediaId(choice);
+      return {
+        ...choice,
+        imageMediaId: mediaId,
+        imageUrl: resolveMediaUrlWithFallback(
+          site.images,
+          choice,
+          getCeilingFallback(choice.id),
+          {
+            altFallback: choice.title,
+            altOverride: choice.altTextOverride ?? choice.imageAlt,
+            context: choice.id,
+          },
+        ),
+        imageAlt: choice.altTextOverride ?? choice.imageAlt ?? choice.title,
+      };
+    });
+}
+
 function mapAtmosphereChoices(site: Awaited<ReturnType<typeof loadCmsSite>>) {
   return site.wizard.atmosphereChoices
     .filter((choice) => choice.active)
@@ -67,6 +100,7 @@ export async function GET() {
     {
       roomChoices: mapRoomChoices(site),
       atmosphereChoices: mapAtmosphereChoices(site),
+      ceilingChoices: mapCeilingChoices(site),
       products: site.wizard.products,
     },
     {
