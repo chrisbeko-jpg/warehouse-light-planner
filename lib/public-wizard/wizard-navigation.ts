@@ -75,7 +75,7 @@ export const WIZARD_STEP_LABELS: {
   showInProgress: boolean;
 }[] = [
   { id: "room", label: "Ruimte", showInProgress: true },
-  { id: "atmosphere", label: "Sfeer", showInProgress: true },
+  { id: "atmosphere", label: "Lichtkleur", showInProgress: true },
   { id: "ceiling", label: "Plafond", showInProgress: true },
   { id: "inputMethod", label: "Invoer", showInProgress: true },
   { id: "floorplan", label: "Plattegrond", showInProgress: true },

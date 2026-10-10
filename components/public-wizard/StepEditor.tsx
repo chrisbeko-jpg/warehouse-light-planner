@@ -22,6 +22,7 @@ import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import { flattenVertices } from "@/lib/polygon-area";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
+import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
 import { WizardProgress } from "@/components/public-wizard/WizardShell";
 import {
   computeFitView,
@@ -436,7 +437,7 @@ export function StepEditor() {
           ← Terug
         </button>
         <div className="min-w-0 flex-1 text-center">
-          <p className="truncate text-sm font-bold sm:text-base">Plattegrond controleren</p>
+          <p className="truncate text-sm font-bold sm:text-base">{WIZARD_COPY.editor.floorplanCheck}</p>
           <p className="truncate text-xs text-[var(--lp-text-secondary)]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
@@ -1104,11 +1105,17 @@ function SidePanel({
             className="lp-btn-primary w-full py-3 font-bold"
             onClick={onGenerate}
           >
-            Genereer lichtplan
+            Lichtplan samenstellen
           </button>
         )}
         {roomComplete && (
           <div className="space-y-2">
+            {lightingPlanGenerated && (
+              <div className="rounded-lg border border-[var(--lp-border)] bg-[var(--lp-bg-secondary)] p-3">
+                <p className="text-sm font-bold">{WIZARD_COPY.editor.planReadyTitle}</p>
+                <p className="mt-1 text-xs text-[var(--lp-text-secondary)]">{WIZARD_COPY.editor.planReadyIntro}</p>
+              </div>
+            )}
             {layoutWarning && (
               <p className="rounded-lg bg-orange-50 p-2 text-xs text-orange-800" data-testid="layout-warning">
                 {layoutWarning}
@@ -1141,7 +1148,7 @@ function SidePanel({
                   className="lp-btn-primary w-full py-3 text-sm font-bold"
                   onClick={onGenerate}
                 >
-                  Lichtplan opnieuw genereren
+                  {WIZARD_COPY.editor.regenerate}
                 </button>
                 <button
                   type="button"
@@ -1149,7 +1156,7 @@ function SidePanel({
                   className="lp-btn-secondary w-full text-sm"
                   onClick={onAddPanel}
                 >
-                  LED-paneel toevoegen
+                  Armatuur toevoegen (paneel)
                 </button>
                 <button
                   type="button"
@@ -1157,7 +1164,7 @@ function SidePanel({
                   className="lp-btn-secondary w-full text-sm"
                   onClick={onAddDownlight}
                 >
-                  Downlight toevoegen
+                  Armatuur toevoegen (downlight)
                 </button>
               </>
             )}
@@ -1168,7 +1175,7 @@ function SidePanel({
                 className={`w-full text-sm ${showHeatmap ? "lp-btn-primary" : "lp-btn-secondary"}`}
                 onClick={onToggleHeatmap}
               >
-                Lichtverdeling
+                {WIZARD_COPY.editor.showDistribution}
               </button>
             )}
             {showHeatmap && (
@@ -1192,7 +1199,7 @@ function SidePanel({
                 className="lp-btn-primary w-full py-3 font-bold"
                 onClick={onContinue}
               >
-                Naar resultaat
+                {WIZARD_COPY.editor.viewResult}
               </button>
             )}
           </div>

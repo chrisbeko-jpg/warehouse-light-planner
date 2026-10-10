@@ -8,115 +8,139 @@ import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
 
 const DEFAULT_HOMEPAGE: CmsPage = {
   slug: "/",
-  title: "AI Lichtadvies voor kantoorverlichting",
+  title: "Online lichtplanner voor installateurs",
+  marketingCopyGeneration: 2,
   seo: {
-    title: "ledpaneel.nl | AI Lichtadvies voor kantoorverlichting",
+    title: "ledpaneel.nl | Online lichtplan voor elektrotechnische professionals",
     description:
-      "Upload uw plattegrond en ontvang binnen enkele minuten een indicatief lichtplan, lichtberekening en projectprijs voor uw kantoor.",
-    ogTitle: "Van plattegrond naar lichtplan met AI",
+      "Maak snel een indicatief lichtplan voor kantoor en utiliteit: armatuurverdeling, lux-indicatie en materiaalbegroting. Ontwikkeld voor installateurs.",
+    ogTitle: "Professioneel lichtplan. Binnen enkele minuten geregeld.",
     ogDescription:
-      "Gratis AI Lichtadvies voor kantoorverlichting. Indicatief lichtplan, Light Indicator en richtprijs.",
+      "Online lichtplanner voor installateurs: ruimte, plafondtype en maatvoering naar een eerste armatuurvoorstel en materiaaloverzicht.",
   },
   blocks: [
     {
       id: "hero",
       type: "hero",
-      headline: "Van plattegrond naar lichtplan met AI",
+      headline: "Professioneel lichtplan. Binnen enkele minuten geregeld.",
       subheadline:
-        "Upload uw plattegrond, kies de gewenste sfeer en ontvang direct een indicatief lichtadvies voor uw kantoor.",
-      primaryCta: "Start gratis AI Lichtadvies",
+        "Maak eenvoudig een lichtplan voor jouw installatieproject. Voer de afmetingen in of upload een plattegrond, kies het plafondtype en ontvang direct een voorstel met armatuurverdeling, indicatieve verlichtingssterkte en materiaalbegroting.",
+      primaryCta: "Start je lichtplan",
       primaryCtaHref: "/lichtadvies",
-      secondaryCta: "Zo werkt het",
+      secondaryCta: "Hoe werkt het?",
       secondaryCtaHref: "/werkwijze",
+      supportLine: "Ontwikkeld voor installateurs en elektrotechnische professionals.",
+    },
+    {
+      id: "benefits",
+      type: "benefits",
+      heading: "Waarom ledpaneel.nl?",
+      items: [
+        {
+          title: "Snel een eerste lichtplan",
+          description:
+            "Van ruimteafmetingen naar een bruikbaar verlichtingsvoorstel, zonder ingewikkelde software.",
+        },
+        {
+          title: "Automatische armatuurverdeling",
+          description:
+            "LED-panelen en downlights worden logisch verdeeld op basis van ruimte, plafondtype en gewenste verlichtingssterkte.",
+        },
+        {
+          title: "Direct inzicht in materiaalkosten",
+          description:
+            "Bekijk het aantal armaturen, de indicatieve luxwaarde en een overzichtelijke materiaalbegroting.",
+        },
+      ],
     },
     {
       id: "steps",
       type: "steps",
-      heading: "Zo werkt AI Lichtadvies",
-      cta: "Maak mijn lichtplan",
+      heading: "Van maatvoering naar lichtplan in vier stappen",
+      intro:
+        "Geen uitgebreide lichtsoftware nodig voor een eerste projectvoorstel. Met onze online configurator werk je snel een praktische basisindeling uit.",
+      cta: "Maak een lichtplan",
       ctaHref: "/lichtadvies",
       items: [
         {
-          title: "Kies uw ruimte",
-          description:
-            "Vertel ons wat voor ruimte u wilt verlichten en welke uitstraling u zoekt.",
+          title: "Kies de ruimte",
+          description: "Selecteer de toepassing en het gewenste verlichtingsniveau.",
         },
         {
-          title: "Upload uw plattegrond",
-          description: "Upload eenvoudig een PDF, JPG of PNG.",
+          title: "Bepaal het plafondtype",
+          description:
+            "Kies een systeemplafond van 60×60 of 120×60 cm, of een vast plafond met opbouwarmaturen.",
         },
         {
-          title: "AI maakt een lichtvoorstel",
-          description:
-            "Het systeem berekent het benodigde lichtniveau en stelt een armaturenindeling voor.",
+          title: "Voer de maatvoering in",
+          description: "Vul lengte, breedte en plafondhoogte in of upload een bestaande plattegrond.",
         },
         {
-          title: "Ontvang lichtplan + offerte",
+          title: "Bekijk en pas je lichtplan aan",
           description:
-            "Na uw aanvraag controleert Lightsale het ontwerp en ontvangt u het uitgewerkte lichtplan met projectofferte.",
+            "De tool berekent een indicatief aantal armaturen en verdeelt deze automatisch. Pas de posities aan waar nodig en vraag vervolgens een projectofferte aan.",
         },
       ],
     },
     {
       id: "example",
       type: "example",
-      heading: "Voorbeeld van uw resultaat",
-      body: "U ziet vooraf hoe de verlichting over de ruimte wordt verdeeld en krijgt direct inzicht in het benodigde aantal armaturen.",
+      heading: "Voorbeeld van een lichtplan",
+      body: "Zo ziet een automatische verdeling eruit: armaturen op het plafondraster, indicatieve lichtverdeling en een materiaaloverzicht voor je werkvoorbereiding.",
       imageIds: [],
       resultExamples: Array.from({ length: 4 }, () => ({ mediaId: null })),
     },
     {
-      id: "benefits",
-      type: "benefits",
-      heading: "Waarom AI Lichtadvies?",
-      items: [
-        { title: "Snel eerste voorstel", description: "Binnen enkele minuten een indicatief lichtvoorstel." },
-        { title: "Lumenmethode", description: "Gebaseerd op oppervlakte, ruimtefunctie en gewenst luxniveau." },
-        { title: "Zelf aanpassen", description: "Verplaats armaturen en voeg downlights toe waar nodig." },
-        { title: "Light Indicator", description: "Indicatieve verdeling van licht over de ruimte." },
-        { title: "Direct inzicht", description: "Aantallen armaturen en een richtprijs op het scherm." },
-        { title: "Specialist controle", description: "Lightsale controleert uw aanvraag voordat u het definitieve plan ontvangt." },
-      ],
-    },
-    {
       id: "products",
       type: "products",
-      heading: "LED-panelen en downlights",
+      heading: "Armaturen in de configurator",
       intro:
-        "De publieke configurator werkt met een zorgvuldig beperkte selectie van bewezen kantoorproducten.",
+        "Een praktische selectie LED-panelen (595×595 mm) en downlights voor systeemplafond en vast plafond — passend bij veel kantoor- en utiliteitsprojecten.",
       items: [
-        { name: "LED-paneel 595×595 – 3000K", description: "Warm en comfortabel kantoorlicht." },
-        { name: "LED-paneel 595×595 – 4000K", description: "Helder en functioneel kantoorlicht." },
-        { name: "Downlight Ø220 – 3000K", description: "Accent en kleinere zones, warm wit." },
-        { name: "Downlight Ø220 – 4000K", description: "Accent en kleinere zones, neutraal wit." },
+        { name: "LED-paneel 595×595 – 3000K", description: "Warm wit voor comfortabele werkruimtes." },
+        { name: "LED-paneel 595×595 – 4000K", description: "Neutraal wit voor functionele omgevingen." },
+        { name: "Downlight Ø220 – 3000K", description: "Opbouw, warm wit — o.a. gangen en zones." },
+        { name: "Downlight Ø220 – 4000K", description: "Opbouw, neutraal wit — o.a. gangen en zones." },
       ],
     },
     {
       id: "trust",
       type: "text",
-      heading: "Lichtadvies met echte praktijkkennis",
-      body: `De AI Lichtadviseur combineert automatische berekeningen met de praktijkkennis van Lightsale. Na uw aanvraag controleren onze lichtspecialisten het voorstel voordat u het definitieve lichtplan en de projectofferte ontvangt. Meer over Lightsale: ${SITE_LINKS.lightsaleUrl}`,
+      heading: "Een handige tool voor je werkvoorbereiding",
+      body: `Of je nu verlichting voorbereidt voor een kantoor, entree, gangzone of algemene ruimte: met ledpaneel.nl maak je snel een eerste verlichtingsvoorstel.
+
+De configurator houdt rekening met de afmetingen van de ruimte, de plafondhoogte, het gekozen armatuur en het gewenste verlichtingsniveau.
+
+Bij systeemplafonds worden armaturen gekoppeld aan het plafondraster. Je kunt de voorgestelde indeling daarna zelf aanpassen aan de praktijksituatie.
+
+Zo heb je sneller een uitgangspunt voor je calculatie, materiaalkeuze en overleg met de opdrachtgever.`,
     },
     {
       id: "process",
-      type: "text",
-      heading: "Van gratis advies naar uw lichtplan",
-      body: "Gratis AI Lichtadvies maken → Resultaat bekijken op scherm → Lichtplan + projectofferte aanvragen. U ontvangt geen directe PDF-download; het definitieve lichtplan wordt na controle door Lightsale verstuurd.",
+      type: "cta",
+      heading: "Jij installeert. Wij denken mee.",
+      body: `Een goed lichtplan is meer dan alleen het aantal armaturen bepalen.
+
+Met ledpaneel.nl maak je zelfstandig een eerste ontwerp. Heb je ondersteuning nodig bij een complexere ruimte, specifieke armaturen, lichtregeling of een uitgebreid lichtontwerp? Dan kan het team van Lightsale met je meekijken.
+
+Wij ondersteunen installatiebedrijven met lichtadvies, armatuurselectie, lichtontwerpen en projectoffertes.`,
+      buttonText: "Vraag een projectofferte aan",
+      buttonHref: "/lichtadvies",
     },
     {
       id: "ai-calculator-cta",
       type: "ai-calculator-cta",
-      heading: "Uw eigen AI lichtcalculator?",
-      body: "Wilt u voor uw eigen organisatie, groothandel of verlichtingsmerk een vergelijkbare AI-calculator inzetten? Wij denken graag mee over een eigen configurator op basis van uw producten, huisstijl en rekenregels.",
-      buttonText: "Neem contact met ons op",
+      heading: "Een eigen online lichtplanner voor jouw klanten?",
+      body: "Met een digitale lichtconfigurator help je klanten sneller bij de eerste selectie van verlichting. Van ruimteafmetingen tot een indicatief lichtplan en materiaaloverzicht. Lightsale onderzoekt samen met je welke configuratie past bij jouw producten, klanten en commerciële proces.",
+      buttonText: "Bespreek de mogelijkheden",
       buttonHref: "/ai-calculator",
     },
     {
       id: "cta-bottom",
       type: "cta",
-      heading: "Klaar om te beginnen?",
-      body: "Start vrijblijvend met een indicatief lichtadvies voor uw kantoorruimte.",
-      buttonText: "Start gratis AI Lichtadvies",
+      heading: "Klaar voor je volgende project?",
+      body: "Start een indicatief lichtplan voor werkvoorbereiding — geen gecertificeerde lichtberekening, wel een concreet uitgangspunt.",
+      buttonText: "Start je lichtplan",
       buttonHref: "/lichtadvies",
     },
   ],
@@ -131,11 +155,19 @@ function page(slug: string, title: string, seoTitle: string, description: string
   };
 }
 
+const ROOM_DESCRIPTIONS: Record<(typeof ROOM_FUNCTIONS)[number]["id"], string> = {
+  workplace_office:
+    "Voor kantoorwerkplekken waar een gelijkmatige en comfortabele basisverlichting nodig is.",
+  reception_hall:
+    "Voor entrees, verkeersruimtes en ontvangstzones met functionele basisverlichting.",
+  other_spaces: "Voor algemene ruimtes waar een lager basisverlichtingsniveau volstaat.",
+};
+
 export const DEFAULT_WIZARD_CONTENT: CmsWizardContent = {
   roomChoices: ROOM_FUNCTIONS.map((room, index) => ({
     id: room.id,
     title: room.name,
-    description: "",
+    description: ROOM_DESCRIPTIONS[room.id],
     suggestedLux: room.suggestedLux,
     imageAlt: room.name,
     sortOrder: index,
@@ -176,7 +208,7 @@ export const DEFAULT_WIZARD_CONTENT: CmsWizardContent = {
 
 export const DEFAULT_NAVIGATION = {
   header: [
-    { label: "AI Lichtadvies", href: "/lichtadvies" },
+    { label: "Lichtplanner", href: "/lichtadvies" },
     { label: "Kantoorverlichting", href: "/kantoorverlichting" },
     { label: "LED-panelen", href: "/led-panelen" },
     { label: "Werkwijze", href: "/werkwijze" },
@@ -184,7 +216,7 @@ export const DEFAULT_NAVIGATION = {
   ],
   footer: [
     { label: "Home", href: "/home" },
-    { label: "AI Lichtadvies", href: "/lichtadvies" },
+    { label: "Lichtplanner", href: "/lichtadvies" },
     { label: "Kantoorverlichting", href: "/kantoorverlichting" },
     { label: "LED-panelen", href: "/led-panelen" },
     { label: "Werkwijze", href: "/werkwijze" },
@@ -202,14 +234,14 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
     "led-panelen": page(
       "/led-panelen",
       "LED-panelen",
-      "LED-panelen 595×595 | ledpaneel.nl",
-      "Informatie over LED-panelen voor kantoorverlichting. 3000K en 4000K, indicatief lichtadvies met AI.",
+      "LED-panelen systeemplafond 595×595 | ledpaneel.nl",
+      "LED-panelen voor systeemplafond en kantoorverlichting. Bereken indicatief aantal panelen en materiaalbegroting met de online lichtplanner.",
       [
         {
           id: "intro",
           type: "text",
-          heading: "LED-panelen voor kantoorverlichting",
-          body: "Onze AI Lichtadviseur werkt met standaard 595×595 mm LED-panelen in warm wit (3000K) en neutraal wit (4000K). Geschikt voor open kantoren, vergaderruimtes en andere werkruimtes.",
+          heading: "LED-panelen voor kantoor en utiliteit",
+          body: "De lichtplanner werkt met standaard 595×595 mm LED-panelen in warm wit (3000K) en neutraal wit (4000K). Geschikt voor open kantoren, vergaderruimtes, gangzones en andere utiliteitsruimtes met systeemplafond 60×60.",
         },
         {
           id: "products",
@@ -226,9 +258,9 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
         {
           id: "cta",
           type: "cta",
-          heading: "Bereken uw lichtplan",
-          body: "Upload uw plattegrond en ontvang een indicatief lichtadvies.",
-          buttonText: "Start gratis AI Lichtadvies",
+          heading: "LED-panelen berekenen",
+          body: "Maak een indicatief lichtplan met armatuurverdeling en materiaalbegroting voor jouw project.",
+          buttonText: "Start je lichtplan",
           buttonHref: "/lichtadvies",
         },
       ],
@@ -237,14 +269,16 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
     werkwijze: page(
       "/werkwijze",
       "Werkwijze",
-      "Zo werkt AI Lichtadvies | ledpaneel.nl",
-      "Stap voor stap uitleg van AI Lichtadvies: ruimte, sfeer, plattegrond, lichtplan en aanvraag.",
+      "Online lichtplan maken | Werkwijze | ledpaneel.nl",
+      "Van ruimtekeuze en plafondtype naar een indicatief lichtplan: werkwijze van de online lichtplanner voor installateurs.",
       [
         {
           id: "steps",
           type: "steps",
-          heading: "Zo werkt AI Lichtadvies",
-          cta: "Start gratis AI Lichtadvies",
+          heading: "Van maatvoering naar lichtplan in vier stappen",
+          intro:
+            "Geen uitgebreide lichtsoftware nodig voor een eerste projectvoorstel. Met onze online configurator werk je snel een praktische basisindeling uit.",
+          cta: "Maak een lichtplan",
           ctaHref: "/lichtadvies",
           items: DEFAULT_HOMEPAGE.blocks.find((b) => b.type === "steps")!.type === "steps"
             ? (DEFAULT_HOMEPAGE.blocks.find((b) => b.type === "steps") as import("@/types/cms").StepsBlock).items
@@ -253,22 +287,22 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
         {
           id: "disclaimer",
           type: "text",
-          heading: "Indicatief resultaat",
-          body: "Het AI Lichtadvies is indicatief en gebaseerd op de lumenmethode. Het definitieve lichtplan wordt door Lightsale gecontroleerd voordat u het ontvangt.",
+          heading: "Indicatief uitgangspunt",
+          body: "Het lichtplan is indicatief en bedoeld voor werkvoorbereiding. Het vervangt geen gecertificeerde lichtberekening of volledige toetsing aan NEN-EN 12464-1. Lightsale kan bij een projectofferte meekijken naar de definitieve invulling.",
         },
       ],
     ),
     "over-ons": page(
       "/over-ons",
       "Over ons",
-      "Over ledpaneel.nl | AI Lichtadvies",
-      "AI Lichtadvies ontwikkeld door Lightsale. Praktijkkennis in kantoorverlichting en lichtontwerp.",
+      "Over ledpaneel.nl | Online lichtplanner",
+      "Online lichtplanner voor installateurs, ontwikkeld door Lightsale. Praktijkkennis in kantoor- en projectverlichting.",
       [
         {
           id: "intro",
           type: "text",
-          heading: "AI Lichtadvies ontwikkeld door Lightsale",
-          body: "ledpaneel.nl biedt bedrijven een snelle manier om een indicatief lichtplan te maken. Het systeem is ontwikkeld vanuit de lichtontwerppraktijk van Lightsale, waar lichtspecialisten dagelijks werken aan kantoor- en projectverlichting.",
+          heading: "De online lichtplanner voor de elektrotechnische professional",
+          body: `ledpaneel.nl helpt installateurs en werkvoorbereiders snel een eerste verlichtingsvoorstel te maken: armatuurverdeling, indicatieve lux en materiaalbegroting. De tool is ontwikkeld vanuit de lichtpraktijk van Lightsale (${SITE_LINKS.lightsaleUrl}), waar specialisten dagelijks werken aan kantoor- en utiliteitsprojecten.`,
         },
       ],
     ),
@@ -276,20 +310,20 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
       "/contact",
       "Contact",
       "Contact | ledpaneel.nl",
-      "Neem contact op over AI Lichtadvies of kantoorverlichting.",
+      "Contact over de lichtplanner, lichtadvies of kantoorverlichting voor installatieprojecten.",
       [
         {
           id: "intro",
           type: "text",
           heading: "Contact",
-          body: `Vragen over AI Lichtadvies? Mail naar info@ledpaneel.nl of start direct uw indicatief lichtplan online.`,
+          body: `Vragen over de lichtplanner of ondersteuning bij een project? Mail naar info@ledpaneel.nl of start direct een lichtplan online.`,
         },
         {
           id: "cta",
           type: "cta",
           heading: "Direct aan de slag",
-          body: "Maak gratis een indicatief lichtadvies voor uw kantoor.",
-          buttonText: "Start gratis AI Lichtadvies",
+          body: "Maak een indicatief lichtplan voor je werkvoorbereiding.",
+          buttonText: "Start je lichtplan",
           buttonHref: "/lichtadvies",
         },
       ],
@@ -298,29 +332,29 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
       "/privacy",
       "Privacyverklaring",
       "Privacyverklaring | ledpaneel.nl",
-      "Privacyverklaring van ledpaneel.nl en AI Lichtadvies.",
+      "Privacyverklaring van ledpaneel.nl en de online lichtplanner.",
       [
         {
           id: "privacy",
           type: "text",
           heading: "Privacyverklaring",
-          body: "Wij verwerken uw gegevens uitsluitend voor het opstellen van een indicatief lichtadvies en projectofferte. Gegevens worden niet gedeeld met derden, behalve waar nodig voor uitvoering van uw aanvraag door Lightsale. Voor vragen: info@ledpaneel.nl.",
+          body: "Wij verwerken je gegevens uitsluitend voor het opstellen van een indicatief lichtplan en projectofferte. Gegevens worden niet gedeeld met derden, behalve waar nodig voor uitvoering van je aanvraag door Lightsale. Voor vragen: info@ledpaneel.nl.",
         },
       ],
     ),
     "ai-calculator": page(
       "/ai-calculator",
-      "Uw eigen AI lichtcalculator",
-      "Eigen AI lichtcalculator voor verlichting | Lightsale",
-      "Een AI lichtcalculator of productconfigurator voor uw eigen assortiment? Lightsale ontwikkelt maatwerk calculators met lichtplan, prijzen en leadgeneratie.",
+      "Eigen lichtconfigurator",
+      "Eigen online lichtplanner voor installateurs en leveranciers | Lightsale",
+      "Digitale lichtconfigurator voor installatiebedrijven, groothandels en leveranciers. Indicatief lichtplan en materiaaloverzicht voor je klanten.",
       [
         {
           id: "hero",
           type: "hero",
-          headline: "Uw eigen AI lichtcalculator",
+          headline: "Een eigen online lichtplanner voor jouw klanten?",
           subheadline:
-            "Een slimme configurator voor uw eigen assortiment, merk of klantomgeving.",
-          primaryCta: "Bespreek mijn AI-calculator",
+            "Met een digitale lichtconfigurator help je klanten sneller bij de eerste selectie van verlichting. Van ruimteafmetingen tot een indicatief lichtplan en materiaaloverzicht.",
+          primaryCta: "Bespreek de mogelijkheden",
           primaryCtaHref: "#ai-calculator-form",
           secondaryCta: "",
           secondaryCtaHref: "",
@@ -328,28 +362,28 @@ export const DEFAULT_CMS_SITE: CmsSiteContent = {
         {
           id: "intro",
           type: "rich-text",
-          html: "<p>Lightsale ontwikkelt maatwerk AI-calculators waarmee uw klanten of medewerkers snel een indicatief lichtplan maken. Denk aan een eigen productselectie, huisstijl en rekenregels — zonder overdreven beloftes, wel met een professionele flow van plattegrond naar offerteaanvraag.</p>",
+          html: "<p>Lightsale onderzoekt samen met je welke configuratie past bij jouw producten, klanten en commerciële proces. Denk aan eigen assortiment, huisstijl en rekenregels — met een professionele flow van maatvoering naar offerteaanvraag.</p>",
         },
         {
           id: "benefits",
           type: "benefits",
-          heading: "Wat kunt u inrichten?",
+          heading: "Wat kun je inrichten?",
           items: [
-            { title: "Eigen producten", description: "Uw assortiment, specificaties en prijslogica." },
-            { title: "Eigen huisstijl", description: "Look & feel passend bij uw merk of klantomgeving." },
-            { title: "Lichtplan-output", description: "Indicatieve plattegrond, armaturenindeling en rapportage." },
+            { title: "Eigen producten", description: "Jouw assortiment, specificaties en prijslogica." },
+            { title: "Eigen huisstijl", description: "Look & feel passend bij je merk of klantomgeving." },
+            { title: "Lichtplan-output", description: "Indicatieve plattegrond, armatuurverdeling en rapportage." },
             { title: "Offerteaanvragen", description: "Leadgeneratie met gecontroleerde opvolging." },
             { title: "Koppelingen", description: "Integratie met CRM, ERP of interne systemen waar gewenst." },
-            { title: "Eigen domein", description: "Publicatie onder uw merk of subdomain." },
+            { title: "Eigen domein", description: "Publicatie onder jouw merk of subdomain." },
           ],
         },
         {
           id: "form",
           type: "ai-calculator-form",
-          heading: "Bespreek mijn AI-calculator",
+          heading: "Bespreek de mogelijkheden",
           intro:
-            "Vertel kort wat u zoekt. We nemen contact op om mogelijkheden, scope en planning te bespreken.",
-          submitButtonText: "Bespreek mijn AI-calculator",
+            "Vertel kort wat je zoekt. We nemen contact op om mogelijkheden, scope en planning te bespreken.",
+          submitButtonText: "Verstuur aanvraag",
         },
       ],
     ),

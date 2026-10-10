@@ -5,6 +5,7 @@ import { CEILING_TYPES, getCeilingType } from "@/lib/public-wizard/ceiling-types
 import { getCeilingFallback } from "@/lib/ledpaneel/fallback-images";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardNav } from "@/components/public-wizard/WizardShell";
+import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
 import type { CeilingTypeId } from "@/types/public-wizard";
 
 interface WizardCeilingChoiceView {
@@ -54,10 +55,8 @@ export function StepCeiling() {
 
   return (
     <div>
-      <h1 className="lp-heading-2 mb-2">Welk type plafond heeft uw ruimte?</h1>
-      <p className="lp-body mb-6">
-        Selecteer het type plafond. Wij kiezen automatisch de passende verlichting en maken een lichtplan.
-      </p>
+      <h1 className="lp-heading-2 mb-2">{WIZARD_COPY.ceiling.title}</h1>
+      <p className="lp-body mb-6">{WIZARD_COPY.ceiling.intro}</p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {ceilingChoices.map((item) => {

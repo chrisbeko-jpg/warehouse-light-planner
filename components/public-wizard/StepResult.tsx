@@ -15,6 +15,8 @@ import { createRoomPolygon } from "@/lib/public-wizard/placement";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { formatMetersNl } from "@/lib/public-wizard/viewport";
 import { WizardCard, WizardNav } from "@/components/public-wizard/WizardShell";
+import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
+import { getPublicProduct } from "@/lib/public-wizard/products";
 
 export function StepResult() {
   const roomFunction = usePublicWizardStore((s) => s.roomFunction);
@@ -54,57 +56,47 @@ export function StepResult() {
       ? `${formatMetersNl(manualDimensions.lengthM)} × ${formatMetersNl(manualDimensions.widthM)} m`
       : null;
 
-  const requiredCount = result.requiredFixtureCount ?? requiredFixtureCount;
   const luxShortfall = !result.meetsTarget;
 
   return (
     <div>
-      <h1 className="lp-heading-2 mb-2">Indicatief resultaat</h1>
-      <p className="lp-body mb-6">
-        Onderstaande waarden zijn gebaseerd op daadwerkelijk geplaatste armaturen.
-      </p>
+      <h1 className="lp-heading-2 mb-2">{WIZARD_COPY.result.title}</h1>
+      <p className="lp-body mb-6">{WIZARD_COPY.result.intro}</p>
 
       <WizardCard className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          {roomMeta && <Stat label="Ruimte" value={roomMeta.name} />}
-          {ceilingType && <Stat label="Plafond" value={getCeilingType(ceilingType).title} />}
+          {roomMeta && <Stat label="Ruimtefunctie" value={roomMeta.name} />}
+          {ceilingType && <Stat label="Plafondtype" value={getCeilingType(ceilingType).title} />}
           {dimensionLabel && <Stat label="Afmetingen" value={dimensionLabel} />}
           <Stat label="Oppervlakte" value={`${formatMetersNl(result.areaM2, 1)} m²`} />
           <Stat label="Plafondhoogte" value={`${formatMetersNl(ceilingHeightM)} m`} />
-          <Stat label="Doel lux" value={`${result.targetLux} lux`} />
-          {requiredCount != null && (
-            <>
-              <Stat label="Theoretisch benodigd" value={`${requiredCount} armaturen`} />
-              <Stat label="Gekozen nette verdeling" value={`${result.fixtureCount} armaturen`} />
-            </>
-          )}
+          <Stat label="Gewenst luxniveau" value={`${result.targetLux} lux`} />
+          <Stat label="Aantal armaturen" value={`${result.fixtureCount}`} />
           {atmosphereMeta && (
             <>
-              <Stat label="Sfeer" value={atmosphereMeta.title} />
-              <Stat label="Lichtkleur" value={atmosphereMeta.subtitle.replace(/^LED-panelen ·\s*/i, "")} />
+              <Stat label="Lichtkleur" value={`${atmosphereMeta.title} (${atmosphereMeta.cctLabel})`} />
+              {fixtures[0] && (
+                <Stat label="Geselecteerd armatuur" value={getPublicProduct(fixtures[0].productId).name} />
+              )}
             </>
           )}
-          <Stat label="Totaal vermogen" value={`${result.totalWattage} W`} />
-          <Stat label="Indicatieve gemiddelde verlichting" value={`${result.indicativeAverageLux} lux`} />
+          <Stat label="Indicatieve gemiddelde lux" value={`${result.indicativeAverageLux} lux`} />
+          {fixtures[0] && (
+            <Stat
+              label="Bruto adviesprijs per armatuur"
+              value={`€ ${getPublicProduct(fixtures[0].productId).unitPriceEuro.toFixed(2)}`}
+            />
+          )}
           {luxShortfall && (
             <p className="col-span-full text-sm text-[var(--lp-warn)]" data-testid="lux-shortfall">
               De gekozen nette indeling haalt het luxdoel indicatief niet: {result.indicativeAverageLux} lux
               bij een doel van {result.targetLux} lux. Dit is geen formele EN 12464-1-validatie.
             </p>
           )}
-          <Stat
-            label="Resultaat"
-            value={
-              result.meetsTarget
-                ? "Voldoet aan de ingestelde doelwaarde"
-                : "Onder de ingestelde doelwaarde"
-            }
-            highlight={result.meetsTarget}
-          />
         </div>
 
         <div>
-          <h3 className="mb-2 text-sm font-semibold">Producten</h3>
+          <h3 className="mb-2 text-sm font-semibold">Materiaalbegroting</h3>
           <ul className="space-y-1 text-sm text-[var(--lp-text-secondary)]">
             {price.lines.map((line) => (
               <li key={line.productId}>
@@ -115,14 +107,17 @@ export function StepResult() {
         </div>
 
         <div className="rounded-xl bg-[var(--lp-editor-bg)] p-4 text-white">
-          <p className="text-sm text-white/70">Indicatieve materiaalprijs</p>
+          <p className="text-sm text-white/70">Indicatieve materiaalsom exclusief btw</p>
           <p className="text-2xl font-bold text-[var(--lp-green)]">{formatMaterialPrice(price)}</p>
           <p className="mt-2 text-xs text-white/80">{MATERIAL_PRICE_DISCLAIMER}</p>
           <p className="mt-1 text-xs text-white/70">{MATERIAL_PRICE_FOOTNOTE}</p>
         </div>
 
+        <p className="text-xs text-[var(--lp-text-secondary)]">{WIZARD_COPY.result.preparationNote}</p>
         <p className="text-xs text-[var(--lp-text-secondary)]">{CALCULATION_DISCLAIMER}</p>
       </WizardCard>
+
+      <p className="mt-4 text-sm text-[var(--lp-text-secondary)]">{WIZARD_COPY.request.successSub}</p>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
@@ -133,7 +128,7 @@ export function StepResult() {
         >
           Lichtplan aanpassen
         </button>
-        <WizardNav nextLabel="Aanvragen" onNext={() => nextStep()} showPrev={false} />
+        <WizardNav nextLabel={WIZARD_COPY.result.requestCta} onNext={() => nextStep()} showPrev={false} />
       </div>
     </div>
   );

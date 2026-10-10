@@ -11,7 +11,7 @@ test.describe("Atmosphere step", () => {
     await startWizard(page);
     await selectRoom(page, "workplace_office");
     await page.getByTestId("wizard-next-button").click();
-    await expect(page.getByRole("heading", { name: "Welke sfeer zoekt u?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welke lichtkleur past bij het project?" })).toBeVisible();
   }
 
   test("warm and neutraal are selectable", async ({ page }) => {
@@ -76,24 +76,24 @@ test.describe("AI Calculator B2B", () => {
     const b2b = page.getByTestId("ai-calculator-cta");
     await expect(hero).toBeVisible();
     await expect(b2b).toBeVisible();
-    await expect(b2b.getByRole("heading", { name: "Uw eigen AI lichtcalculator?" })).toBeVisible();
+    await expect(b2b.getByRole("heading", { name: "Een eigen online lichtplanner voor jouw klanten?" })).toBeVisible();
     const heroBox = await hero.boundingBox();
     const b2bBox = await b2b.boundingBox();
     expect((b2bBox?.y ?? 0) > (heroBox?.y ?? 0)).toBeTruthy();
   });
 
-  test("homepage primary CTA remains AI Lichtadvies", async ({ page }) => {
+  test("homepage primary CTA links to lichtplanner", async ({ page }) => {
     await page.goto("/home");
-    const primary = page.getByRole("link", { name: "Start gratis AI Lichtadvies" }).first();
+    const primary = page.getByRole("link", { name: "Start je lichtplan" }).first();
     await expect(primary).toBeVisible();
     await expect(primary).toHaveAttribute("href", "/lichtadvies");
   });
 
   test("B2B CTA opens ai-calculator page", async ({ page }) => {
     await page.goto("/home");
-    await page.getByTestId("ai-calculator-cta").getByRole("link", { name: "Neem contact met ons op" }).click();
+    await page.getByTestId("ai-calculator-cta").getByRole("link", { name: "Bespreek de mogelijkheden" }).click();
     await expect(page).toHaveURL(/\/ai-calculator/);
-    await expect(page.getByRole("heading", { name: "Uw eigen AI lichtcalculator", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Een eigen online lichtplanner voor jouw klanten?", level: 1 })).toBeVisible();
   });
 
   test("ai-calculator form submits successfully", async ({ page }) => {

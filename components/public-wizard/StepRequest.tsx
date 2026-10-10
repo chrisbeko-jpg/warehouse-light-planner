@@ -10,6 +10,7 @@ import {
 } from "@/lib/public-wizard/lead-form";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardCard, WizardNav } from "@/components/public-wizard/WizardShell";
+import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
 import type { LeadContactForm } from "@/types/public-wizard";
 
 const EMPTY_FORM: LeadContactForm = {
@@ -148,11 +149,8 @@ export function StepRequest() {
   if (submitReference) {
     return (
       <WizardCard className="text-center">
-        <h1 className="mb-4 text-2xl font-bold">Bedankt voor uw aanvraag.</h1>
-        <p className="mb-4 text-[var(--lp-text-secondary)]">
-          Lightsale controleert het lichtplan en de productspecificatie. U ontvangt vervolgens het
-          uitgewerkte lichtplan samen met een projectofferte.
-        </p>
+        <h1 className="mb-4 text-2xl font-bold">{WIZARD_COPY.request.successTitle}</h1>
+        <p className="mb-4 text-[var(--lp-text-secondary)]">{WIZARD_COPY.request.successBody}</p>
         <p className="font-semibold">Referentie: {submitReference}</p>
         <p className="text-sm text-[var(--lp-text-secondary)]">Bevestiging verzonden naar: {submitEmail}</p>
       </WizardCard>
@@ -161,11 +159,8 @@ export function StepRequest() {
 
   return (
     <div>
-      <h1 className="lp-heading-2 mb-2">Ontvang mijn lichtplan + projectofferte</h1>
-      <p className="lp-body mb-4">
-        Vul uw gegevens in. U ontvangt geen directe PDF-download — Lightsale stuurt het uitgewerkte
-        plan na controle.
-      </p>
+      <h1 className="lp-heading-2 mb-2">{WIZARD_COPY.request.title}</h1>
+      <p className="lp-body mb-4">{WIZARD_COPY.request.intro}</p>
 
       <WizardCard className="grid gap-3 sm:grid-cols-2">
         <Field label="Bedrijfsnaam *" value={form.companyName} onChange={(v) => update({ companyName: v })} />
@@ -259,7 +254,7 @@ export function StepRequest() {
         </button>
         <WizardNav
           showPrev
-          nextLabel={submitting ? "Versturen…" : "Ontvang lichtplan + offerte"}
+          nextLabel={submitting ? "Versturen…" : WIZARD_COPY.result.requestCta}
           nextDisabled={submitting}
           onNext={() => void handleSubmit()}
         />

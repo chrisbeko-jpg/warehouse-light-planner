@@ -46,6 +46,9 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
                   </Link>
                 )}
               </div>
+              {block.supportLine?.trim() && (
+                <p className="mt-4 text-sm text-[var(--lp-text-secondary)]">{block.supportLine}</p>
+              )}
             </div>
             <CmsImage
               media={resolveMediaWithFallback(images, block, getHeroFallback(block.id), {
@@ -113,7 +116,12 @@ export function ContentBlockRenderer({ block, site }: { block: ContentBlock; sit
       return (
         <section className="lp-section">
           <div className="lp-container">
-            <h2 className="lp-heading-2 mb-8 text-center">{block.heading}</h2>
+            <h2 className="lp-heading-2 mb-4 text-center">{block.heading}</h2>
+            {block.intro?.trim() && (
+              <p className="lp-body mx-auto mb-8 max-w-2xl text-center text-[var(--lp-text-secondary)]">
+                {block.intro}
+              </p>
+            )}
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {block.items.map((item, i) => (
                 <article key={item.title} className="lp-card p-5">

@@ -8,6 +8,7 @@ import {
   formatMetersNl,
   parseDimensionMeters,
 } from "@/lib/public-wizard/viewport";
+import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
 
 function parseField(value: string, max: number): number | null {
   return parseDimensionMeters(value, { max, min: DIMENSION_LIMITS.minM });
@@ -95,8 +96,8 @@ export function StepManualDimensions() {
 
   return (
     <div>
-      <h1 className="lp-heading-2 mb-2">Wat zijn de afmetingen van de ruimte?</h1>
-      <p className="lp-body mb-6">Vul lengte, breedte en plafondhoogte in meters in.</p>
+      <h1 className="lp-heading-2 mb-2">{WIZARD_COPY.dimensions.title}</h1>
+      <p className="lp-body mb-6">{WIZARD_COPY.dimensions.intro}</p>
 
       <WizardCard className="grid gap-4 sm:grid-cols-3">
         <label className="block text-sm font-medium">
@@ -154,15 +155,16 @@ export function StepManualDimensions() {
       </p>
 
       {loading && (
-        <p className="mt-3 text-sm text-[var(--lp-text-secondary)]" data-testid="manual-plan-loading">
-          Uw lichtplan wordt gemaakt…
-        </p>
+        <div className="mt-3 text-sm text-[var(--lp-text-secondary)]" data-testid="manual-plan-loading">
+          <p>{WIZARD_COPY.dimensions.loading}</p>
+          <p className="mt-1 text-xs">{WIZARD_COPY.dimensions.loadingSub}</p>
+        </div>
       )}
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       <WizardNav
-        nextLabel={loading ? "Bezig…" : "Maak mijn lichtplan"}
+        nextLabel={loading ? "Bezig…" : WIZARD_COPY.dimensions.submit}
         nextDisabled={loading || !parsed.lengthM || !parsed.widthM || !parsed.ceilingHeightM}
         onNext={submit}
       />

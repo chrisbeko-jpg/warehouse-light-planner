@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { PublicWizard } from "@/components/public-wizard/PublicWizard";
 
 export const metadata: Metadata = {
-  title: "AI Lichtadvies",
+  title: "Online lichtplan maken | Lichtplanner",
   description:
-    "Start gratis AI Lichtadvies: upload uw plattegrond en ontvang een indicatief lichtplan voor uw kantoor.",
+    "Stel je lichtplan samen: ruimte, plafondtype en maatvoering naar armatuurverdeling, indicatieve lux en materiaalbegroting voor installateurs.",
 };
 
 export default function LichtadviesPage() {

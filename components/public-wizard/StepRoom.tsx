@@ -5,11 +5,13 @@ import { getRoomFunction, ROOM_FUNCTIONS } from "@/lib/public-wizard/room-functi
 import { getRoomFallback } from "@/lib/ledpaneel/fallback-images";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardNav } from "@/components/public-wizard/WizardShell";
+import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
 import type { RoomFunctionId } from "@/types/public-wizard";
 
 interface WizardRoomChoiceView {
   id: string;
   title: string;
+  description?: string;
   suggestedLux: number;
   imageUrl: string | null;
   imageAlt: string;
@@ -35,6 +37,7 @@ export function StepRoom() {
       return ROOM_FUNCTIONS.map((room) => ({
         id: room.id,
         title: room.name,
+        description: WIZARD_COPY.room.descriptions[room.id],
         suggestedLux: room.suggestedLux,
         imageUrl: getRoomFallback(room.id),
         imageAlt: room.name,
@@ -45,8 +48,8 @@ export function StepRoom() {
 
   return (
     <div>
-      <h1 className="lp-heading-2 mb-2">Welke ruimte wilt u verlichten?</h1>
-      <p className="lp-body mb-5">Kies het luxniveau dat past bij uw ruimte.</p>
+      <h2 className="lp-heading-2 mb-2">{WIZARD_COPY.room.title}</h2>
+      <p className="lp-body mb-5">{WIZARD_COPY.room.intro}</p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {roomChoices.map((room) => {
@@ -82,11 +85,20 @@ export function StepRoom() {
               <div className="space-y-0.5 p-3">
                 <p className="text-sm font-bold leading-tight">{room.title}</p>
                 <p className="text-xs font-semibold text-[var(--lp-green-dark)]">{room.suggestedLux} lux</p>
+                {(room.description?.trim() ||
+                  WIZARD_COPY.room.descriptions[room.id as keyof typeof WIZARD_COPY.room.descriptions]) && (
+                  <p className="text-xs text-[var(--lp-text-secondary)]">
+                    {room.description?.trim() ||
+                      WIZARD_COPY.room.descriptions[room.id as keyof typeof WIZARD_COPY.room.descriptions]}
+                  </p>
+                )}
               </div>
             </button>
           );
         })}
       </div>
+
+      <p className="mt-4 text-xs text-[var(--lp-text-secondary)]">{WIZARD_COPY.room.luxDisclaimer}</p>
 
       <WizardNav
         nextDisabled={!roomFunction}

@@ -34,7 +34,7 @@ export function LedpaneelHeader() {
           ))}
         </nav>
         <Link href="/lichtadvies" className="lp-btn-primary shrink-0 text-sm">
-          {isWizard ? "AI Lichtadvies" : "Start gratis AI Lichtadvies"}
+          {isWizard ? "Lichtplanner" : "Start je lichtplan"}
         </Link>
       </div>
     </header>

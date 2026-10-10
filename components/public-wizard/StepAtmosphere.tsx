@@ -6,6 +6,7 @@ import { ATMOSPHERES, getAtmosphere } from "@/lib/public-wizard/atmospheres";
 import { getAtmosphereFallback } from "@/lib/ledpaneel/fallback-images";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardNav } from "@/components/public-wizard/WizardShell";
+import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
 import type { AtmosphereId } from "@/types/public-wizard";
 
 interface WizardAtmosphereChoiceView {
@@ -70,10 +71,8 @@ export function StepAtmosphere() {
 
   return (
     <div>
-      <h1 className="lp-heading-2 mb-2">Welke sfeer zoekt u?</h1>
-      <p className="lp-body mb-6">
-        Kies warm of helder functioneel. Premium architectonisch volgt later.
-      </p>
+      <h1 className="lp-heading-2 mb-2">{WIZARD_COPY.atmosphere.title}</h1>
+      <p className="lp-body mb-6">{WIZARD_COPY.atmosphere.intro}</p>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {atmosphereChoices.map((item) => {

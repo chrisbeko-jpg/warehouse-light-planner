@@ -14,6 +14,7 @@ import { StepManualDimensions } from "@/components/public-wizard/StepManualDimen
 import { StepFloorPlanUpload } from "@/components/public-wizard/StepFloorPlanUpload";
 import { StepResult } from "@/components/public-wizard/StepResult";
 import { StepRequest } from "@/components/public-wizard/StepRequest";
+import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
 
 const StepEditor = dynamic(
   () => import("@/components/public-wizard/StepEditor").then((m) => m.StepEditor),
@@ -48,12 +49,22 @@ export function PublicWizard() {
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <LedpaneelLogo size="sm" />
-          <p className="mt-2 text-sm font-semibold text-[var(--lp-green-dark)]">AI Lichtadvies</p>
-          <p className="text-sm text-[var(--lp-text-secondary)]">
-            Indicatief lichtadvies — het definitieve lichtplan wordt door Lightsale gecontroleerd.
-          </p>
+          <p className="mt-2 text-sm font-semibold text-[var(--lp-green-dark)]">{WIZARD_COPY.headerTitle}</p>
+          <p className="text-sm text-[var(--lp-text-secondary)]">{WIZARD_COPY.headerSubtitle}</p>
         </div>
       </header>
+      {step === "room" && (
+        <div className="mb-6">
+          <h1 className="lp-heading-2 mb-2">Stel je lichtplan samen</h1>
+          <p className="lp-body">
+            Selecteer de ruimte, het plafondtype en de afmetingen. Wij berekenen een eerste armatuurvoorstel en
+            verdelen de verlichting automatisch over de ruimte.
+          </p>
+          <p className="mt-2 text-sm text-[var(--lp-text-secondary)]">
+            Je kunt de voorgestelde armatuurposities daarna zelf aanpassen.
+          </p>
+        </div>
+      )}
       <div className="mb-8">
         <WizardProgress />
       </div>

@@ -16,10 +16,10 @@ import {
 } from "./helpers/wizard";
 
 test.describe("Public LED site & wizard", () => {
-  test("homepage shows AI Lichtadvies proposition", async ({ page }) => {
+  test("homepage shows lichtplanner proposition", async ({ page }) => {
     await page.goto("/home");
-    await expect(page.getByRole("heading", { name: /Van plattegrond naar lichtplan met AI/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Start gratis AI Lichtadvies" }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Professioneel lichtplan/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Start je lichtplan" }).first()).toBeVisible();
   });
 
   test("room function selection sets target lux", async ({ page }) => {

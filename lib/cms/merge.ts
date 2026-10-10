@@ -1,7 +1,6 @@
 import { DEFAULT_CMS_SITE } from "@/lib/cms/defaults";
 import { normalizeContentBlock, normalizeSiteMediaPayload } from "@/lib/cms/normalize-media";
 import { EXAMPLE_IMAGE_SLOT_COUNT, readMediaId } from "@/lib/cms/media";
-import { KANTOORVERLICHTING_SEED } from "@/lib/cms/seeds/kantoorverlichting";
 import { normalizeRoomFunctionId } from "@/lib/public-wizard/room-functions";
 import type { RoomFunctionId } from "@/types/public-wizard";
 import type {
@@ -22,6 +21,7 @@ import type {
   TextImageBlock,
   WideImageBlock,
 } from "@/types/cms";
+import { MARKETING_COPY_GENERATION } from "@/types/cms";
 
 function migrateLegacyAtmosphereIds(byId: Map<string, WizardAtmosphereChoiceCms>): void {
   const legacyNeutral = byId.get("neutral");
@@ -74,6 +74,10 @@ function mergeAtmosphereChoices(
       imageId: mediaId ?? undefined,
     };
 
+    merged.title = storedItem.title?.trim() ? storedItem.title : defaultItem.title;
+    merged.subtitle = storedItem.subtitle?.trim() ? storedItem.subtitle : defaultItem.subtitle;
+    merged.description = storedItem.description?.trim() ? storedItem.description : defaultItem.description;
+
     if (defaultItem.id === "premium_architectural") {
       return { ...merged, enabled: merged.enabled === true };
     }
@@ -111,6 +115,8 @@ function mergeRoomChoices(
       ...defaultItem,
       ...storedItem,
       id: defaultItem.id,
+      title: storedItem.title?.trim() ? storedItem.title : defaultItem.title,
+      description: storedItem.description?.trim() ? storedItem.description : defaultItem.description,
       suggestedLux: defaultItem.suggestedLux,
       mediaId,
       imageId: mediaId ?? undefined,
@@ -176,26 +182,85 @@ export function mergeWizardContent(stored?: Partial<CmsWizardContent>): CmsWizar
   };
 }
 
-function mergeKantoorPage(stored?: CmsPage): CmsPage {
-  const seed = KANTOORVERLICHTING_SEED;
-  if (!stored) return seed;
-  return {
-    ...seed,
+function refreshMarketingMerge(defaultBlock: ContentBlock, storedBlock: ContentBlock): ContentBlock {
+  if (defaultBlock.type !== storedBlock.type) return normalizeContentBlock(defaultBlock);
+
+  let merged = {
+    ...storedBlock,
+    ...defaultBlock,
+    id: defaultBlock.id,
+    type: defaultBlock.type,
+  } as ContentBlock;
+
+  if (merged.type === "hero" && storedBlock.type === "hero") {
+    merged = mergeMediaFields(defaultBlock as HeroBlock, merged as HeroBlock);
+  }
+  if (
+    (merged.type === "text-image" || merged.type === "image-text") &&
+    storedBlock.type === merged.type
+  ) {
+    merged = mergeMediaFields(defaultBlock as TextImageBlock, merged as TextImageBlock);
+  }
+  if (merged.type === "wide-image" && storedBlock.type === "wide-image") {
+    merged = mergeMediaFields(defaultBlock as WideImageBlock, merged as WideImageBlock);
+  }
+  if (merged.type === "example" && storedBlock.type === "example") {
+    merged = mergeExampleBlock(defaultBlock as ExampleBlock, storedBlock as ExampleBlock);
+  }
+  if (merged.type === "products" && storedBlock.type === "products") {
+    merged = mergeProductsBlock(defaultBlock as ProductsBlock, storedBlock as ProductsBlock);
+  }
+
+  return merged;
+}
+
+function mergePageBlocks(
+  defaultBlocks: ContentBlock[],
+  storedBlocks?: ContentBlock[],
+  marketingRefresh?: boolean,
+): ContentBlock[] {
+  if (!storedBlocks?.length) return defaultBlocks.map(normalizeContentBlock);
+  const storedById = new Map(storedBlocks.map((block) => [block.id, block]));
+  const merged: ContentBlock[] = defaultBlocks.map((defaultBlock) => {
+    const stored = storedById.get(defaultBlock.id);
+    if (!stored || stored.type !== defaultBlock.type) return normalizeContentBlock(defaultBlock);
+    const block = marketingRefresh
+      ? refreshMarketingMerge(defaultBlock, stored)
+      : mergeContentBlock(defaultBlock, stored);
+    return normalizeContentBlock(block);
+  });
+  for (const stored of storedBlocks) {
+    if (!defaultBlocks.some((block) => block.id === stored.id)) {
+      merged.push(normalizeContentBlock(stored));
+    }
+  }
+  return merged;
+}
+
+function mergeCmsPage(defaultPage: CmsPage, stored?: Partial<CmsPage>): CmsPage {
+  const marketingRefresh = (stored?.marketingCopyGeneration ?? 0) < MARKETING_COPY_GENERATION;
+  const merged: CmsPage = {
+    ...defaultPage,
     ...stored,
-    seo: { ...seed.seo, ...stored.seo },
-    blocks: mergePageBlocks(seed.blocks, stored.blocks),
+    seo: marketingRefresh
+      ? { ...stored?.seo, ...defaultPage.seo }
+      : { ...defaultPage.seo, ...stored?.seo },
+    blocks: mergePageBlocks(defaultPage.blocks, stored?.blocks, marketingRefresh),
+    marketingCopyGeneration: MARKETING_COPY_GENERATION,
   };
+
+  if (marketingRefresh) {
+    merged.title = defaultPage.title;
+    if (defaultPage.intro !== undefined) merged.intro = defaultPage.intro;
+    if (defaultPage.primaryCtaText !== undefined) merged.primaryCtaText = defaultPage.primaryCtaText;
+    if (defaultPage.primaryCtaHref !== undefined) merged.primaryCtaHref = defaultPage.primaryCtaHref;
+  }
+
+  return merged;
 }
 
 export function mergeSitePayload(stored?: Partial<CmsSitePayload>): CmsSitePayload {
-  const defaults = mergeSitePayloadDefaults(stored);
-  return normalizeSiteMediaPayload({
-    ...defaults,
-    pages: {
-      ...defaults.pages,
-      kantoorverlichting: mergeKantoorPage(stored?.pages?.kantoorverlichting),
-    },
-  });
+  return normalizeSiteMediaPayload(mergeSitePayloadDefaults(stored));
 }
 
 function mergeExampleBlock(defaultBlock: ExampleBlock, storedBlock: ExampleBlock): ExampleBlock {
@@ -291,30 +356,9 @@ function mergeContentBlock(defaultBlock: ContentBlock, storedBlock: ContentBlock
   return merged;
 }
 
-function mergePageBlocks(defaultBlocks: ContentBlock[], storedBlocks?: ContentBlock[]): ContentBlock[] {
-  if (!storedBlocks?.length) return defaultBlocks.map(normalizeContentBlock);
-  const storedById = new Map(storedBlocks.map((block) => [block.id, block]));
-  const merged: ContentBlock[] = defaultBlocks.map((defaultBlock) => {
-    const stored = storedById.get(defaultBlock.id);
-    if (!stored || stored.type !== defaultBlock.type) return normalizeContentBlock(defaultBlock);
-    return normalizeContentBlock(mergeContentBlock(defaultBlock, stored));
-  });
-  for (const stored of storedBlocks) {
-    if (!defaultBlocks.some((block) => block.id === stored.id)) {
-      merged.push(normalizeContentBlock(stored));
-    }
-  }
-  return merged;
-}
-
 function mergeHomepage(stored?: Partial<CmsPage>): CmsPage {
   const defaults = DEFAULT_CMS_SITE.homepage;
-  const merged: CmsPage = {
-    ...defaults,
-    ...stored,
-    seo: { ...defaults.seo, ...stored?.seo },
-    blocks: mergePageBlocks(defaults.blocks, stored?.blocks),
-  };
+  const merged = mergeCmsPage(defaults, stored);
 
   if (!merged.blocks.some((block) => block.id === "ai-calculator-cta")) {
     const aiBlock = defaults.blocks.find((block) => block.id === "ai-calculator-cta");
@@ -329,9 +373,24 @@ function mergeHomepage(stored?: Partial<CmsPage>): CmsPage {
 }
 
 function mergeSitePayloadDefaults(stored?: Partial<CmsSitePayload>): CmsSitePayload {
+  const defaultPages = DEFAULT_CMS_SITE.pages;
+  const storedPages = stored?.pages ?? {};
+  const pages = Object.fromEntries(
+    Object.entries(defaultPages).map(([key, defaultPage]) => [
+      key,
+      mergeCmsPage(defaultPage, storedPages[key as keyof typeof storedPages]),
+    ]),
+  ) as typeof defaultPages;
+
+  for (const [key, page] of Object.entries(storedPages)) {
+    if (!(key in pages)) {
+      (pages as Record<string, CmsPage>)[key] = page as CmsPage;
+    }
+  }
+
   const payload = {
     homepage: mergeHomepage(stored?.homepage),
-    pages: { ...DEFAULT_CMS_SITE.pages, ...stored?.pages },
+    pages,
     images: { ...DEFAULT_CMS_SITE.images, ...stored?.images },
     wizard: mergeWizardContent(stored?.wizard),
     navigation: stored?.navigation ?? DEFAULT_CMS_SITE.navigation,

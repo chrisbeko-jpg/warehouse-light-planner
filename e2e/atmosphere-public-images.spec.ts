@@ -50,7 +50,7 @@ async function openAtmosphereStep(page: import("@playwright/test").Page) {
   await startWizard(page);
   await selectRoom(page, "workplace_office");
   await page.getByTestId("wizard-next-button").click();
-  await expect(page.getByRole("heading", { name: "Welke sfeer zoekt u?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welke lichtkleur past bij het project?" })).toBeVisible();
 }
 
 test.describe("Public atmosphere card images", () => {

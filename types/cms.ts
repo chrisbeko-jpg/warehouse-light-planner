@@ -52,6 +52,8 @@ export interface ContentBlockBase {
 export interface HeroBlock extends ContentBlockBase {
   type: "hero";
   tagline?: string;
+  /** Short line below CTAs (e.g. audience note). */
+  supportLine?: string;
   headline: string;
   subheadline: string;
   primaryCta: string;
@@ -122,6 +124,7 @@ export interface BenefitsBlock extends ContentBlockBase {
 export interface StepsBlock extends ContentBlockBase {
   type: "steps";
   heading: string;
+  intro?: string;
   cta: string;
   ctaHref: string;
   items: { title: string; description: string }[];
@@ -204,9 +207,13 @@ export type ContentBlock =
   | AiCalculatorCtaBlock
   | AiCalculatorFormBlock;
 
+/** Bump when default marketing copy on a page should refresh (text only; media preserved). */
+export const MARKETING_COPY_GENERATION = 2;
+
 export interface CmsPage {
   slug: string;
   title: string;
+  marketingCopyGeneration?: number;
   status?: CmsPageStatus;
   seo: CmsSeo;
   intro?: string;

@@ -10,11 +10,11 @@ export const revalidate = 0;
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_LINKS.siteUrl),
   title: {
-    default: "ledpaneel.nl | AI Lichtadvies voor kantoorverlichting",
+    default: "ledpaneel.nl | Online lichtplan voor installateurs",
     template: "%s | ledpaneel.nl",
   },
   description:
-    "Upload uw plattegrond en ontvang binnen enkele minuten een indicatief lichtplan, lichtberekening en projectprijs.",
+    "Online lichtplanner voor elektrotechnische professionals: armatuurverdeling, indicatieve lux en materiaalbegroting.",
 };
 
 export default function LedpaneelLayout({ children }: { children: React.ReactNode }) {

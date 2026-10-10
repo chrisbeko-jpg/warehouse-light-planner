@@ -2,6 +2,7 @@
 
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardNav } from "@/components/public-wizard/WizardShell";
+import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
 import type { WizardInputMethod } from "@/types/public-wizard";
 
 const OPTIONS: {
@@ -13,16 +14,16 @@ const OPTIONS: {
 }[] = [
   {
     id: "floorplan",
-    title: "Plattegrond uploaden",
-    body: "Upload een PDF, JPG of PNG van uw plattegrond. U bepaalt daarna eenvoudig de schaal en de ruimte.",
-    cta: "Plattegrond uploaden",
+    title: WIZARD_COPY.inputMethod.floorplan.title,
+    body: WIZARD_COPY.inputMethod.floorplan.body,
+    cta: WIZARD_COPY.inputMethod.floorplan.cta,
     icon: "📄",
   },
   {
     id: "dimensions",
-    title: "Zelf afmetingen invoeren",
-    body: "Geen plattegrond? Vul de lengte, breedte en plafondhoogte van de ruimte in.",
-    cta: "Afmetingen invoeren",
+    title: WIZARD_COPY.inputMethod.dimensions.title,
+    body: WIZARD_COPY.inputMethod.dimensions.body,
+    cta: WIZARD_COPY.inputMethod.dimensions.cta,
     icon: "📐",
   },
 ];
@@ -34,8 +35,8 @@ export function StepInputMethod() {
 
   return (
     <div>
-      <h1 className="lp-heading-2 mb-2">Hoe wilt u de ruimte invoeren?</h1>
-      <p className="lp-body mb-6">Kies hoe u de afmetingen van de ruimte wilt bepalen.</p>
+      <h1 className="lp-heading-2 mb-2">{WIZARD_COPY.inputMethod.title}</h1>
+      <p className="lp-body mb-6">{WIZARD_COPY.inputMethod.intro}</p>
 
       <div className="grid gap-4 md:grid-cols-2">
         {OPTIONS.map((option) => {
