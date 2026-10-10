@@ -1,5 +1,6 @@
 import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
 import { ceilingCellSizeM } from "@/lib/public-wizard/ceiling-raster";
+import { placeElongatedPanelsModuleFirst } from "@/lib/public-wizard/elongated-module-placement";
 import {
   MATRIX_COUNT_SEARCH_DELTA,
   selectBestDistributedModuleMatrix,
@@ -283,70 +284,21 @@ export function placeElongatedPanelsOnModules(
   context: PanelLayoutContext,
   ceilingType: CeilingTypeId = "grid_1200_600",
 ): MatrixPlacementResult {
-  if (vertices.length < 3 || requiredCount <= 0 || pixelsPerMeter <= 0) {
-    return { fixtures: [], requestedCount: requiredCount, placedCount: 0 };
-  }
-
-  const bounds = polygonBounds(vertices);
-  const roomWidthM = (bounds.maxX - bounds.minX) / pixelsPerMeter;
-  const roomHeightM = (bounds.maxY - bounds.minY) / pixelsPerMeter;
-  const rotation = panelRotationForRoom(roomWidthM, roomHeightM, productId);
-
-  const roomGrid = buildRoomCeilingGrid(vertices, pixelsPerMeter, ceilingType);
-  if (!roomGrid) {
-    return { fixtures: [], requestedCount: requiredCount, placedCount: 0 };
-  }
-
-  const colsByRow = new Map<number, Array<{ col: number; point: Point2D }>>();
-  for (const { col, row } of listAllModuleIndices(roomGrid)) {
-    const point = elongatedPanelCenterPx(roomGrid, col, row, productId, rotation);
-    if (!isPanelFootprintInsideRoom(point, pixelsPerMeter, vertices, productId, rotation)) continue;
-    const list = colsByRow.get(row) ?? [];
-    list.push({ col, point });
-    colsByRow.set(row, list);
-  }
-  const sortedRows = [...colsByRow.keys()].sort((a, b) => a - b);
-  for (const row of sortedRows) {
-    colsByRow.get(row)!.sort((a, b) => a.col - b.col);
-  }
-
-  const roomAspect = roomWidthM / Math.max(roomHeightM, 0.01);
-  const best = selectBestDistributedModuleMatrix({
-    sortedRows,
-    colsByRow,
-    requiredCount,
-    roomAspect,
-    bounds,
+  const result = placeElongatedPanelsModuleFirst(
     vertices,
     pixelsPerMeter,
+    requiredCount,
     productId,
     context,
-    rotation,
-  });
-
-  const fixtures: PlacedPublicFixture[] = (best?.points ?? []).map((point) => ({
-    id: nextId(),
-    productId,
-    x: point.x,
-    y: point.y,
-    rotation,
-  }));
-
-  let warning: string | undefined;
-  if (best && fixtures.length !== requiredCount) {
-    warning = `Theoretisch benodigd: ${requiredCount} panelen. Gekozen nette verdeling: ${fixtures.length} panelen (${best.rows}×${best.cols}). Het 1200×300 paneel ligt in een inbouwvoorziening binnen de plafondmodule.`;
-  } else if (best) {
-    warning =
-      "Het 1200×300 paneel vult de 1200×600 plafondmodule niet volledig. Het ligt in een inbouwvoorziening binnen de module.";
-  }
-
+    ceilingType,
+  );
   return {
-    fixtures,
-    requestedCount: requiredCount,
-    placedCount: fixtures.length,
-    matrixRows: best?.rows,
-    matrixCols: best?.cols,
-    warning,
+    fixtures: result.fixtures,
+    requestedCount: result.requestedCount,
+    placedCount: result.placedCount,
+    matrixRows: result.matrixRows,
+    matrixCols: result.matrixCols,
+    warning: result.warning,
   };
 }
 

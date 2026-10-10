@@ -8,6 +8,7 @@ import { placeFixturesWithLayoutInfo } from "../lib/public-wizard/placement.ts";
 import { placeElongatedPanelsOnModules } from "../lib/public-wizard/matrix-placement.ts";
 import { describeFixtureMatrix } from "../lib/public-wizard/ceiling-grid.ts";
 import { evaluateLayoutQuality } from "../lib/public-wizard/layout-quality.ts";
+import { countAdjacentLuminaires } from "../lib/public-wizard/luminaire-adjacency.ts";
 
 const PPM = 100;
 const OUT = path.join("scripts", "output", "placement-quality");
@@ -46,6 +47,11 @@ function svgFor(vertices, fixtures, label) {
 const cases = [
   { id: "8x6-14", length: 8, width: 6, count: 14, product: "led_panel_4000", ceiling: "grid_600" },
   { id: "10x7.5-21", length: 10, width: 7.5, count: 21, product: "led_panel_1200x300_4000", ceiling: "grid_1200_600", elongated: true },
+  { id: "8x9-20", length: 8, width: 9, count: 20, product: "led_panel_1200x300_4000", ceiling: "grid_1200_600", elongated: true },
+  { id: "8x6.4-15", length: 8, width: 6.4, count: 15, product: "led_panel_1200x300_4000", ceiling: "grid_1200_600", elongated: true },
+  { id: "8x7-18", length: 8, width: 7, count: 18, product: "led_panel_1200x300_4000", ceiling: "grid_1200_600", elongated: true },
+  { id: "6x6-elong", length: 6, width: 6, count: 10, product: "led_panel_1200x300_4000", ceiling: "grid_1200_600", elongated: true },
+  { id: "12x4-elong", length: 12, width: 4, count: 14, product: "led_panel_1200x300_4000", ceiling: "grid_1200_600", elongated: true },
   { id: "8x5-12", length: 8, width: 5, count: 12, product: "led_panel_4000", ceiling: "grid_600" },
   { id: "6.5x3.2-3dl", length: 6.5, width: 3.2, count: 3, product: "downlight_4000", ceiling: "grid_600", lux: 250 },
   { id: "12x4-16", length: 12, width: 4, count: 16, product: "led_panel_4000", ceiling: "grid_600" },
@@ -87,10 +93,19 @@ for (const c of cases) {
   const b = boundsOf(vertices);
   const quality = evaluateLayoutQuality(layout.fixtures, b);
   const matrix = describeFixtureMatrix(layout.fixtures);
+  let adjacentPairs = 0;
+  if (c.elongated && layout.fixtures.length > 0) {
+    const rot = layout.fixtures[0].rotation ?? 0;
+    adjacentPairs = countAdjacentLuminaires(layout.fixtures, PPM, c.product, rot).totalPairs;
+    if (adjacentPairs > 0) {
+      throw new Error(`${c.id}: elongated layout has ${adjacentPairs} adjacent pairs`);
+    }
+  }
   const entry = {
     id: c.id,
     placed: layout.placedCount,
     requested: c.count,
+    adjacentPairs,
     matrix,
     quality: {
       score: quality.score,
