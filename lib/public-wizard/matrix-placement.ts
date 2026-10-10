@@ -1,8 +1,12 @@
 import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
+import { ceilingCellSizeM } from "@/lib/public-wizard/ceiling-raster";
 import {
-  ceilingCellSizeM,
-  centeredModuleCentersM,
-} from "@/lib/public-wizard/ceiling-raster";
+  buildRoomCeilingGrid,
+  downlightCenterPx,
+  elongatedPanelCenterPx,
+  listAllModuleIndices,
+  moduleMeetsWallClearanceM,
+} from "@/lib/public-wizard/room-ceiling-grid";
 import type { PanelLayoutContext } from "@/lib/public-wizard/ceiling-grid";
 import {
   isPanelPlacementValid,
@@ -114,6 +118,20 @@ export function placeDownlightsSymmetrically(
   const roomWidthM = (bounds.maxX - bounds.minX) / pixelsPerMeter;
   const roomHeightM = (bounds.maxY - bounds.minY) / pixelsPerMeter;
   const roomAspect = roomWidthM / Math.max(roomHeightM, 0.01);
+  const ceilingType = context.ceilingType ?? "grid_600";
+  const roomGrid = buildRoomCeilingGrid(vertices, pixelsPerMeter, ceilingType);
+
+  if (roomGrid && product.category === "downlight") {
+    return placeDownlightsOnModuleGrid(
+      vertices,
+      pixelsPerMeter,
+      requiredCount,
+      productId,
+      context,
+      roomGrid,
+      roomAspect,
+    );
+  }
 
   let bestPoints: Point2D[] | null = null;
   let bestRows = 0;
@@ -270,19 +288,32 @@ export function placeElongatedPanelsOnModules(
   const roomWidthM = (bounds.maxX - bounds.minX) / pixelsPerMeter;
   const roomHeightM = (bounds.maxY - bounds.minY) / pixelsPerMeter;
   const rotation = panelRotationForRoom(roomWidthM, roomHeightM, productId);
-  const oriented = orientedFixtureSizeM(productId, rotation);
-  const cells = ceilingCellSizeM(ceilingType, roomWidthM, roomHeightM);
   const clearance = 0.6;
 
-  const fitCenters = (spanM: number, cellM: number, fixtureM: number) =>
-    centeredModuleCentersM(spanM, cellM).filter(
-      (center) => center >= clearance + fixtureM / 2 - 1e-4 && center <= spanM - clearance - fixtureM / 2 + 1e-4,
-    );
+  const roomGrid = buildRoomCeilingGrid(vertices, pixelsPerMeter, ceilingType);
+  if (!roomGrid) {
+    return { fixtures: [], requestedCount: requiredCount, placedCount: 0 };
+  }
 
-  const centersXM = fitCenters(roomWidthM, cells.cellWidthM, oriented.widthM);
-  const centersYM = fitCenters(roomHeightM, cells.cellHeightM, oriented.heightM);
-  const centersX = centersXM.map((meter) => bounds.minX + meter * pixelsPerMeter);
-  const centersY = centersYM.map((meter) => bounds.minY + meter * pixelsPerMeter);
+  const moduleEntries: Array<{ col: number; row: number; point: Point2D }> = [];
+  for (const { col, row } of listAllModuleIndices(roomGrid)) {
+    if (!moduleMeetsWallClearanceM(roomGrid, col, row, vertices, clearance)) continue;
+    const point = elongatedPanelCenterPx(roomGrid, col, row, productId, rotation);
+    if (!isPanelPlacementValid(point, pixelsPerMeter, vertices, productId, rotation)) continue;
+    moduleEntries.push({ col, row, point });
+  }
+
+  const colsByRow = new Map<number, Array<{ col: number; point: Point2D }>>();
+  for (const entry of moduleEntries) {
+    const list = colsByRow.get(entry.row) ?? [];
+    list.push({ col: entry.col, point: entry.point });
+    colsByRow.set(entry.row, list);
+  }
+  const sortedRows = [...colsByRow.keys()].sort((a, b) => a - b);
+  for (const row of sortedRows) {
+    colsByRow.get(row)!.sort((a, b) => a.col - b.col);
+  }
+
   const roomAspect = roomWidthM / Math.max(roomHeightM, 0.01);
   const maxTotal = Math.min(80, Math.max(requiredCount, Math.ceil(requiredCount * 1.28)));
   const candidateSizes: Array<{ rows: number; cols: number }> = [];
@@ -291,40 +322,31 @@ export function placeElongatedPanelsOnModules(
       if (rows * cols <= maxTotal) candidateSizes.push({ rows, cols });
     }
   }
-  const preferredStepX = indexStep(centersXM, oriented.widthM + 0.6);
-  const preferredStepY = indexStep(centersYM, oriented.heightM + 0.6);
-  const minStepX = indexStep(centersXM, oriented.widthM + 0.05);
-  const minStepY = indexStep(centersYM, oriented.heightM + 0.05);
-
   let best: { points: Point2D[]; rows: number; cols: number } | null = null;
   let bestScore = -Infinity;
 
   for (const size of candidateSizes) {
     const rows = size.rows;
     const cols = size.cols;
-    const stepOptionsX = preferredStepX === minStepX ? [preferredStepX] : [preferredStepX, minStepX];
-    const stepOptionsY = preferredStepY === minStepY ? [preferredStepY] : [preferredStepY, minStepY];
-
-    for (const stepX of stepOptionsX) {
-      for (const stepY of stepOptionsY) {
-        const xs = takeCentered(centersX, cols, stepX);
-        const ys = takeCentered(centersY, rows, stepY);
-        if (!xs || !ys) continue;
+    for (let stepRows = 1; stepRows <= 3; stepRows++) {
+      for (let stepCols = 1; stepCols <= 3; stepCols++) {
+        const rowIdx = takeCenteredIndices(sortedRows.length, rows, stepRows);
+        if (!rowIdx) continue;
+        const pickedRows = rowIdx.map((index) => sortedRows[index]!);
+        const colLists = pickedRows.map((row) => colsByRow.get(row) ?? []);
+        if (colLists.some((list) => list.length < cols)) continue;
+        const minCols = Math.min(...colLists.map((list) => list.length));
+        const colIdx = takeCenteredIndices(minCols, cols, stepCols);
+        if (!colIdx) continue;
 
         const points: Point2D[] = [];
-        let valid = true;
-        for (const y of ys) {
-          for (const x of xs) {
-            const point = { x, y };
-            if (!isPanelPlacementValid(point, pixelsPerMeter, vertices, productId, rotation)) {
-              valid = false;
-              break;
-            }
-            points.push(point);
+        for (const row of pickedRows) {
+          const colList = colsByRow.get(row)!;
+          for (const colIndex of colIdx) {
+            points.push(colList[colIndex]!.point);
           }
-          if (!valid) break;
         }
-        if (!valid || points.length !== rows * cols) continue;
+        if (points.length !== rows * cols) continue;
 
         const fixtures: PlacedPublicFixture[] = points.map((point, index) => ({
           id: `score-${index}`,
@@ -350,8 +372,6 @@ export function placeElongatedPanelsOnModules(
         else score -= Math.abs(delta) * 500;
         if (!meets) score -= (context.targetLux - lux) * 8;
         else score += 150;
-        if (stepX < preferredStepX || stepY < preferredStepY) score -= 700;
-
         if (score > bestScore) {
           bestScore = score;
           best = { points, rows, cols };
@@ -385,6 +405,134 @@ export function placeElongatedPanelsOnModules(
   };
 }
 
+function takeCenteredIndices(length: number, count: number, step: number): number[] | null {
+  const need = (count - 1) * step + 1;
+  if (count < 1 || need > length) return null;
+  const slack = length - need;
+  const start = Math.floor(slack / 2);
+  return Array.from({ length: count }, (_, index) => start + index * step);
+}
+
+function placeDownlightsOnModuleGrid(
+  vertices: Point2D[],
+  pixelsPerMeter: number,
+  requiredCount: number,
+  productId: PublicProductId,
+  context: PanelLayoutContext,
+  grid: ReturnType<typeof buildRoomCeilingGrid>,
+  roomAspect: number,
+): MatrixPlacementResult {
+  if (!grid) return { fixtures: [], requestedCount: requiredCount, placedCount: 0 };
+
+  const validModules = listAllModuleIndices(grid).filter(({ col, row }) => {
+    const center = downlightCenterPx(grid, col, row);
+    if (!pointInPolygon(center, vertices)) return false;
+    const product = getPublicProduct(productId);
+    const radiusM = (product.diameterM ?? Math.max(product.widthM, product.heightM)) / 2;
+    return minDistanceToPolygonBoundaryM(center, vertices, pixelsPerMeter) >= radiusM - 1e-4;
+  });
+
+  const colsByRow = new Map<number, number[]>();
+  for (const { col, row } of validModules) {
+    const list = colsByRow.get(row) ?? [];
+    list.push(col);
+    colsByRow.set(row, list);
+  }
+  const sortedRows = [...colsByRow.keys()].sort((a, b) => a - b);
+  for (const row of sortedRows) {
+    colsByRow.get(row)!.sort((a, b) => a - b);
+  }
+
+  let bestPoints: Point2D[] | null = null;
+  let bestRows = 0;
+  let bestCols = 0;
+  let bestScore = -Infinity;
+
+  for (const size of matrixSizes(requiredCount)) {
+    const [rows, cols] = orientMatrix(size.rows, size.cols, roomAspect);
+    for (let stepRows = 1; stepRows <= 3; stepRows++) {
+      for (let stepCols = 1; stepCols <= 3; stepCols++) {
+        const rowIdx = takeCenteredIndices(sortedRows.length, rows, stepRows);
+        if (!rowIdx) continue;
+        const pickedRows = rowIdx.map((index) => sortedRows[index]!);
+        const colLists = pickedRows.map((row) => colsByRow.get(row) ?? []);
+        if (colLists.some((list) => list.length < cols)) continue;
+        const minCols = Math.min(...colLists.map((list) => list.length));
+        const colIdx = takeCenteredIndices(minCols, cols, stepCols);
+        if (!colIdx) continue;
+
+        const points: Point2D[] = [];
+        let valid = true;
+        for (const row of pickedRows) {
+          const colList = colsByRow.get(row)!;
+          for (const colIndex of colIdx) {
+            const col = colList[colIndex]!;
+            const point = downlightCenterPx(grid, col, row);
+            if (!pointInPolygon(point, vertices)) {
+              valid = false;
+              break;
+            }
+            points.push(point);
+          }
+          if (!valid) break;
+        }
+        if (!valid || points.length !== rows * cols) continue;
+
+        const fixtures: PlacedPublicFixture[] = points.map((point, index) => ({
+          id: `score-${index}`,
+          productId,
+          x: point.x,
+          y: point.y,
+          rotation: 0,
+        }));
+        const lux = calculateIndicativeResult(
+          context.areaM2,
+          context.targetLux,
+          context.ceilingHeightM,
+          fixtures,
+          requiredCount,
+        ).indicativeAverageLux;
+        const meets = lux >= context.targetLux * 0.95;
+        const delta = rows * cols - requiredCount;
+        let score = 12000;
+        score -= Math.abs(Math.log((cols / Math.max(rows, 1) + 0.01) / (roomAspect + 0.01))) * 220;
+        if (delta === 0) score += 2500;
+        else score -= Math.abs(delta) * 900;
+        if (!meets) score -= (context.targetLux - lux) * 4;
+        else score += 200;
+        if (score > bestScore) {
+          bestScore = score;
+          bestPoints = points;
+          bestRows = rows;
+          bestCols = cols;
+        }
+      }
+    }
+  }
+
+  const fixtures: PlacedPublicFixture[] = (bestPoints ?? []).map((point) => ({
+    id: nextId(),
+    productId,
+    x: point.x,
+    y: point.y,
+    rotation: 0,
+  }));
+
+  let warning: string | undefined;
+  if (fixtures.length > 0 && fixtures.length !== requiredCount) {
+    warning = `Theoretisch benodigd: ${requiredCount} armaturen. Gekozen nette verdeling: ${fixtures.length} armaturen (${bestRows}×${bestCols}).`;
+  }
+
+  return {
+    fixtures,
+    requestedCount: requiredCount,
+    placedCount: fixtures.length,
+    matrixRows: bestRows || undefined,
+    matrixCols: bestCols || undefined,
+    warning,
+  };
+}
+
 export function listModuleCenterPoints(
   vertices: Point2D[],
   pixelsPerMeter: number,
@@ -393,24 +541,16 @@ export function listModuleCenterPoints(
   rotation: number,
 ): Point2D[] {
   if (vertices.length < 3 || pixelsPerMeter <= 0) return [];
-  const bounds = polygonBounds(vertices);
-  const roomWidthM = (bounds.maxX - bounds.minX) / pixelsPerMeter;
-  const roomHeightM = (bounds.maxY - bounds.minY) / pixelsPerMeter;
-  const oriented = orientedFixtureSizeM(productId, rotation);
-  const cells = ceilingCellSizeM(ceilingType, roomWidthM, roomHeightM);
-  const centersX = centeredModuleCentersM(roomWidthM, cells.cellWidthM).map(
-    (meter) => bounds.minX + meter * pixelsPerMeter,
-  );
-  const centersY = centeredModuleCentersM(roomHeightM, cells.cellHeightM).map(
-    (meter) => bounds.minY + meter * pixelsPerMeter,
-  );
+  const grid = buildRoomCeilingGrid(vertices, pixelsPerMeter, ceilingType);
+  if (!grid) return [];
+  const product = getPublicProduct(productId);
+  const clearance = product.minWallClearanceM ?? 0.6;
   const points: Point2D[] = [];
-  for (const y of centersY) {
-    for (const x of centersX) {
-      const point = { x, y };
-      if (isPanelPlacementValid(point, pixelsPerMeter, vertices, productId, rotation)) {
-        points.push(point);
-      }
+  for (const { col, row } of listAllModuleIndices(grid)) {
+    if (!moduleMeetsWallClearanceM(grid, col, row, vertices, clearance)) continue;
+    const point = elongatedPanelCenterPx(grid, col, row, productId, rotation);
+    if (isPanelPlacementValid(point, pixelsPerMeter, vertices, productId, rotation)) {
+      points.push(point);
     }
   }
   return points;

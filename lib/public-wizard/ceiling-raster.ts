@@ -1,3 +1,4 @@
+import { buildRoomCeilingGrid, buildRasterSegments } from "@/lib/public-wizard/room-ceiling-grid";
 import type { Point2D } from "@/types/floor-plan";
 import type { CeilingTypeId } from "@/types/public-wizard";
 
@@ -73,29 +74,16 @@ export function buildCeilingRaster(
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
-  const roomWidthM = (maxX - minX) / pixelsPerMeter;
-  const roomHeightM = (maxY - minY) / pixelsPerMeter;
-  const cells = ceilingCellSizeM(ceilingType, roomWidthM, roomHeightM);
-  const segments: RasterSegment[] = [];
+  const grid = buildRoomCeilingGrid(vertices, pixelsPerMeter, ceilingType);
+  if (!grid) {
+    const cells = ceilingCellSizeM(ceilingType, (maxX - minX) / pixelsPerMeter, (maxY - minY) / pixelsPerMeter);
+    return { ...cells, segments: [] };
+  }
 
-  const pushLines = (spanPx: number, origin: number, cellM: number, vertical: boolean) => {
-    const cellPx = cellM * pixelsPerMeter;
-    if (cellPx <= 1) return;
-    const count = Math.floor((spanPx + 1e-3) / cellPx);
-    if (count < 1) return;
-    const offset = (spanPx - count * cellPx) / 2;
-    for (let index = 0; index <= count; index++) {
-      const position = origin + offset + index * cellPx;
-      if (vertical) {
-        segments.push({ x1: position, y1: minY, x2: position, y2: maxY });
-      } else {
-        segments.push({ x1: minX, y1: position, x2: maxX, y2: position });
-      }
-    }
+  return {
+    helper: grid.helper,
+    cellWidthM: grid.cellWidthM,
+    cellHeightM: grid.cellHeightM,
+    segments: buildRasterSegments(grid, maxX, maxY),
   };
-
-  pushLines(maxX - minX, minX, cells.cellWidthM, true);
-  pushLines(maxY - minY, minY, cells.cellHeightM, false);
-
-  return { ...cells, segments };
 }

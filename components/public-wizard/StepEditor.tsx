@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import type Konva from "konva";
@@ -16,7 +16,8 @@ import { buildCeilingRaster } from "@/lib/public-wizard/ceiling-raster";
 import { getCeilingType } from "@/lib/public-wizard/ceiling-types";
 import { CEILING_GRID_M } from "@/lib/public-wizard/grid";
 import { snapFixtureCenter } from "@/lib/public-wizard/placement";
-import { getPublicProduct } from "@/lib/public-wizard/products";
+import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
+import { orientedFixtureSizeM } from "@/lib/public-wizard/placement-constraints";
 import { getAtmosphere } from "@/lib/public-wizard/atmospheres";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import { flattenVertices } from "@/lib/polygon-area";
@@ -755,42 +756,20 @@ export function StepEditor() {
                     />
                   </>
                 )}
-                {fixtures.map((fixture) => {
-                  const product = getPublicProduct(fixture.productId);
-                  const ppm = pixelsPerMeter ?? 50;
-                  const swapped = Math.abs(Math.round(fixture.rotation / 90)) % 2 === 1;
-                  const widthM = swapped ? product.heightM : product.widthM;
-                  const heightM = swapped ? product.widthM : product.heightM;
-                  const widthPx = widthM * ppm;
-                  const heightPx = heightM * ppm;
-                  const isSelected = fixture.id === selectedFixtureId;
-                  const canDrag = !isPanning && editorMode === "select";
-                  return (
-                    <Rect
-                      key={fixture.id}
-                      name={fixture.id}
-                      data-testid={`fixture-${fixture.id}`}
-                      x={fixture.x - widthPx / 2}
-                      y={fixture.y - heightPx / 2}
-                      width={widthPx}
-                      height={heightPx}
-                      fill={product.category === "downlight" ? "#94a3b8" : "#18A66A"}
-                      stroke={isSelected ? "#ffffff" : "#087A4C"}
-                      strokeWidth={(isSelected ? 3 : 1) / viewState.scale}
-                      cornerRadius={product.category === "downlight" ? Math.min(widthPx, heightPx) / 2 : 4}
-                      draggable={canDrag}
-                      onDragStart={(e) => {
-                        e.cancelBubble = true;
-                      }}
-                      onDragMove={handleFixtureDragMove}
-                      onDragEnd={(e) => handleFixtureDragEnd(fixture.id, e)}
-                      onClick={(e) => {
-                        e.cancelBubble = true;
-                        if (!isPanning && editorMode === "select") selectFixture(fixture.id);
-                      }}
-                    />
-                  );
-                })}
+                <EditorFixtureRects
+                  fixtures={fixtures}
+                  pixelsPerMeter={pixelsPerMeter}
+                  ceilingType={ceilingType}
+                  cellWidthM={ceilingRaster?.cellWidthM}
+                  cellHeightM={ceilingRaster?.cellHeightM}
+                  selectedFixtureId={selectedFixtureId}
+                  isPanning={isPanning}
+                  editorMode={editorMode}
+                  viewScale={viewState.scale}
+                  onDragMove={handleFixtureDragMove}
+                  onDragEnd={handleFixtureDragEnd}
+                  onSelect={selectFixture}
+                />
               </Layer>
             </Stage>
           )}
@@ -898,6 +877,80 @@ export function StepEditor() {
     </div>
   );
 }
+
+const EditorFixtureRects = memo(function EditorFixtureRects({
+  fixtures,
+  pixelsPerMeter,
+  ceilingType,
+  cellWidthM,
+  cellHeightM,
+  selectedFixtureId,
+  isPanning,
+  editorMode,
+  viewScale,
+  onDragMove,
+  onDragEnd,
+  onSelect,
+}: {
+  fixtures: ReturnType<typeof usePublicWizardStore.getState>["fixtures"];
+  pixelsPerMeter: number | null;
+  ceilingType: ReturnType<typeof usePublicWizardStore.getState>["ceilingType"];
+  cellWidthM?: number;
+  cellHeightM?: number;
+  selectedFixtureId: string | null;
+  isPanning: boolean;
+  editorMode: string;
+  viewScale: number;
+  onDragMove: (event: KonvaEventObject<DragEvent>) => void;
+  onDragEnd: (id: string, event: KonvaEventObject<DragEvent>) => void;
+  onSelect: (id: string) => void;
+}) {
+  const ppm = pixelsPerMeter ?? 50;
+  const canDrag = !isPanning && editorMode === "select";
+
+  return (
+    <>
+      {fixtures.map((fixture) => {
+        const product = getPublicProduct(fixture.productId);
+        const oriented = orientedFixtureSizeM(fixture.productId, fixture.rotation);
+        const fillsModule =
+          ceilingType === "grid_600" &&
+          product.category === "led_panel" &&
+          !isElongatedPanel(fixture.productId);
+        const widthM = fillsModule && cellWidthM ? cellWidthM : oriented.widthM;
+        const heightM = fillsModule && cellHeightM ? cellHeightM : oriented.heightM;
+        const widthPx = widthM * ppm;
+        const heightPx = heightM * ppm;
+        const isSelected = fixture.id === selectedFixtureId;
+        return (
+          <Rect
+            key={fixture.id}
+            name={fixture.id}
+            data-testid={`fixture-${fixture.id}`}
+            x={fixture.x - widthPx / 2}
+            y={fixture.y - heightPx / 2}
+            width={widthPx}
+            height={heightPx}
+            fill={product.category === "downlight" ? "#94a3b8" : "#18A66A"}
+            stroke={isSelected ? "#ffffff" : "#087A4C"}
+            strokeWidth={(isSelected ? 3 : 1) / viewScale}
+            cornerRadius={product.category === "downlight" ? Math.min(widthPx, heightPx) / 2 : 4}
+            draggable={canDrag}
+            onDragStart={(e) => {
+              e.cancelBubble = true;
+            }}
+            onDragMove={onDragMove}
+            onDragEnd={(e) => onDragEnd(fixture.id, e)}
+            onClick={(e) => {
+              e.cancelBubble = true;
+              if (!isPanning && editorMode === "select") onSelect(fixture.id);
+            }}
+          />
+        );
+      })}
+    </>
+  );
+});
 
 function SidePanel({
   editorPhase,

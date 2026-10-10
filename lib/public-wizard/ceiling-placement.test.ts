@@ -11,6 +11,11 @@ import { minPanelOuterEdgeClearanceM } from "@/lib/public-wizard/placement-const
 import { calculateMaterialPrice } from "@/lib/public-wizard/pricing";
 import { getPublicProduct, getUnitPrice, setActiveProductCatalog } from "@/lib/public-wizard/products";
 import { selectConfiguredProduct } from "@/lib/public-wizard/product-selection";
+import {
+  buildRoomCeilingGrid,
+  downlightCenterPx,
+  nearestModuleIndex,
+} from "@/lib/public-wizard/room-ceiling-grid";
 import { getNextWizardStep } from "@/lib/public-wizard/wizard-navigation";
 import type { Point2D } from "@/types/floor-plan";
 import type { AtmosphereId, CeilingTypeId, PublicProductId, RoomFunctionId } from "@/types/public-wizard";
@@ -100,15 +105,21 @@ test("6.50 × 3.20 m reception downlights stay on one centred row when three are
 
   const ys = layout.fixtures.map((fixture) => fixture.y);
   assert.ok(Math.max(...ys) - Math.min(...ys) < 1);
-  const centerY = 40 + (widthM * 100) / 2;
-  assert.ok(Math.abs(ys[0]! - centerY) < 1);
 
   const xs = layout.fixtures.map((fixture) => fixture.x).sort((a, b) => a - b);
   const gaps = [xs[1]! - xs[0]!, xs[2]! - xs[1]!];
   assert.ok(Math.abs(gaps[0]! - gaps[1]!) < 1);
-  const leftMargin = xs[0]! - 40;
-  const rightMargin = 40 + lengthM * 100 - xs[2]!;
-  assert.ok(Math.abs(leftMargin - rightMargin) < 1);
+  assert.ok(Math.abs(gaps[0]! - 60) < 1);
+
+  const grid = buildRoomCeilingGrid(vertices, 100, "grid_600");
+  assert.ok(grid);
+  for (const fixture of layout.fixtures) {
+    const index = nearestModuleIndex(grid, fixture.x, fixture.y);
+    assert.ok(index);
+    const expected = downlightCenterPx(grid, index.col, index.row);
+    assert.ok(Math.abs(fixture.x - expected.x) < 0.5);
+    assert.ok(Math.abs(fixture.y - expected.y) < 0.5);
+  }
 });
 
 test("6.50 × 3.20 m at 250 lux uses the product count in a symmetric matrix", () => {
@@ -182,7 +193,7 @@ test("1200×300 panels keep 600 mm wall clearance and do not touch", () => {
   const xs = [...new Set(layout.fixtures.map((fixture) => fixture.x))].sort((a, b) => a - b);
   if (xs.length > 1) {
     const gapM = (xs[1]! - xs[0]!) / 100;
-    assert.ok(gapM > product.widthM + 0.05);
+    assert.ok(gapM >= 1.2 - 0.02);
   }
   const price = calculateMaterialPrice(layout.fixtures);
   assert.equal(price.lines[0]?.unitEuro, 50);
