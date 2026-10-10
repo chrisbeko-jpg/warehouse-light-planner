@@ -8,7 +8,8 @@ import {
   isPanelFootprintInsideRoom,
   minDistanceToPolygonBoundaryM,
 } from "@/lib/public-wizard/placement-constraints";
-import { getPublicProduct } from "@/lib/public-wizard/products";
+import { countAdjacentLuminaires, minEdgeToEdgeGapM } from "@/lib/public-wizard/luminaire-adjacency";
+import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import type { Point2D } from "@/types/floor-plan";
 import type { PlacedPublicFixture, PublicProductId } from "@/types/public-wizard";
 
@@ -183,6 +184,16 @@ export function scoreDistributedFixtureLayout(options: {
     const minGap = MIN_PANEL_CENTER_SPACING_M - 0.02;
     if (cols > 1 && colSpacingPx > 0 && colSpacingPx / pixelsPerMeter < minGap) return -Infinity;
     if (rows > 1 && rowSpacingPx > 0 && rowSpacingPx / pixelsPerMeter < minGap) return -Infinity;
+
+    const adjacent = countAdjacentLuminaires(points, pixelsPerMeter, productId, rotation);
+    if (adjacent.totalPairs > 0) {
+      const penaltyPerPair = isElongatedPanel(productId) ? 18_000 : 4_000;
+      score -= adjacent.totalPairs * penaltyPerPair;
+    }
+    const minEdgeGap = minEdgeToEdgeGapM(points, pixelsPerMeter, productId, rotation);
+    if (Number.isFinite(minEdgeGap)) {
+      score += Math.min(minEdgeGap, 1.2) * (isElongatedPanel(productId) ? 220 : 80);
+    }
   }
 
   return score;
@@ -216,7 +227,12 @@ function colIndicesMeetMinGap(
   colList: ModuleColumnEntry[],
   indices: number[],
   pixelsPerMeter: number,
+  productId: PublicProductId,
+  rotation: number,
 ): boolean {
+  if (isElongatedPanel(productId)) {
+    return true;
+  }
   if (indices.length < 2) return true;
   const sorted = [...indices].sort((a, b) => a - b);
   for (let i = 1; i < sorted.length; i++) {
@@ -245,13 +261,31 @@ function orientMatrixForRoom(
   rows: number,
   cols: number,
   roomAspect: number,
+  productId: PublicProductId,
 ): [number, number] {
   if (rows === cols) return [rows, cols];
+  if (isElongatedPanel(productId)) return [rows, cols];
   const err = (r: number, c: number) => {
     const aspect = c / Math.max(r, 1);
     return Math.abs(Math.log((aspect + 0.01) / (roomAspect + 0.01)));
   };
   return err(cols, rows) < err(rows, cols) ? [cols, rows] : [rows, cols];
+}
+
+function matrixOrientationsToTry(
+  rows: number,
+  cols: number,
+  productId: PublicProductId,
+  roomAspect: number,
+): Array<[number, number]> {
+  if (rows === cols) return [[rows, cols]];
+  if (isElongatedPanel(productId)) {
+    const a: [number, number] = [rows, cols];
+    const b: [number, number] = [cols, rows];
+    if (a[0] === b[0] && a[1] === b[1]) return [a];
+    return [a, b];
+  }
+  return [orientMatrixForRoom(rows, cols, roomAspect, productId)];
 }
 
 function tryUniformMatrix(
@@ -277,7 +311,7 @@ function tryUniformMatrix(
       let valid = true;
       for (const row of pickedRows) {
         const colList = colsByRow.get(row)!;
-        if (!colIndicesMeetMinGap(colList, colPick.indices, pixelsPerMeter)) {
+        if (!colIndicesMeetMinGap(colList, colPick.indices, pixelsPerMeter, productId, rotation)) {
           valid = false;
           break;
         }
@@ -384,36 +418,58 @@ export function selectBestDistributedModuleMatrix(
     }
   }
 
-  for (const size of sizes) {
-    if (preferSingleRow && size.rows > 1) continue;
-    const [matrixRows, matrixCols] = orientMatrixForRoom(size.rows, size.cols, roomAspect);
-    const uniform = tryUniformMatrix(input, matrixRows, matrixCols);
-    if (!uniform) continue;
+  const triedMatrixKeys = new Set<string>();
 
-    const score = scoreDistributedFixtureLayout({
-      points: uniform.points,
-      rows: matrixRows,
-      cols: matrixCols,
-      rowStep: uniform.rowStep,
-      colStep: uniform.colStep,
-      calculatedCount,
-      bounds: input.bounds,
-      vertices: input.vertices,
-      pixelsPerMeter: input.pixelsPerMeter,
-      productId: input.productId,
-      context: input.context,
-      rotation: input.rotation,
-    });
-    if (score > bestScore) {
-      bestScore = score;
-      best = {
-        points: uniform.points,
-        rows: matrixRows,
-        cols: matrixCols,
-        rowStep: uniform.rowStep,
-        colStep: uniform.colStep,
-      };
+  const evaluateSizes = (sizeList: typeof sizes) => {
+    for (const size of sizeList) {
+      if (preferSingleRow && size.rows > 1) continue;
+      const orientations = matrixOrientationsToTry(
+        size.rows,
+        size.cols,
+        input.productId,
+        roomAspect,
+      );
+
+      for (const [matrixRows, matrixCols] of orientations) {
+        const key = `${matrixRows}x${matrixCols}`;
+        if (triedMatrixKeys.has(key)) continue;
+        triedMatrixKeys.add(key);
+
+        const uniform = tryUniformMatrix(input, matrixRows, matrixCols);
+        if (!uniform) continue;
+
+        const score = scoreDistributedFixtureLayout({
+          points: uniform.points,
+          rows: matrixRows,
+          cols: matrixCols,
+          rowStep: uniform.rowStep,
+          colStep: uniform.colStep,
+          calculatedCount,
+          bounds: input.bounds,
+          vertices: input.vertices,
+          pixelsPerMeter: input.pixelsPerMeter,
+          productId: input.productId,
+          context: input.context,
+          rotation: input.rotation,
+        });
+        if (score > bestScore) {
+          bestScore = score;
+          best = {
+            points: uniform.points,
+            rows: matrixRows,
+            cols: matrixCols,
+            rowStep: uniform.rowStep,
+            colStep: uniform.colStep,
+          };
+        }
+      }
     }
+  };
+
+  const exactSizes = sizes.filter((size) => size.total === calculatedCount);
+  evaluateSizes(exactSizes);
+  if (!best) {
+    evaluateSizes(sizes.filter((size) => size.total !== calculatedCount));
   }
 
   return best;
