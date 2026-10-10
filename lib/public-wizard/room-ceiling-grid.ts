@@ -233,15 +233,8 @@ export function listModuleSnapCenters(
   const grid = buildRoomCeilingGrid(vertices, pixelsPerMeter, ceilingType);
   if (!grid) return [];
   const product = getPublicProduct(productId);
-  const clearance =
-    product.category === "led_panel"
-      ? product.minWallClearanceM ?? 0.6
-      : 0;
   const points: Point2D[] = [];
   for (const { col, row } of listAllModuleIndices(grid)) {
-    if (clearance > 0 && !moduleMeetsWallClearanceM(grid, col, row, vertices, clearance)) {
-      continue;
-    }
     const center = fixtureCenterForModule(grid, col, row, productId, rotation);
     if (!pointInPolygon(center, vertices)) continue;
     if (product.category === "downlight") {

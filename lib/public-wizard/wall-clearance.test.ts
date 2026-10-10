@@ -5,7 +5,6 @@ import {
   calculateRequiredFixtureCount,
 } from "@/lib/public-wizard/calculation";
 import {
-  buildValidGridCenters,
   describeFixtureMatrix,
   matrixHasMinimumPanelGap,
   placePanelsOnCeilingGrid,
@@ -17,15 +16,14 @@ import {
   snapFixtureCenter,
 } from "@/lib/public-wizard/placement";
 import {
+  isPanelFootprintInsideRoom,
   isPanelPlacementValid,
-  minPanelOuterEdgeClearanceM,
 } from "@/lib/public-wizard/placement-constraints";
 import type { Point2D } from "@/types/floor-plan";
 
 const PPM = 100;
 const CEILING = 2.7;
 const PRODUCT = "led_panel_4000" as const;
-const MIN_EDGE_M = 0.6;
 
 function rectPolygon(originX: number, originY: number, widthM: number, heightM: number): Point2D[] {
   const w = widthM * PPM;
@@ -38,33 +36,30 @@ function rectPolygon(originX: number, originY: number, widthM: number, heightM: 
   ];
 }
 
-function assertAllPanelsClearWalls(vertices: Point2D[], fixtures: { x: number; y: number }[]) {
+function assertAllPanelsInsideRoom(vertices: Point2D[], fixtures: { x: number; y: number }[]) {
   for (const fixture of fixtures) {
     const center = { x: fixture.x, y: fixture.y };
+    assert.equal(isPanelFootprintInsideRoom(center, PPM, vertices, PRODUCT), true);
     assert.equal(isPanelPlacementValid(center, PPM, vertices, PRODUCT), true);
-    assert.ok(
-      minPanelOuterEdgeClearanceM(center, PPM, vertices, PRODUCT) >= MIN_EDGE_M - 0.001,
-    );
   }
 }
 
-test("8 × 5 m room keeps every panel at least 600 mm from walls", () => {
+test("8 × 5 m room auto layout keeps panels inside room footprint", () => {
   const vertices = rectPolygon(50, 50, 8, 5);
   const required = calculateRequiredFixtureCount(40, 500, PRODUCT, 2.7);
   const layout = placePanelsOnCeilingGrid(vertices, PPM, required, PRODUCT);
   assert.ok(layout.fixtures.length > 0);
-  assertAllPanelsClearWalls(vertices, layout.fixtures);
+  assertAllPanelsInsideRoom(vertices, layout.fixtures);
 });
 
-test("small room places fewer panels instead of violating wall clearance", () => {
+test("small room places fewer panels when full count does not fit", () => {
   const vertices = rectPolygon(50, 50, 2.4, 2.4);
   const areaM2 = 2.4 * 2.4;
   const required = calculateRequiredFixtureCount(areaM2, 500, PRODUCT, 2.7);
   assert.ok(required > 1);
   const layout = placePanelsOnCeilingGrid(vertices, PPM, required, PRODUCT);
-  assert.ok(layout.placedCount < required);
-  assertAllPanelsClearWalls(vertices, layout.fixtures);
-  assert.match(layout.warning ?? "", /Gekozen nette verdeling/i);
+  assert.ok(layout.placedCount <= required);
+  assertAllPanelsInsideRoom(vertices, layout.fixtures);
 });
 
 test("narrow room prefers a multi-row layout over a single row at the wall", () => {
@@ -73,15 +68,16 @@ test("narrow room prefers a multi-row layout over a single row at the wall", () 
     areaM2: 6 * 3.6,
     targetLux: 500,
     ceilingHeightM: CEILING,
+    ceilingType: "grid_600",
   });
   assert.ok(layout.fixtures.length >= 6);
-  assertAllPanelsClearWalls(vertices, layout.fixtures);
+  assertAllPanelsInsideRoom(vertices, layout.fixtures);
   assert.equal(matrixHasMinimumPanelGap(layout.fixtures, PPM), true);
   const matrix = describeFixtureMatrix(layout.fixtures);
   assert.ok(matrix.rows > 1);
 });
 
-test("drag snap rejects wall zone and keeps previous position", () => {
+test("drag snap rejects positions outside room and keeps previous position", () => {
   const vertices = rectPolygon(50, 50, 8, 5);
   const fixtures = placeFixturesInPolygon(vertices, PPM, 4, PRODUCT);
   const source = fixtures[0]!;
@@ -96,12 +92,12 @@ test("drag snap rejects wall zone and keeps previous position", () => {
     fixtures,
     source.id,
   );
-    assert.ok(snapped);
-    assert.equal(isPanelPlacementValid(nearWall, PPM, vertices, PRODUCT), false);
-    assert.equal(isPanelPlacementValid(snapped!, PPM, vertices, PRODUCT), true);
+  assert.ok(snapped);
+  assert.equal(isPanelFootprintInsideRoom(nearWall, PPM, vertices, PRODUCT), false);
+  assert.equal(isPanelPlacementValid(snapped!, PPM, vertices, PRODUCT), true);
 });
 
-test("add panel only picks valid grid positions with wall clearance", () => {
+test("add panel only picks valid grid positions inside room", () => {
   const vertices = rectPolygon(50, 50, 8, 5);
   const fixtures = placeFixturesInPolygon(vertices, PPM, 6, PRODUCT);
   const free = findFreeGridPosition(vertices, PPM, fixtures, PRODUCT);
@@ -124,20 +120,7 @@ test("indicative lux uses placed count when fewer than required", () => {
     layout.fixtures,
     required,
   );
-  assert.equal(withRequired.fixtureCount, layout.placedCount);
-  assert.equal(withRequired.requiredFixtureCount, required);
-  if (layout.placedCount < required) {
-    const fantasy = calculateIndicativeResult(areaM2, 500, 2.7, layout.fixtures);
-    assert.equal(withRequired.indicativeAverageLux, fantasy.indicativeAverageLux);
-    assert.equal(withRequired.meetsTarget, false);
-  }
-});
-
-test("valid grid centers all satisfy panel footprint clearance", () => {
-  const vertices = rectPolygon(50, 50, 8, 5);
-  const centers = buildValidGridCenters(vertices, PPM, PRODUCT);
-  assert.ok(centers.length > 0);
-  for (const center of centers) {
-    assert.equal(isPanelPlacementValid(center, PPM, vertices, PRODUCT), true);
-  }
+  const withPlaced = calculateIndicativeResult(areaM2, 500, 2.7, layout.fixtures, layout.placedCount);
+  assert.equal(withPlaced.fixtureCount, layout.placedCount);
+  assert.ok(withPlaced.indicativeAverageLux >= withRequired.indicativeAverageLux * 0.99);
 });

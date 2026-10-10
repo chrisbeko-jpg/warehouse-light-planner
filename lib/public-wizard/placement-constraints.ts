@@ -4,7 +4,8 @@ import type { Point2D } from "@/types/floor-plan";
 import type { PublicProductId } from "@/types/public-wizard";
 
 /** Minimum free space from room boundary to the outer edge of an LED panel. */
-export const DEFAULT_LED_PANEL_WALL_CLEARANCE_M = 0.6;
+/** Preferred margin for manual validation; automatic placement uses footprint-only checks. */
+export const DEFAULT_LED_PANEL_WALL_CLEARANCE_M = 0;
 
 export function getMinWallClearanceM(productId: PublicProductId): number {
   const product = getPublicProduct(productId);
@@ -79,7 +80,8 @@ export function getFixtureFootprintCorners(
   ];
 }
 
-export function isPanelPlacementValid(
+/** Footprint fully inside room polygon — used for automatic placement (no extra wall margin). */
+export function isPanelFootprintInsideRoom(
   center: Point2D,
   pixelsPerMeter: number,
   vertices: Point2D[],
@@ -90,13 +92,35 @@ export function isPanelPlacementValid(
   if (product.category !== "led_panel") {
     return pointInPolygon(center, vertices);
   }
-
-  const clearanceM = getMinWallClearanceM(productId);
   const corners = getFixtureFootprintCorners(center, pixelsPerMeter, productId, rotation);
-  if (!corners.every((corner) => pointInPolygon(corner, vertices))) {
+  return corners.every((corner) => pointInPolygon(corner, vertices));
+}
+
+export function isPanelPlacementValid(
+  center: Point2D,
+  pixelsPerMeter: number,
+  vertices: Point2D[],
+  productId: PublicProductId,
+  rotation = 0,
+  options?: { enforceWallClearance?: boolean },
+): boolean {
+  const product = getPublicProduct(productId);
+  if (product.category !== "led_panel") {
+    return pointInPolygon(center, vertices);
+  }
+
+  if (!isPanelFootprintInsideRoom(center, pixelsPerMeter, vertices, productId, rotation)) {
     return false;
   }
 
+  if (options?.enforceWallClearance === false) {
+    return true;
+  }
+
+  const clearanceM = getMinWallClearanceM(productId);
+  if (clearanceM <= 0) return true;
+
+  const corners = getFixtureFootprintCorners(center, pixelsPerMeter, productId, rotation);
   for (const corner of corners) {
     if (minDistanceToPolygonBoundaryM(corner, vertices, pixelsPerMeter) < clearanceM - 1e-4) {
       return false;

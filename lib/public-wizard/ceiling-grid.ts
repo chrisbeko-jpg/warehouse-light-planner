@@ -4,7 +4,6 @@ import {
   gridPanelCenterPx,
   listAllModuleIndices,
   listModuleSnapCenters,
-  moduleMeetsWallClearanceM,
   snapPointToModule,
 } from "@/lib/public-wizard/room-ceiling-grid";
 import { CEILING_GRID_M, snapPointToGridPx, uniqueGridPoints } from "@/lib/public-wizard/grid";
@@ -12,11 +11,13 @@ import {
   calculateIndicativeResult,
 } from "@/lib/public-wizard/calculation";
 import {
-  DEFAULT_LED_PANEL_WALL_CLEARANCE_M,
+  getFixtureHalfSizeM,
   getMinCenterInsetM,
   isFixtureCenterValid,
+  isPanelFootprintInsideRoom,
   isPanelPlacementValid,
 } from "@/lib/public-wizard/placement-constraints";
+import { selectBestDistributedModuleMatrix } from "@/lib/public-wizard/distributed-placement";
 import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import { pointInPolygon } from "@/lib/public-wizard/placement";
 import type { Point2D } from "@/types/floor-plan";
@@ -181,7 +182,7 @@ function getSafeBoundsPx(
   productId: PublicProductId,
 ) {
   const bounds = polygonBounds(vertices);
-  const insetPx = getMinCenterInsetM(productId) * pixelsPerMeter;
+  const insetPx = getFixtureHalfSizeM(productId) * pixelsPerMeter;
   return {
     bounds,
     minX: bounds.minX + insetPx,
@@ -494,77 +495,37 @@ function computeBestModuleMatrixLayout(
   if (!ceilingType) return null;
   const grid = buildRoomCeilingGrid(vertices, pixelsPerMeter, ceilingType);
   if (!grid) return null;
-  const clearance = getPublicProduct(productId).minWallClearanceM ?? DEFAULT_LED_PANEL_WALL_CLEARANCE_M;
-  const validModules = listAllModuleIndices(grid).filter(({ col, row }) =>
-    moduleMeetsWallClearanceM(grid, col, row, vertices, clearance),
-  );
-  const colsByRow = new Map<number, number[]>();
-  for (const { col, row } of validModules) {
+
+  const colsByRow = new Map<number, Array<{ col: number; point: Point2D }>>();
+  for (const { col, row } of listAllModuleIndices(grid)) {
+    const point = gridPanelCenterPx(grid, col, row);
+    if (!isPanelFootprintInsideRoom(point, pixelsPerMeter, vertices, productId, 0)) continue;
     const list = colsByRow.get(row) ?? [];
-    list.push(col);
+    list.push({ col, point });
     colsByRow.set(row, list);
   }
   const sortedRows = [...colsByRow.keys()].sort((a, b) => a - b);
   for (const row of sortedRows) {
-    colsByRow.get(row)!.sort((a, b) => a - b);
-  }
-  const roomWidthM = grid.roomWidthM;
-  const roomHeightM = grid.roomHeightM;
-  const roomAspect = roomWidthM / Math.max(roomHeightM, 0.01);
-  const matrixCandidates = chooseBestMatrix(requiredCount, roomWidthM, roomHeightM);
-
-  let bestPoints: Point2D[] | null = null;
-  let bestRows = 0;
-  let bestCols = 0;
-  let bestScore = -Infinity;
-
-  for (const candidate of matrixCandidates) {
-    const { rows, cols } = candidate;
-    for (let stepRows = MIN_AUTO_PANEL_CENTER_SPACING_CELLS; stepRows >= 1; stepRows--) {
-      for (let stepCols = MIN_AUTO_PANEL_CENTER_SPACING_CELLS; stepCols >= 1; stepCols--) {
-        const rowIdx = takeCenteredModuleIndices(sortedRows.length, rows, stepRows);
-        if (!rowIdx) continue;
-        const pickedRows = rowIdx.map((index) => sortedRows[index]!);
-        const colLists = pickedRows.map((row) => colsByRow.get(row) ?? []);
-        if (colLists.some((list) => list.length < cols)) continue;
-        const minCols = Math.min(...colLists.map((list) => list.length));
-        const colIdx = takeCenteredModuleIndices(minCols, cols, stepCols);
-        if (!colIdx) continue;
-
-        const points: Point2D[] = [];
-        for (const row of pickedRows) {
-          const colList = colsByRow.get(row)!;
-          for (const colIndex of colIdx) {
-            const col = colList[colIndex]!;
-            points.push(gridPanelCenterPx(grid, col, row));
-          }
-        }
-        if (points.length !== rows * cols) continue;
-
-        const score = scoreCompleteMatrixLayout(
-          points,
-          rows,
-          cols,
-          requiredCount,
-          vertices,
-          pixelsPerMeter,
-          productId,
-          context,
-          stepCols,
-          stepRows,
-        );
-        if (score > bestScore) {
-          bestScore = score;
-          bestPoints = points;
-          bestRows = rows;
-          bestCols = cols;
-        }
-      }
-    }
+    colsByRow.get(row)!.sort((a, b) => a.col - b.col);
   }
 
-  if (!bestPoints) return null;
-  return { points: bestPoints, rows: bestRows, cols: bestCols };
+  const bounds = polygonBounds(vertices);
+  const roomAspect = grid.roomWidthM / Math.max(grid.roomHeightM, 0.01);
+  const best = selectBestDistributedModuleMatrix({
+    sortedRows,
+    colsByRow,
+    requiredCount,
+    roomAspect,
+    bounds,
+    vertices,
+    pixelsPerMeter,
+    productId,
+    context,
+    rotation: 0,
+  });
+
+  if (!best) return null;
+  return { points: best.points, rows: best.rows, cols: best.cols };
 }
 
 function computeBestCompleteMatrixLayout(
