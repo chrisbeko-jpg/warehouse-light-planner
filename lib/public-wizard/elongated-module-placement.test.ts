@@ -7,6 +7,12 @@ import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
 import { calculateRequiredFixtureCount } from "@/lib/public-wizard/calculation";
 import { placeElongatedPanelsOnModules } from "@/lib/public-wizard/matrix-placement";
 import { placeFixturesWithLayoutInfo } from "@/lib/public-wizard/placement";
+import { getFixtureFootprintCorners } from "@/lib/public-wizard/placement-constraints";
+import {
+  buildRoomCeilingGrid,
+  moduleBoundsM,
+  nearestModuleIndex,
+} from "@/lib/public-wizard/room-ceiling-grid";
 import type { Point2D } from "@/types/floor-plan";
 
 const PPM = 100;
@@ -22,6 +28,31 @@ function rect(lengthM: number, widthM: number): Point2D[] {
     { x: origin + lengthM * PPM, y: origin + widthM * PPM },
     { x: origin, y: origin + widthM * PPM },
   ];
+}
+
+function assertElongatedPanelsFlushToModuleMount(
+  vertices: Point2D[],
+  pixelsPerMeter: number,
+  fixtures: Array<{ x: number; y: number; rotation?: number; productId: string }>,
+) {
+  const grid = buildRoomCeilingGrid(vertices, pixelsPerMeter, "grid_1200_600");
+  assert.ok(grid);
+  for (const fixture of fixtures) {
+    const index = nearestModuleIndex(grid, fixture.x, fixture.y);
+    assert.ok(index, "fixture should sit on a ceiling module");
+    const mod = moduleBoundsM(grid, index.col, index.row);
+    const rotation = fixture.rotation ?? 0;
+    const corners = getFixtureFootprintCorners(
+      fixture,
+      pixelsPerMeter,
+      PRODUCT,
+      rotation,
+    );
+    const topM = (corners[0]!.y - grid.roomMinY) / pixelsPerMeter;
+    const leftM = (corners[0]!.x - grid.roomMinX) / pixelsPerMeter;
+    assert.ok(Math.abs(topM - mod.topM) < 0.02, `top mount ${topM} vs ${mod.topM}`);
+    assert.ok(Math.abs(leftM - mod.leftM) < 0.02, `left mount ${leftM} vs ${mod.leftM}`);
+  }
 }
 
 function assertSeparated(layout: ReturnType<typeof placeElongatedPanelsModuleFirst>) {
@@ -174,8 +205,9 @@ test("8×12 m / 27 calculated — prefers balanced 4×7 over 3×9", () => {
     { areaM2: scene.areaM2, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
   );
   assert.ok(layout.placedCount >= 27 && layout.placedCount <= 30);
-  assert.equal(layout.matrixCols, 4);
-  assert.equal(layout.matrixRows, 7);
+  assert.equal(layout.matrixCols, 7);
+  assert.equal(layout.matrixRows, 4);
+  assert.equal(layout.fixtures[0]?.rotation, 90);
   const adj = countAdjacentLuminaires(
     layout.fixtures.map((f) => ({ x: f.x, y: f.y })),
     scene.pixelsPerMeter,
@@ -240,6 +272,53 @@ test("15×20 m calculated count uses scalable balanced matrix", () => {
     PRODUCT,
     layout.fixtures[0]?.rotation ?? 0,
   ).totalPairs, 0);
+});
+
+test("A: 8×8,5 m / 20 panels — 4×5 matrix with flush 120×30 mount", () => {
+  const scene = buildManualRoomScene({ lengthM: 8, widthM: 8.5 });
+  const count = calculateRequiredFixtureCount(scene.areaM2, 500, PRODUCT, CEILING);
+  const layout = placeFixturesWithLayoutInfo(
+    scene.vertices,
+    scene.pixelsPerMeter,
+    count,
+    PRODUCT,
+    { areaM2: scene.areaM2, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
+  );
+  assert.equal(layout.placedCount, 20);
+  assert.equal(layout.matrixCols, 5);
+  assert.equal(layout.matrixRows, 4);
+  assert.equal(layout.fixtures[0]?.rotation, 90);
+  assertElongatedPanelsFlushToModuleMount(scene.vertices, scene.pixelsPerMeter, layout.fixtures);
+});
+
+test("B: 8×7 m / 18 panels — matrix unchanged with profile alignment", () => {
+  const layout = placeElongatedPanelsOnModules(
+    rect(8, 7),
+    PPM,
+    18,
+    PRODUCT,
+    { areaM2: 56, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
+    "grid_1200_600",
+  );
+  assert.equal(layout.matrixCols, 3);
+  assert.equal(layout.matrixRows, 6);
+  assert.equal(layout.placedCount, 18);
+  assertElongatedPanelsFlushToModuleMount(rect(8, 7), PPM, layout.fixtures);
+});
+
+test("C: 8×12 m / 27+ panels — large matrix with profile alignment", () => {
+  const scene = buildManualRoomScene({ lengthM: 8, widthM: 12 });
+  const count = calculateRequiredFixtureCount(scene.areaM2, 500, PRODUCT, CEILING);
+  const layout = placeFixturesWithLayoutInfo(
+    scene.vertices,
+    scene.pixelsPerMeter,
+    count,
+    PRODUCT,
+    { areaM2: scene.areaM2, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
+  );
+  assert.ok(layout.placedCount >= count);
+  assert.ok(layout.placedCount <= count + 3);
+  assertElongatedPanelsFlushToModuleMount(scene.vertices, scene.pixelsPerMeter, layout.fixtures);
 });
 
 test("G: 600×600 panels still use distributed matrix path", () => {

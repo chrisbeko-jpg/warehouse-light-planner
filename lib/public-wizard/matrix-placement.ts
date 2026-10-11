@@ -275,8 +275,7 @@ function takeCentered(centers: number[], count: number, step: number): number[] 
 }
 
 /**
- * Place a 1200×300 panel on the centre of a 1200×600 module.
- * The panel does not replace the whole ceiling tile.
+ * Place a 1200×300 panel flush to the module mount edge (not centred in the 600 mm depth).
  */
 export function placeElongatedPanelsOnModules(
   vertices: Point2D[],

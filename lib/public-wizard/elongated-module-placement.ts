@@ -14,6 +14,7 @@ import { computeMatrixSpacingMetrics } from "@/lib/public-wizard/matrix-spacing-
 import { isPanelFootprintInsideRoom } from "@/lib/public-wizard/placement-constraints";
 import {
   buildRoomCeilingGrid,
+  defaultElongatedPanelRotationForGrid,
   elongatedPanelCenterPx,
   isElongatedPanelContainedInModule,
   listAllModuleIndices,
@@ -208,7 +209,8 @@ function collectCandidates(
 ): ModuleMatrixCandidate[] {
   const candidates: ModuleMatrixCandidate[] = [];
   const bounds = polygonBoundsFromVertices(vertices);
-  const rotations = [0, 90] as const;
+  const gridRotation = defaultElongatedPanelRotationForGrid(grid);
+  const rotations = [gridRotation] as const;
 
   const counts = new Set<number>();
   for (let delta = 0; delta <= countDelta; delta++) {
@@ -265,8 +267,13 @@ function pickBest(candidates: ModuleMatrixCandidate[], requiredCount: number): M
   const luxOk = shortlist.filter((c) => c.meetsLuxTarget);
   if (luxOk.length > 0) shortlist = luxOk;
 
+  const sufficientCount = shortlist.filter((c) => c.placedCount >= requiredCount);
+  if (sufficientCount.length > 0) shortlist = sufficientCount;
+
   shortlist.sort((a, b) => {
     if (a.adjacentPairs !== b.adjacentPairs) return a.adjacentPairs - b.adjacentPairs;
+    if (a.placedCount > requiredCount + 2 && b.placedCount <= requiredCount + 2) return 1;
+    if (b.placedCount > requiredCount + 2 && a.placedCount <= requiredCount + 2) return -1;
     if (b.score !== a.score) return b.score - a.score;
     const aCount = Math.abs(a.placedCount - requiredCount);
     const bCount = Math.abs(b.placedCount - requiredCount);

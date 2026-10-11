@@ -93,6 +93,11 @@ export function moduleBoundsM(
   };
 }
 
+/** Panel rotation so the 1200 mm edge follows the 1200 mm module edge. */
+export function defaultElongatedPanelRotationForGrid(grid: RoomCeilingGrid): 0 | 90 {
+  return grid.cellWidthM + 1e-6 >= grid.cellHeightM ? 0 : 90;
+}
+
 export function moduleCenterPx(grid: RoomCeilingGrid, col: number, row: number): Point2D {
   const { leftM, topM } = moduleLeftTopM(grid, col, row);
   return {
@@ -107,9 +112,46 @@ export function downlightCenterPx(grid: RoomCeilingGrid, col: number, row: numbe
 }
 
 /**
- * 1200×300 in a 1200×600 module: full module length, 300 mm depth, flush to module start (top/left).
+ * 1200×300 in a 1200×600 module: flush to the module origin side (top for horizontal modules,
+ * left for vertical modules). Never centred in the 600 mm depth.
  */
 const MODULE_FIT_TOLERANCE_M = 0.002;
+
+function elongatedPanelMountFootprintM(
+  grid: RoomCeilingGrid,
+  col: number,
+  row: number,
+  productId: PublicProductId,
+  rotation: number,
+): { leftM: number; topM: number; rightM: number; bottomM: number } | null {
+  const { leftM, topM } = moduleLeftTopM(grid, col, row);
+  const oriented = orientedFixtureSizeM(productId, rotation);
+  const tol = MODULE_FIT_TOLERANCE_M;
+
+  if (oriented.widthM > grid.cellWidthM + tol || oriented.heightM > grid.cellHeightM + tol) {
+    return null;
+  }
+
+  if (Math.abs(oriented.widthM - grid.cellWidthM) < tol) {
+    return {
+      leftM,
+      topM,
+      rightM: leftM + grid.cellWidthM,
+      bottomM: topM + oriented.heightM,
+    };
+  }
+
+  if (Math.abs(oriented.heightM - grid.cellHeightM) < tol) {
+    return {
+      leftM,
+      topM,
+      rightM: leftM + oriented.widthM,
+      bottomM: topM + grid.cellHeightM,
+    };
+  }
+
+  return null;
+}
 
 /** Axis-aligned 1200×300 footprint inside a ceiling module (metres, room-local). */
 export function elongatedPanelFootprintBoundsM(
@@ -119,25 +161,10 @@ export function elongatedPanelFootprintBoundsM(
   productId: PublicProductId,
   rotation: number,
 ): { leftM: number; topM: number; rightM: number; bottomM: number } {
-  const { leftM, topM } = moduleLeftTopM(grid, col, row);
-  const oriented = orientedFixtureSizeM(productId, rotation);
-  if (Math.abs(oriented.widthM - grid.cellWidthM) < 1e-4) {
-    return {
-      leftM,
-      topM,
-      rightM: leftM + grid.cellWidthM,
-      bottomM: topM + oriented.heightM,
-    };
-  }
-  if (Math.abs(oriented.heightM - grid.cellHeightM) < 1e-4) {
-    return {
-      leftM,
-      topM,
-      rightM: leftM + oriented.widthM,
-      bottomM: topM + grid.cellHeightM,
-    };
-  }
-  return moduleBoundsM(grid, col, row);
+  return (
+    elongatedPanelMountFootprintM(grid, col, row, productId, rotation) ??
+    moduleBoundsM(grid, col, row)
+  );
 }
 
 export function isElongatedPanelContainedInModule(
@@ -149,8 +176,9 @@ export function isElongatedPanelContainedInModule(
   toleranceM = MODULE_FIT_TOLERANCE_M,
 ): boolean {
   if (col < 0 || row < 0 || col >= grid.cols || row >= grid.rows) return false;
+  const panel = elongatedPanelMountFootprintM(grid, col, row, productId, rotation);
+  if (!panel) return false;
   const tile = moduleBoundsM(grid, col, row);
-  const panel = elongatedPanelFootprintBoundsM(grid, col, row, productId, rotation);
   return (
     panel.leftM >= tile.leftM - toleranceM &&
     panel.topM >= tile.topM - toleranceM &&
@@ -166,22 +194,12 @@ export function elongatedPanelCenterPx(
   productId: PublicProductId,
   rotation: number,
 ): Point2D {
-  const { leftM, topM } = moduleLeftTopM(grid, col, row);
-  const oriented = orientedFixtureSizeM(productId, rotation);
-  let centerLocalXM = leftM;
-  let centerLocalYM = topM;
-
-  if (Math.abs(oriented.widthM - grid.cellWidthM) < 1e-4) {
-    centerLocalXM += grid.cellWidthM / 2;
-    centerLocalYM += oriented.heightM / 2;
-  } else if (Math.abs(oriented.heightM - grid.cellHeightM) < 1e-4) {
-    centerLocalYM += grid.cellHeightM / 2;
-    centerLocalXM += oriented.widthM / 2;
-  } else {
-    centerLocalXM += grid.cellWidthM / 2;
-    centerLocalYM += grid.cellHeightM / 2;
+  const footprint = elongatedPanelMountFootprintM(grid, col, row, productId, rotation);
+  if (!footprint) {
+    return moduleCenterPx(grid, col, row);
   }
-
+  const centerLocalXM = (footprint.leftM + footprint.rightM) / 2;
+  const centerLocalYM = (footprint.topM + footprint.bottomM) / 2;
   return {
     x: grid.roomMinX + centerLocalXM * grid.pixelsPerMeter,
     y: grid.roomMinY + centerLocalYM * grid.pixelsPerMeter,

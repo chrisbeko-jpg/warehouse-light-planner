@@ -58,13 +58,11 @@ test("1200×300 footprint stays inside assigned module bounds", () => {
   const vertices = rect(8, 5);
   const grid = buildRoomCeilingGrid(vertices, 100, "grid_1200_600");
   assert.ok(grid);
-  for (const rot of [0, 90] as const) {
-    for (let col = 0; col < grid.cols; col++) {
-      for (let row = 0; row < grid.rows; row++) {
-        assert.ok(
-          isElongatedPanelContainedInModule(grid, col, row, "led_panel_1200x300_4000", rot),
-        );
-      }
+  for (let col = 0; col < grid.cols; col++) {
+    for (let row = 0; row < grid.rows; row++) {
+      assert.ok(
+        isElongatedPanelContainedInModule(grid, col, row, "led_panel_1200x300_4000", 0),
+      );
     }
   }
 });
@@ -79,6 +77,25 @@ test("1200×300 panel aligns to module long edge start", () => {
   const topPx = 40 + bounds.topM * 100;
   assert.ok(Math.abs(center.x - (leftPx + 60)) < 0.5);
   assert.ok(Math.abs(center.y - (topPx + 15)) < 0.5);
+  const corners = getFixtureFootprintCorners(center, 100, "led_panel_1200x300_4000", 0);
+  assert.ok(Math.abs(corners[0]!.y - topPx) < 0.5);
+  assert.ok(Math.abs(corners[0]!.x - leftPx) < 0.5);
+});
+
+test("1200×300 panel on vertical 120×60 grid aligns to left module edge at 90°", () => {
+  const vertices = rect(8, 8.5);
+  const grid = buildRoomCeilingGrid(vertices, 100, "grid_1200_600");
+  assert.ok(grid);
+  assert.ok(Math.abs(grid.cellWidthM - 0.6) < 1e-4);
+  assert.ok(Math.abs(grid.cellHeightM - 1.2) < 1e-4);
+  const center = elongatedPanelCenterPx(grid, 1, 1, "led_panel_1200x300_4000", 90);
+  const bounds = moduleBoundsM(grid, 1, 1);
+  const leftPx = 40 + bounds.leftM * 100;
+  const topPx = 40 + bounds.topM * 100;
+  const corners = getFixtureFootprintCorners(center, 100, "led_panel_1200x300_4000", 90);
+  assert.ok(Math.abs(corners[0]!.x - leftPx) < 0.5);
+  assert.ok(Math.abs(corners[0]!.y - topPx) < 0.5);
+  assert.ok(Math.abs(corners[2]!.y - (topPx + 120)) < 0.5);
 });
 
 test("snapPointToModule picks nearest module centre", () => {
