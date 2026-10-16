@@ -1,4 +1,8 @@
 import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
+import {
+  autoWallClearanceScoreAdjustment,
+  computeLayoutWallMarginsM,
+} from "@/lib/public-wizard/layout-wall-clearance";
 import { getSpreadMetrics } from "@/lib/public-wizard/ceiling-grid";
 import { evaluateLayoutQuality, isCompleteRectangularMatrix } from "@/lib/public-wizard/layout-quality";
 import type { PanelLayoutContext } from "@/lib/public-wizard/ceiling-grid";
@@ -176,21 +180,14 @@ export function scoreDistributedFixtureLayout(options: {
   score -= countDelta * 1400;
   if (countDelta === 0) score += 3500;
 
-  const halfM = getFixtureHalfSizeM(productId);
-  let minEdgeM = Infinity;
-  for (const point of points) {
-    if (product.category === "led_panel") {
-      minEdgeM = Math.min(
-        minEdgeM,
-        minPanelMinEdgeClearanceM(point, pixelsPerMeter, vertices, productId, rotation),
-      );
-    } else {
-      minEdgeM = Math.min(minEdgeM, minDistanceToPolygonBoundaryM(point, vertices, pixelsPerMeter) - halfM);
-    }
-  }
-  if (Number.isFinite(minEdgeM) && minEdgeM >= 0) {
-    score += Math.min(minEdgeM, 0.45) * 40;
-  }
+  const wallMargins = computeLayoutWallMarginsM(
+    points,
+    pixelsPerMeter,
+    vertices,
+    productId,
+    rotation,
+  );
+  score += autoWallClearanceScoreAdjustment(wallMargins.minM);
 
   if (product.category === "led_panel" && placedCount >= 2) {
     if (!isElongatedPanel(productId)) {

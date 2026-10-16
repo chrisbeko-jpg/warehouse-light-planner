@@ -69,7 +69,7 @@ export function enumerateEvenlySpacedIndexSets(
   const centeredStart = Math.floor((slotCount - ((pickCount - 1) * minStep + 1)) / 2);
   return [...unique.values()]
     .sort((a, b) => Math.abs(a[0]! - centeredStart) - Math.abs(b[0]! - centeredStart))
-    .slice(0, 16);
+    .slice(0, 32);
 }
 
 export function enumerateMatrixFactors(count: number, maxDim = 12): Array<{ rows: number; cols: number }> {

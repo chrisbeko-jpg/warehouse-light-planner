@@ -11,6 +11,10 @@ import {
   calculateIndicativeResult,
 } from "@/lib/public-wizard/calculation";
 import {
+  autoWallClearanceScoreAdjustment,
+  computeLayoutWallMarginsM,
+} from "@/lib/public-wizard/layout-wall-clearance";
+import {
   getFixtureHalfSizeM,
   getMinCenterInsetM,
   isFixtureCenterValid,
@@ -329,7 +333,7 @@ function tryBuildCenteredMatrix(
   const idealOriginY = (safe.minY + safe.maxY - matrixH) / 2;
 
   let best: Point2D[] | null = null;
-  let bestBalance = Infinity;
+  let bestBalance = -Infinity;
 
   for (let ox = -10; ox <= 10; ox++) {
     for (let oy = -10; oy <= 10; oy++) {
@@ -362,8 +366,16 @@ function tryBuildCenteredMatrix(
       const balance =
         Math.abs(metrics.leftMarginPx - metrics.rightMarginPx) +
         Math.abs(metrics.topMarginPx - metrics.bottomMarginPx);
-      if (balance < bestBalance) {
-        bestBalance = balance;
+      const walls = computeLayoutWallMarginsM(
+        points,
+        pixelsPerMeter,
+        vertices,
+        productId,
+        0,
+      );
+      const rank = walls.minM * 5000 - balance * 0.08 + autoWallClearanceScoreAdjustment(walls.minM);
+      if (rank > bestBalance) {
+        bestBalance = rank;
         best = points;
       }
     }
@@ -463,6 +475,9 @@ function scoreCompleteMatrixLayout(
   } else if (lux >= context.targetLux * 0.95) {
     score += 120;
   }
+
+  const walls = computeLayoutWallMarginsM(points, pixelsPerMeter, vertices, productId, 0);
+  score += autoWallClearanceScoreAdjustment(walls.minM);
 
   return score;
 }
@@ -777,7 +792,13 @@ export function snapFixtureToGrid(
   const rotation = frame?.rotation ?? 0;
 
   const isValid = (candidate: Point2D) => {
-    if (!isFixtureCenterValid(candidate, pixelsPerMeter, vertices, productId, rotation)) return false;
+    if (
+      !isFixtureCenterValid(candidate, pixelsPerMeter, vertices, productId, rotation, {
+        enforceWallClearance: false,
+      })
+    ) {
+      return false;
+    }
     return !positionOccupied(candidate, occupied, excludeId);
   };
 

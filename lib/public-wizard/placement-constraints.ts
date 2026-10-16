@@ -135,10 +135,11 @@ export function isFixtureCenterValid(
   vertices: Point2D[],
   productId: PublicProductId,
   rotation = 0,
+  options?: { enforceWallClearance?: boolean },
 ): boolean {
   const product = getPublicProduct(productId);
   if (product.category === "led_panel") {
-    return isPanelPlacementValid(center, pixelsPerMeter, vertices, productId, rotation);
+    return isPanelPlacementValid(center, pixelsPerMeter, vertices, productId, rotation, options);
   }
   return pointInPolygon(center, vertices);
 }

@@ -37,8 +37,11 @@ test("120×30 panel drag snaps flush to module mount and persists", () => {
   const before = usePublicWizardStore.getState().fixtures;
   assert.ok(before.length > 0);
   const target = before[0]!;
-  const second = before[1]!;
-  usePublicWizardStore.getState().moveFixtureById(target.id, second.x, second.y);
+  const free = before.find(
+    (f) => f.id !== target.id && (Math.abs(f.x - target.x) > 80 || Math.abs(f.y - target.y) > 80),
+  );
+  assert.ok(free, "need a distinct module to drag onto");
+  usePublicWizardStore.getState().moveFixtureById(target.id, free.x, free.y);
   const moved = usePublicWizardStore.getState().fixtures.find((f) => f.id === target.id)!;
   assert.notEqual(moved.x, target.x);
   usePublicWizardStore.getState().getIndicativeResult();

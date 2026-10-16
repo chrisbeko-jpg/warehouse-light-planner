@@ -1,6 +1,6 @@
+import { computeLayoutWallMarginsM } from "@/lib/public-wizard/layout-wall-clearance";
 import {
   getFixtureFootprintCorners,
-  minPanelOuterEdgeClearanceM,
   orientedFixtureSizeM,
 } from "@/lib/public-wizard/placement-constraints";
 import type { RoomBounds } from "@/lib/public-wizard/layout-quality";
@@ -18,6 +18,7 @@ export interface MatrixSpacingMetrics {
   wallMarginBottomM: number;
   spacingImbalance: number;
   wallMarginBalance: number;
+  minWallMarginM: number;
 }
 
 function uniqueSorted(values: number[], roundPx = 2): number[] {
@@ -73,39 +74,17 @@ export function computeMatrixSpacingMetrics(
   const edgeGapXM = minEdgeGapBetweenAxes(points, ppm, productId, rotation, "x");
   const edgeGapYM = minEdgeGapBetweenAxes(points, ppm, productId, rotation, "y");
 
-  const minX = Math.min(...points.map((p) => p.x));
-  const maxX = Math.max(...points.map((p) => p.x));
-  const minY = Math.min(...points.map((p) => p.y));
-  const maxY = Math.max(...points.map((p) => p.y));
-
-  const wallMarginLeftM = minPanelOuterEdgeClearanceM(
-    { x: minX, y: (minY + maxY) / 2 },
+  const layoutWalls = computeLayoutWallMarginsM(
+    points,
     ppm,
     roomVertices,
     productId,
     rotation,
   );
-  const wallMarginRightM = minPanelOuterEdgeClearanceM(
-    { x: maxX, y: (minY + maxY) / 2 },
-    ppm,
-    roomVertices,
-    productId,
-    rotation,
-  );
-  const wallMarginTopM = minPanelOuterEdgeClearanceM(
-    { x: (minX + maxX) / 2, y: minY },
-    ppm,
-    roomVertices,
-    productId,
-    rotation,
-  );
-  const wallMarginBottomM = minPanelOuterEdgeClearanceM(
-    { x: (minX + maxX) / 2, y: maxY },
-    ppm,
-    roomVertices,
-    productId,
-    rotation,
-  );
+  const wallMarginLeftM = layoutWalls.leftM;
+  const wallMarginRightM = layoutWalls.rightM;
+  const wallMarginTopM = layoutWalls.topM;
+  const wallMarginBottomM = layoutWalls.bottomM;
 
   const pitchRatio =
     centerPitchXM > 0.01 && centerPitchYM > 0.01
@@ -133,5 +112,6 @@ export function computeMatrixSpacingMetrics(
     wallMarginBottomM,
     spacingImbalance,
     wallMarginBalance,
+    minWallMarginM: layoutWalls.minM,
   };
 }

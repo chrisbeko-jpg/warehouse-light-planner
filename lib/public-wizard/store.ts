@@ -594,21 +594,6 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       set({ editorMessage: "Geen geldige rasterpositie. Armatuur teruggezet." });
       return;
     }
-    const dragAttempted =
-      Math.hypot(x - previous.x, y - previous.y) > 4;
-    const unchanged =
-      Math.abs(snapped.x - previous.x) < 2 && Math.abs(snapped.y - previous.y) < 2;
-    if (
-      dragAttempted &&
-      unchanged &&
-      getPublicProduct(fixture.productId).category === "led_panel"
-    ) {
-      set({
-        editorMessage: "Minimale afstand tot wand is 60 cm.",
-        selectedFixtureId: id,
-      });
-      return;
-    }
     set({
       fixtures: moveFixture(fixtures, id, snapped.x, snapped.y),
       selectedFixtureId: id,

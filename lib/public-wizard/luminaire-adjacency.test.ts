@@ -62,8 +62,8 @@ test("5×3 separated layout scores higher than 3×5 touching rows for same room"
 
   const goodScore = scoreDistributedFixtureLayout({
     points: goodPoints,
-    rows: 5,
-    cols: 3,
+    rows: good.matrixRows ?? 5,
+    cols: good.matrixCols ?? 3,
     rowStep: 1,
     colStep: 2,
     calculatedCount: 15,
@@ -72,7 +72,7 @@ test("5×3 separated layout scores higher than 3×5 touching rows for same room"
     pixelsPerMeter: PPM,
     productId: PRODUCT,
     context,
-    rotation,
+    rotation: good.fixtures[0]?.rotation ?? rotation,
   });
 
   const badScore = scoreDistributedFixtureLayout({

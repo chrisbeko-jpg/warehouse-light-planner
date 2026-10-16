@@ -10,6 +10,12 @@ import {
   minModuleIndexStepForAxis,
   enumerateEvenlySpacedIndexSets,
 } from "@/lib/public-wizard/module-spacing";
+import {
+  autoWallClearanceMatrixPickAdjustment,
+  autoWallClearanceScoreAdjustment,
+  isAutoWallClearanceAcceptable,
+} from "@/lib/public-wizard/layout-wall-clearance";
+import type { MatrixSpacingMetrics } from "@/lib/public-wizard/matrix-spacing-metrics";
 import { computeMatrixSpacingMetrics } from "@/lib/public-wizard/matrix-spacing-metrics";
 import { isPanelFootprintInsideRoom } from "@/lib/public-wizard/placement-constraints";
 import {
@@ -68,6 +74,7 @@ interface ModuleMatrixCandidate {
   adjacentPairs: number;
   meetsLuxTarget: boolean;
   score: number;
+  spacing?: MatrixSpacingMetrics;
 }
 
 function tryModuleMatrix(
@@ -189,9 +196,15 @@ function tryModuleMatrix(
         adjacentPairs: adjacent,
         meetsLuxTarget: lux.meetsTarget,
         score: scored.score,
+        spacing,
       };
 
-      if (!best || candidate.score > best.score) best = candidate;
+      const pickScore =
+        candidate.score + autoWallClearanceScoreAdjustment(spacing.minWallMarginM);
+      const bestPickScore = best
+        ? best.score + autoWallClearanceScoreAdjustment(best.spacing?.minWallMarginM ?? 0)
+        : -Infinity;
+      if (!best || pickScore > bestPickScore) best = candidate;
     }
   }
 
@@ -274,10 +287,24 @@ function pickBest(candidates: ModuleMatrixCandidate[], requiredCount: number): M
     if (a.adjacentPairs !== b.adjacentPairs) return a.adjacentPairs - b.adjacentPairs;
     if (a.placedCount > requiredCount + 2 && b.placedCount <= requiredCount + 2) return 1;
     if (b.placedCount > requiredCount + 2 && a.placedCount <= requiredCount + 2) return -1;
+    const aPick =
+      a.score + autoWallClearanceMatrixPickAdjustment(a.spacing?.minWallMarginM ?? 0);
+    const bPick =
+      b.score + autoWallClearanceMatrixPickAdjustment(b.spacing?.minWallMarginM ?? 0);
+    if (bPick !== aPick) return bPick - aPick;
+    const aWallOk = isAutoWallClearanceAcceptable(a.spacing?.minWallMarginM ?? 0);
+    const bWallOk = isAutoWallClearanceAcceptable(b.spacing?.minWallMarginM ?? 0);
+    if (aWallOk && !bWallOk) return -1;
+    if (bWallOk && !aWallOk) return 1;
+    if (a.placedCount === requiredCount && b.placedCount !== requiredCount) return -1;
+    if (b.placedCount === requiredCount && a.placedCount !== requiredCount) return 1;
     if (b.score !== a.score) return b.score - a.score;
     const aCount = Math.abs(a.placedCount - requiredCount);
     const bCount = Math.abs(b.placedCount - requiredCount);
     if (aCount !== bCount) return aCount - bCount;
+    const aWall = a.spacing?.minWallMarginM ?? 0;
+    const bWall = b.spacing?.minWallMarginM ?? 0;
+    if (Math.abs(aWall - bWall) > 0.02) return bWall - aWall;
     if (Math.abs(b.score - a.score) < 12_000 && a.rotation !== b.rotation) {
       return a.rotation - b.rotation;
     }
