@@ -58,6 +58,38 @@ export interface PlacedPublicFixture {
   rotation: number;
 }
 
+export type EditorPlanView = "2d" | "3d";
+
+export type Room3DFloorType = "gray" | "parquet" | "resin" | "custom";
+
+export interface Room3DFloorSettings {
+  type: Room3DFloorType;
+  color: string;
+}
+
+export interface Room3DWindow {
+  id: string;
+  /** Index of the wall segment (vertex i → i+1). */
+  wallIndex: number;
+  /** Distance from the start of the wall segment (meters). */
+  offsetAlongWallM: number;
+  widthM: number;
+  heightM: number;
+  sillHeightM: number;
+}
+
+export interface Room3DSettings {
+  wallColor: string;
+  ceilingColor: string;
+  floor: Room3DFloorSettings;
+  windows: Room3DWindow[];
+  showCeiling: boolean;
+  /** Visual only — does not affect lux calculation. */
+  dayLightEnabled: boolean;
+}
+
+export type Room3DCameraPreset = "fit" | "isometric" | "top" | "interior";
+
 export interface PublicRoomPolygon {
   vertices: Point2D[];
   areaM2: number;

@@ -14,6 +14,8 @@
     "test:placement-report": "npx tsx scripts/placement-quality-report.mjs"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
     "@tiptap/extension-image": "^3.30.5",
     "@tiptap/extension-link": "^3.30.5",
     "@tiptap/extension-placeholder": "^3.30.5",
@@ -32,6 +34,7 @@
     "react-dom": "^19.0.0",
     "react-konva": "^19.0.6",
     "sanitize-html": "^2.17.1",
+    "three": "^0.186.1",
     "zustand": "^5.0.5"
   },
   "devDependencies": {

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
@@ -23,6 +24,7 @@ import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import { flattenVertices } from "@/lib/polygon-area";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
+import { EditorPlanViewToggle } from "@/components/public-wizard/EditorPlanViewToggle";
 import { WizardProgress } from "@/components/public-wizard/WizardShell";
 import {
   computeFitView,
@@ -35,6 +37,18 @@ import type { EditorPhase, PublicEditorMode } from "@/lib/public-wizard/store";
 
 const SIDE_PANEL_WIDTH = 320;
 const HIT_RADIUS = 14;
+
+const Room3DViewer = dynamic(
+  () => import("@/components/public-wizard/room3d/Room3DViewer").then((m) => m.Room3DViewer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center text-sm text-[var(--lp-text-secondary)]">
+        3D-weergave laden…
+      </div>
+    ),
+  },
+);
 
 export function StepEditor() {
   const roomFunction = usePublicWizardStore((s) => s.roomFunction);
@@ -68,6 +82,8 @@ export function StepEditor() {
   const preferredProductId = usePublicWizardStore((s) => s.preferredProductId);
   const inputMethod = usePublicWizardStore((s) => s.inputMethod);
   const manualDimensionsRoute = inputMethod === "dimensions";
+  const editorPlanView = usePublicWizardStore((s) => s.editorPlanView);
+  const room3D = usePublicWizardStore((s) => s.room3D);
 
   const prevStep = usePublicWizardStore((s) => s.prevStep);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
@@ -116,6 +132,12 @@ export function StepEditor() {
   const atmosphereMeta = atmosphere ? getAtmosphere(atmosphere) : null;
   const scaleComplete = Boolean(pixelsPerMeter);
   const roomComplete = roomVertices.length >= 3 && editorPhase === "plan";
+  const show3DView =
+    editorPlanView === "3d" &&
+    roomComplete &&
+    Boolean(pixelsPerMeter) &&
+    Boolean(ceilingType) &&
+    fixtures.length > 0;
   const roomReady = roomVertices.length >= 3 && Boolean(pixelsPerMeter);
   const panelWidth = sidePanelCollapsed ? 0 : SIDE_PANEL_WIDTH;
   const indicativeResult = getIndicativeResult();
@@ -479,8 +501,11 @@ export function StepEditor() {
         </div>
       </header>
 
-      <div className="shrink-0 border-b border-[var(--lp-border)] bg-white px-3 py-2 sm:px-4">
+      <div className="shrink-0 space-y-2 border-b border-[var(--lp-border)] bg-white px-3 py-2 sm:px-4">
         <WizardProgress />
+        {roomComplete && (
+          <EditorPlanViewToggle disabled={!lightingPlanGenerated && fixtures.length === 0} />
+        )}
       </div>
 
       <div className="relative flex min-h-0 flex-1">
@@ -598,7 +623,18 @@ export function StepEditor() {
             Scroll/trackpad zoom · Space + slepen om te verschuiven
           </p>
 
-          {backgroundDataUrl && (
+          {show3DView && pixelsPerMeter && ceilingType && (
+            <Room3DViewer
+              vertices={roomVertices}
+              pixelsPerMeter={pixelsPerMeter}
+              ceilingHeightM={ceilingHeightM}
+              ceilingType={ceilingType}
+              fixtures={fixtures}
+              room3D={room3D}
+            />
+          )}
+
+          {backgroundDataUrl && !show3DView && (
             <Stage
               ref={stageRef}
               width={viewportSize.width}

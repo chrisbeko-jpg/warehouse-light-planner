@@ -30,12 +30,22 @@ import {
   isWizardFlowStep,
 } from "@/lib/public-wizard/wizard-navigation";
 import type { Point2D } from "@/types/floor-plan";
+import { DEFAULT_ROOM_3D_SETTINGS } from "@/lib/public-wizard/room3d-defaults";
+import {
+  DEFAULT_WINDOW_3D,
+  validateWindowOnWall,
+  wallSegmentsM,
+  makeRoom3DOrigin,
+} from "@/lib/public-wizard/room3d-coords";
 import type {
   AtmosphereId,
   CeilingTypeId,
+  EditorPlanView,
   ManualDimensions,
   PlacedPublicFixture,
   PublicProductId,
+  Room3DSettings,
+  Room3DWindow,
   RoomFunctionId,
   WizardInputMethod,
   WizardStepId,
@@ -95,6 +105,8 @@ export interface PublicWizardStore {
   primaryPanelFixtures: PlacedPublicFixture[] | null;
   alternativeMixedFixtures: PlacedPublicFixture[] | null;
   lightingPlanVariant: "panels" | "mixed";
+  editorPlanView: EditorPlanView;
+  room3D: Room3DSettings;
 
   setStep: (step: WizardStepId) => void;
   nextStep: () => boolean;
@@ -130,6 +142,13 @@ export interface PublicWizardStore {
   addDownlight: () => boolean;
   duplicateSelectedFixture: () => void;
   goToEditor: () => void;
+  goToEditor3D: () => void;
+  setEditorPlanView: (view: EditorPlanView) => void;
+  patchRoom3D: (patch: Partial<Room3DSettings>) => void;
+  setRoom3DFloor: (patch: Partial<Room3DSettings["floor"]>) => void;
+  addRoom3DWindow: () => boolean;
+  updateRoom3DWindow: (id: string, patch: Partial<Omit<Room3DWindow, "id">>) => boolean;
+  removeRoom3DWindow: (id: string) => void;
   clearEditorMessage: () => void;
   setShowHeatmap: (value: boolean) => void;
   setDownlightProductId: (id: PublicProductId) => void;
@@ -194,6 +213,8 @@ const initialState = {
   primaryPanelFixtures: null as PlacedPublicFixture[] | null,
   alternativeMixedFixtures: null as PlacedPublicFixture[] | null,
   lightingPlanVariant: "panels" as "panels" | "mixed",
+  editorPlanView: "2d" as EditorPlanView,
+  room3D: { ...DEFAULT_ROOM_3D_SETTINGS, floor: { ...DEFAULT_ROOM_3D_SETTINGS.floor } },
 };
 
 function cloneFixtures(fixtures: PlacedPublicFixture[]): PlacedPublicFixture[] {
@@ -732,7 +753,78 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       step: "editor",
       editorMode: "select",
       editorPhase: "plan",
+      editorPlanView: "2d",
     }),
+
+  goToEditor3D: () =>
+    set({
+      step: "editor",
+      editorMode: "select",
+      editorPhase: "plan",
+      editorPlanView: "3d",
+    }),
+
+  setEditorPlanView: (view) => set({ editorPlanView: view }),
+
+  patchRoom3D: (patch) =>
+    set((state) => ({
+      room3D: {
+        ...state.room3D,
+        ...patch,
+        floor: patch.floor ? { ...state.room3D.floor, ...patch.floor } : state.room3D.floor,
+      },
+    })),
+
+  setRoom3DFloor: (patch) =>
+    set((state) => ({
+      room3D: {
+        ...state.room3D,
+        floor: { ...state.room3D.floor, ...patch },
+      },
+    })),
+
+  addRoom3DWindow: () => {
+    const { roomVertices, pixelsPerMeter, room3D } = get();
+    if (roomVertices.length < 3 || !pixelsPerMeter) return false;
+    const walls = wallSegmentsM(roomVertices, makeRoom3DOrigin(roomVertices, pixelsPerMeter));
+    if (walls.length === 0) return false;
+    const wallIndex = 0;
+    const candidate: Room3DWindow = {
+      ...DEFAULT_WINDOW_3D,
+      id: `win-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      wallIndex,
+    };
+    const validated = validateWindowOnWall(candidate, walls, room3D.windows);
+    if (!validated) return false;
+    set({ room3D: { ...room3D, windows: [...room3D.windows, validated] } });
+    return true;
+  },
+
+  updateRoom3DWindow: (id, patch) => {
+    const { roomVertices, pixelsPerMeter, room3D } = get();
+    if (roomVertices.length < 3 || !pixelsPerMeter) return false;
+    const walls = wallSegmentsM(roomVertices, makeRoom3DOrigin(roomVertices, pixelsPerMeter));
+    const current = room3D.windows.find((w) => w.id === id);
+    if (!current) return false;
+    const merged = { ...current, ...patch };
+    const validated = validateWindowOnWall(merged, walls, room3D.windows);
+    if (!validated) return false;
+    set({
+      room3D: {
+        ...room3D,
+        windows: room3D.windows.map((w) => (w.id === id ? validated : w)),
+      },
+    });
+    return true;
+  },
+
+  removeRoom3DWindow: (id) =>
+    set((state) => ({
+      room3D: {
+        ...state.room3D,
+        windows: state.room3D.windows.filter((w) => w.id !== id),
+      },
+    })),
 
   clearEditorMessage: () => set({ editorMessage: null }),
 

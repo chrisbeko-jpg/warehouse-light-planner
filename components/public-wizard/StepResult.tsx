@@ -34,6 +34,7 @@ export function StepResult() {
   const setLightingPlanVariant = usePublicWizardStore((s) => s.setLightingPlanVariant);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
   const goToEditor = usePublicWizardStore((s) => s.goToEditor);
+  const goToEditor3D = usePublicWizardStore((s) => s.goToEditor3D);
 
   const result = useMemo(() => {
     if (roomVertices.length < 3 || !pixelsPerMeter) return null;
@@ -181,14 +182,24 @@ export function StepResult() {
       <p className="mt-4 text-sm text-[var(--lp-text-secondary)]">{WIZARD_COPY.request.successSub}</p>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          type="button"
-          data-testid="edit-light-plan-button"
-          className="lp-btn-secondary px-8 py-3"
-          onClick={() => goToEditor()}
-        >
-          Lichtplan aanpassen
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            data-testid="edit-light-plan-button"
+            className="lp-btn-secondary px-8 py-3"
+            onClick={() => goToEditor()}
+          >
+            Lichtplan aanpassen
+          </button>
+          <button
+            type="button"
+            data-testid="view-light-plan-3d-button"
+            className="lp-btn-secondary px-8 py-3"
+            onClick={() => goToEditor3D()}
+          >
+            Bekijk lichtplan in 3D
+          </button>
+        </div>
         <WizardNav nextLabel={WIZARD_COPY.result.requestCta} onNext={() => nextStep()} showPrev={false} />
       </div>
     </div>

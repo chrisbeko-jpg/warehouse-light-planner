@@ -74,4 +74,6 @@ export const SCALE_RESET_PRESERVE_KEYS = [
   "backgroundHeight",
   "downlightProductId",
   "step",
+  "editorPlanView",
+  "room3D",
 ] as const satisfies readonly (keyof PublicWizardStore)[];
