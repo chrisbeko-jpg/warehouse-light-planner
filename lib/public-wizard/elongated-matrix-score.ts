@@ -55,7 +55,9 @@ export function scoreElongatedMatrixCandidate(input: ElongatedMatrixScoreInput):
 
   if (input.rotation === 0) score += 2500;
 
-  score -= maxSampleDistanceM * 180;
+  score -= maxSampleDistanceM * 420;
+  if (maxSampleDistanceM > 2.2) score -= 8000;
+  if (maxSampleDistanceM > 1.85) score -= 3500;
   score -= Math.abs(input.matrixRows - input.matrixCols) * 35;
 
   const colGaps = gapSpreadPx(input.points.map((p) => p.x));

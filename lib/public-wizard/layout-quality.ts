@@ -137,14 +137,27 @@ function detectHollowMiddle(points: Point2D[], bounds: RoomBounds): boolean {
   const inMiddleX = points.filter((p) => Math.abs(p.x - midX) < bandX / 2).length;
   const ys = sortedUnique(points.map((p) => p.y));
   const xs = sortedUnique(points.map((p) => p.x));
+  const complete = isCompleteRectangularMatrix(points);
+  const twoColumnMatrix = complete && xs.length === 2 && ys.length >= 4;
   if (ys.length >= 2 && inMiddleY === 0 && points.length >= 10) return true;
-  if (xs.length >= 2 && inMiddleX === 0 && points.length >= 8 && roomW > roomH * 1.05) return true;
+  if (
+    xs.length >= 2 &&
+    inMiddleX === 0 &&
+    points.length >= 8 &&
+    roomW > roomH * 1.05 &&
+    !twoColumnMatrix
+  ) {
+    return true;
+  }
   return false;
 }
 
 function detectEdgeOnlyColumns(points: Point2D[], bounds: RoomBounds): boolean {
   const xs = sortedUnique(points.map((p) => p.x));
+  const ys = sortedUnique(points.map((p) => p.y));
   if (xs.length !== 2 || points.length < 8) return false;
+  // A full 2×N matrix (many rows, two columns) is a valid spread when count factors as 2×N.
+  if (isCompleteRectangularMatrix(points) && ys.length >= 4) return false;
   const roomW = bounds.maxX - bounds.minX;
   const roomH = bounds.maxY - bounds.minY;
   if (roomW <= roomH * 1.05) return false;

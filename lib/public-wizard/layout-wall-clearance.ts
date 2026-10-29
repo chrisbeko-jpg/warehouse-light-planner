@@ -78,7 +78,10 @@ export function autoWallClearanceScoreAdjustment(minWallM: number): number {
   if (minWallM >= 0.1) {
     return -18_000 + (minWallM - 0.1) * 140_000;
   }
-  return -35_000;
+  if (minWallM >= 0.05) {
+    return -28_000 + (minWallM - 0.05) * 200_000;
+  }
+  return -45_000;
 }
 
 /**

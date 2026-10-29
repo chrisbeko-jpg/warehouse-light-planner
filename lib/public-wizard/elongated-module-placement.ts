@@ -11,10 +11,13 @@ import {
   enumerateEvenlySpacedIndexSets,
 } from "@/lib/public-wizard/module-spacing";
 import {
-  autoWallClearanceMatrixPickAdjustment,
   autoWallClearanceScoreAdjustment,
   isAutoWallClearanceAcceptable,
 } from "@/lib/public-wizard/layout-wall-clearance";
+import {
+  computeLayoutCoverageMetrics,
+  layoutCoverageScoreAdjustment,
+} from "@/lib/public-wizard/elongated-layout-coverage";
 import type { MatrixSpacingMetrics } from "@/lib/public-wizard/matrix-spacing-metrics";
 import { computeMatrixSpacingMetrics } from "@/lib/public-wizard/matrix-spacing-metrics";
 import { isPanelFootprintInsideRoom } from "@/lib/public-wizard/placement-constraints";
@@ -75,6 +78,8 @@ interface ModuleMatrixCandidate {
   meetsLuxTarget: boolean;
   score: number;
   spacing?: MatrixSpacingMetrics;
+  maxSampleDistanceM?: number;
+  axisMarginImbalanceM?: number;
 }
 
 function tryModuleMatrix(
@@ -168,6 +173,8 @@ function tryModuleMatrix(
         vertices,
       );
 
+      const coverage = computeLayoutCoverageMetrics(points, bounds, pixelsPerMeter);
+
       const scored = scoreElongatedMatrixCandidate({
         points,
         bounds,
@@ -197,12 +204,21 @@ function tryModuleMatrix(
         meetsLuxTarget: lux.meetsTarget,
         score: scored.score,
         spacing,
+        maxSampleDistanceM: coverage.maxSampleDistanceM,
+        axisMarginImbalanceM: coverage.axisMarginImbalanceM,
       };
 
       const pickScore =
-        candidate.score + autoWallClearanceScoreAdjustment(spacing.minWallMarginM);
+        scored.score +
+        layoutCoverageScoreAdjustment(coverage) +
+        autoWallClearanceScoreAdjustment(spacing.minWallMarginM);
       const bestPickScore = best
-        ? best.score + autoWallClearanceScoreAdjustment(best.spacing?.minWallMarginM ?? 0)
+        ? best.score +
+          layoutCoverageScoreAdjustment({
+            maxSampleDistanceM: best.maxSampleDistanceM ?? Infinity,
+            axisMarginImbalanceM: best.axisMarginImbalanceM ?? Infinity,
+          }) +
+          autoWallClearanceScoreAdjustment(best.spacing?.minWallMarginM ?? 0)
         : -Infinity;
       if (!best || pickScore > bestPickScore) best = candidate;
     }
@@ -283,15 +299,32 @@ function pickBest(candidates: ModuleMatrixCandidate[], requiredCount: number): M
   const sufficientCount = shortlist.filter((c) => c.placedCount >= requiredCount);
   if (sufficientCount.length > 0) shortlist = sufficientCount;
 
+  const exactCount = shortlist.filter((c) => c.placedCount === requiredCount);
+  if (exactCount.length > 0) shortlist = exactCount;
+
   shortlist.sort((a, b) => {
     if (a.adjacentPairs !== b.adjacentPairs) return a.adjacentPairs - b.adjacentPairs;
     if (a.placedCount > requiredCount + 2 && b.placedCount <= requiredCount + 2) return 1;
     if (b.placedCount > requiredCount + 2 && a.placedCount <= requiredCount + 2) return -1;
-    const aPick =
-      a.score + autoWallClearanceMatrixPickAdjustment(a.spacing?.minWallMarginM ?? 0);
-    const bPick =
-      b.score + autoWallClearanceMatrixPickAdjustment(b.spacing?.minWallMarginM ?? 0);
-    if (bPick !== aPick) return bPick - aPick;
+    const flushPenalty = (c: ModuleMatrixCandidate) => {
+      const w = c.spacing?.minWallMarginM ?? 0;
+      if (w < 0.12) return -80_000;
+      if (!isAutoWallClearanceAcceptable(w)) {
+        // Prefer full-room matrices over compact 2×N when walls are still reasonable (≥18 cm).
+        if (w >= 0.18 && (c.maxSampleDistanceM ?? Infinity) < 2.05 && c.cols >= 3 && c.rows >= 3) {
+          return -2_500;
+        }
+        if (w >= 0.18 && (c.maxSampleDistanceM ?? Infinity) < 2.05) return -5_000;
+        return -12_000;
+      }
+      return 0;
+    };
+    const aScore = a.score + flushPenalty(a);
+    const bScore = b.score + flushPenalty(b);
+    if (bScore !== aScore) return bScore - aScore;
+    const aMax = a.maxSampleDistanceM ?? Infinity;
+    const bMax = b.maxSampleDistanceM ?? Infinity;
+    if (Math.abs(aMax - bMax) > 0.15) return aMax - bMax;
     const aWallOk = isAutoWallClearanceAcceptable(a.spacing?.minWallMarginM ?? 0);
     const bWallOk = isAutoWallClearanceAcceptable(b.spacing?.minWallMarginM ?? 0);
     if (aWallOk && !bWallOk) return -1;

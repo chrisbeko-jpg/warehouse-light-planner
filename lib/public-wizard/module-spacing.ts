@@ -67,9 +67,15 @@ export function enumerateEvenlySpacedIndexSets(
   const unique = new Map<string, number[]>();
   for (const set of sets) unique.set(set.join(","), set);
   const centeredStart = Math.floor((slotCount - ((pickCount - 1) * minStep + 1)) / 2);
-  return [...unique.values()]
-    .sort((a, b) => Math.abs(a[0]! - centeredStart) - Math.abs(b[0]! - centeredStart))
-    .slice(0, 32);
+  const span = (set: number[]) => (set.length > 0 ? set[set.length - 1]! - set[0]! : 0);
+  return [...unique.values()].sort((a, b) => {
+    const spanDiff = span(b) - span(a);
+    if (spanDiff !== 0) return spanDiff;
+    const edgeA = Math.min(a[0]!, slotCount - 1 - a[a.length - 1]!);
+    const edgeB = Math.min(b[0]!, slotCount - 1 - b[b.length - 1]!);
+    if (edgeB !== edgeA) return edgeB - edgeA;
+    return Math.abs(a[0]! - centeredStart) - Math.abs(b[0]! - centeredStart);
+  });
 }
 
 export function enumerateMatrixFactors(count: number, maxDim = 12): Array<{ rows: number; cols: number }> {
