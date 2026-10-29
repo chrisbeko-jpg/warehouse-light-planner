@@ -122,6 +122,11 @@ export interface IndicativeResult {
   fixtureCount: number;
   requiredFixtureCount?: number;
   totalWattage: number;
+  /** Sum of catalogue lumens (Φ) for placed fixtures. */
+  totalLumens?: number;
+  lumensPerFixture?: number;
+  utilisationFactor?: number;
+  maintenanceFactor?: number;
   indicativeAverageLux: number;
   meetsTarget: boolean;
 }

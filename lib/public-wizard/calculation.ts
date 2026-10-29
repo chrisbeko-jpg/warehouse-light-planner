@@ -1,21 +1,29 @@
-import { getHeightFactor } from "@/lib/height-factor";
-import { getPublicProduct } from "@/lib/public-wizard/products";
+import {
+  CALCULATION_DISCLAIMER_ELONGATED,
+  effectiveLumensPerFixtureIndicative,
+  getIndicativeLumenParameters,
+  INDICATIVE_LUX_TOLERANCE,
+  nominalFixtureCountFromLumenMethod,
+} from "@/lib/public-wizard/indicative-lumen-method";
+import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import type { IndicativeResult, PlacedPublicFixture, PublicProductId } from "@/types/public-wizard";
 
-/** Sensible defaults — not exposed in public UI. */
+/** @deprecated use indicative-lumen-method constants */
 export const UTILISATION_FACTOR = 0.6;
 export const MAINTENANCE_FACTOR = 0.8;
 
 export const CALCULATION_DISCLAIMER =
   "Deze berekening is indicatief en gebaseerd op de lumenmethode. Het is geen formele EN 12464-1-validatie. De definitieve projectspecificatie wordt door Lightsale gecontroleerd.";
 
+export function calculationDisclaimerForProduct(productId: PublicProductId): string {
+  return isElongatedPanel(productId) ? CALCULATION_DISCLAIMER_ELONGATED : CALCULATION_DISCLAIMER;
+}
+
 export function effectiveLumensPerFixture(
   productId: PublicProductId,
   ceilingHeightM: number,
 ): number {
-  const product = getPublicProduct(productId);
-  const heightFactor = getHeightFactor(ceilingHeightM);
-  return product.lumens * UTILISATION_FACTOR * MAINTENANCE_FACTOR * heightFactor;
+  return effectiveLumensPerFixtureIndicative(productId, ceilingHeightM);
 }
 
 export function calculateRequiredFixtureCount(
@@ -24,11 +32,7 @@ export function calculateRequiredFixtureCount(
   productId: PublicProductId,
   ceilingHeightM: number,
 ): number {
-  if (areaM2 <= 0) return 0;
-  const requiredLumens = areaM2 * targetLux;
-  const perFixture = effectiveLumensPerFixture(productId, ceilingHeightM);
-  if (perFixture <= 0) return 0;
-  return Math.min(120, Math.max(1, Math.ceil(requiredLumens / perFixture)));
+  return nominalFixtureCountFromLumenMethod(areaM2, targetLux, productId, ceilingHeightM);
 }
 
 export function calculateIndicativeResult(
@@ -38,12 +42,21 @@ export function calculateIndicativeResult(
   fixtures: PlacedPublicFixture[],
   requiredFixtureCount?: number,
 ): IndicativeResult {
+  const primaryProduct = fixtures[0]?.productId;
+  const params = primaryProduct
+    ? getIndicativeLumenParameters(primaryProduct, ceilingHeightM)
+    : null;
+
   const totalWattage = fixtures.reduce(
     (sum, f) => sum + getPublicProduct(f.productId).watts,
     0,
   );
   const totalEffectiveLumens = fixtures.reduce(
-    (sum, f) => sum + effectiveLumensPerFixture(f.productId, ceilingHeightM),
+    (sum, f) => sum + effectiveLumensPerFixtureIndicative(f.productId, ceilingHeightM),
+    0,
+  );
+  const totalLumens = fixtures.reduce(
+    (sum, f) => sum + getPublicProduct(f.productId).lumens,
     0,
   );
   const indicativeAverageLux =
@@ -55,7 +68,11 @@ export function calculateIndicativeResult(
     fixtureCount: fixtures.length,
     requiredFixtureCount,
     totalWattage,
+    totalLumens,
+    lumensPerFixture: params?.lumensPerFixture,
+    utilisationFactor: params?.utilisationFactor,
+    maintenanceFactor: params?.maintenanceFactor,
     indicativeAverageLux: Math.round(indicativeAverageLux),
-    meetsTarget: indicativeAverageLux >= targetLux * 0.95,
+    meetsTarget: indicativeAverageLux >= targetLux * INDICATIVE_LUX_TOLERANCE,
   };
 }

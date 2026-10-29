@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { CALCULATION_DISCLAIMER, calculateIndicativeResult } from "@/lib/public-wizard/calculation";
+import {
+  calculationDisclaimerForProduct,
+  calculateIndicativeResult,
+} from "@/lib/public-wizard/calculation";
 import {
   calculateMaterialPrice,
   formatMaterialPrice,
@@ -100,6 +103,31 @@ export function StepResult() {
           <Stat label="Plafondhoogte" value={`${formatMetersNl(ceilingHeightM)} m`} />
           <Stat label="Gewenst luxniveau" value={`${result.targetLux} lux`} />
           <Stat label="Aantal armaturen" value={`${result.fixtureCount}`} />
+          {result.lumensPerFixture != null && (
+            <Stat label="Lichtstroom per armatuur" value={`${result.lumensPerFixture} lm`} />
+          )}
+          {result.totalLumens != null && (
+            <Stat label="Totale lichtstroom (bruto)" value={`${result.totalLumens} lm`} />
+          )}
+          {result.utilisationFactor != null && (
+            <Stat
+              label="Indicatieve benuttingsfactor (UF)"
+              value={result.utilisationFactor.toFixed(2)}
+            />
+          )}
+          {result.maintenanceFactor != null && (
+            <Stat
+              label="Onderhoudsfactor (MF)"
+              value={result.maintenanceFactor.toFixed(2)}
+            />
+          )}
+          {requiredFixtureCount != null && requiredFixtureCount !== result.fixtureCount && (
+            <Stat
+              label="Nominaal berekend aantal (lumenmethode)"
+              value={`${requiredFixtureCount}`}
+            />
+          )}
+          <Stat label="Totaal vermogen" value={`${result.totalWattage} W`} />
           {atmosphereMeta && (
             <>
               <Stat label="Lichtkleur" value={`${atmosphereMeta.title} (${atmosphereMeta.cctLabel})`} />
@@ -176,7 +204,11 @@ export function StepResult() {
         </div>
 
         <p className="text-xs text-[var(--lp-text-secondary)]">{WIZARD_COPY.result.preparationNote}</p>
-        <p className="text-xs text-[var(--lp-text-secondary)]">{CALCULATION_DISCLAIMER}</p>
+        <p className="text-xs text-[var(--lp-text-secondary)]">
+          {fixtures[0]
+            ? calculationDisclaimerForProduct(fixtures[0].productId)
+            : calculationDisclaimerForProduct("led_panel_4000")}
+        </p>
       </WizardCard>
 
       <p className="mt-4 text-sm text-[var(--lp-text-secondary)]">{WIZARD_COPY.request.successSub}</p>

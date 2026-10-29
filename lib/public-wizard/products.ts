@@ -83,7 +83,7 @@ export const PUBLIC_PRODUCTS: PublicProductDefinition[] = [
     category: "led_panel",
     mounting: "recessed",
     cct: 3000,
-    lumens: 3600,
+    lumens: 3200,
     watts: 36,
     beamAngleDeg: 90,
     widthM: 1.2,
@@ -91,7 +91,8 @@ export const PUBLIC_PRODUCTS: PublicProductDefinition[] = [
     minWallClearanceM: 0,
     unitPriceEuro: 50,
     photometryConfirmed: false,
-    photometryNote: PANEL_NOTE,
+    photometryNote:
+      "Indicatief 3200 lm per armatuur (120×30 cm). Pas lumen en vermogen in het CMS aan zodra de datasheet bekend is.",
   },
   {
     id: "led_panel_1200x300_4000",
@@ -99,7 +100,7 @@ export const PUBLIC_PRODUCTS: PublicProductDefinition[] = [
     category: "led_panel",
     mounting: "recessed",
     cct: 4000,
-    lumens: 3800,
+    lumens: 3200,
     watts: 36,
     beamAngleDeg: 90,
     widthM: 1.2,

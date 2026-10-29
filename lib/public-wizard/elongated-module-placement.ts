@@ -32,7 +32,10 @@ import {
 } from "@/lib/public-wizard/room-ceiling-grid";
 import type { Point2D } from "@/types/floor-plan";
 import type { CeilingTypeId, PlacedPublicFixture, PublicProductId } from "@/types/public-wizard";
-import { MATRIX_COUNT_SEARCH_DELTA } from "@/lib/public-wizard/distributed-placement";
+import {
+  ELONGATED_COUNT_SEARCH_DELTA,
+  fixtureCountCandidates,
+} from "@/lib/public-wizard/indicative-lumen-method";
 
 export interface ElongatedModulePlacementResult {
   fixtures: PlacedPublicFixture[];
@@ -241,11 +244,7 @@ function collectCandidates(
   const gridRotation = defaultElongatedPanelRotationForGrid(grid);
   const rotations = [gridRotation] as const;
 
-  const counts = new Set<number>();
-  for (let delta = 0; delta <= countDelta; delta++) {
-    if (requiredCount - delta >= 1) counts.add(requiredCount - delta);
-    if (delta > 0 && requiredCount + delta <= 120) counts.add(requiredCount + delta);
-  }
+  const counts = new Set(fixtureCountCandidates(requiredCount, countDelta));
 
   for (const rotation of rotations) {
     const validModules = validModulesForRotation(grid, vertices, pixelsPerMeter, productId, rotation);
@@ -286,7 +285,7 @@ function collectCandidates(
   return candidates;
 }
 
-function pickBest(candidates: ModuleMatrixCandidate[], requiredCount: number): ModuleMatrixCandidate | null {
+function pickBest(candidates: ModuleMatrixCandidate[], nominalCount: number): ModuleMatrixCandidate | null {
   const pool = candidates;
   if (pool.length === 0) return null;
 
@@ -296,16 +295,21 @@ function pickBest(candidates: ModuleMatrixCandidate[], requiredCount: number): M
   const luxOk = shortlist.filter((c) => c.meetsLuxTarget);
   if (luxOk.length > 0) shortlist = luxOk;
 
-  const sufficientCount = shortlist.filter((c) => c.placedCount >= requiredCount);
-  if (sufficientCount.length > 0) shortlist = sufficientCount;
-
-  const exactCount = shortlist.filter((c) => c.placedCount === requiredCount);
-  if (exactCount.length > 0) shortlist = exactCount;
+  const hasProfessionalMatrix = shortlist.some((c) => c.cols >= 3 && c.rows >= 3);
 
   shortlist.sort((a, b) => {
     if (a.adjacentPairs !== b.adjacentPairs) return a.adjacentPairs - b.adjacentPairs;
-    if (a.placedCount > requiredCount + 2 && b.placedCount <= requiredCount + 2) return 1;
-    if (b.placedCount > requiredCount + 2 && a.placedCount <= requiredCount + 2) return -1;
+    const narrowTwoCol = (c: ModuleMatrixCandidate) => {
+      if (c.cols !== 2) return 0;
+      if (hasProfessionalMatrix && c.rows >= 4) return -150_000;
+      if (c.rows >= 6) return -90_000;
+      return -25_000;
+    };
+    const aNarrow = narrowTwoCol(a);
+    const bNarrow = narrowTwoCol(b);
+    if (aNarrow !== bNarrow) return bNarrow - aNarrow;
+    if (a.placedCount > nominalCount + 2 && b.placedCount <= nominalCount + 2) return 1;
+    if (b.placedCount > nominalCount + 2 && a.placedCount <= nominalCount + 2) return -1;
     const flushPenalty = (c: ModuleMatrixCandidate) => {
       const w = c.spacing?.minWallMarginM ?? 0;
       if (w < 0.12) return -80_000;
@@ -329,12 +333,14 @@ function pickBest(candidates: ModuleMatrixCandidate[], requiredCount: number): M
     const bWallOk = isAutoWallClearanceAcceptable(b.spacing?.minWallMarginM ?? 0);
     if (aWallOk && !bWallOk) return -1;
     if (bWallOk && !aWallOk) return 1;
-    if (a.placedCount === requiredCount && b.placedCount !== requiredCount) return -1;
-    if (b.placedCount === requiredCount && a.placedCount !== requiredCount) return 1;
+    if (a.meetsLuxTarget && b.meetsLuxTarget) {
+      if (a.placedCount !== b.placedCount) return a.placedCount - b.placedCount;
+    }
     if (b.score !== a.score) return b.score - a.score;
-    const aCount = Math.abs(a.placedCount - requiredCount);
-    const bCount = Math.abs(b.placedCount - requiredCount);
+    const aCount = Math.abs(a.placedCount - nominalCount);
+    const bCount = Math.abs(b.placedCount - nominalCount);
     if (aCount !== bCount) return aCount - bCount;
+    if (a.cols !== b.cols) return b.cols - a.cols;
     const aWall = a.spacing?.minWallMarginM ?? 0;
     const bWall = b.spacing?.minWallMarginM ?? 0;
     if (Math.abs(aWall - bWall) > 0.02) return bWall - aWall;
@@ -371,7 +377,7 @@ export function enumerateElongatedModuleMatrixCandidates(
     productId,
     context,
     requiredCount,
-    MATRIX_COUNT_SEARCH_DELTA,
+    ELONGATED_COUNT_SEARCH_DELTA,
   );
 }
 
@@ -408,17 +414,27 @@ export function placeElongatedPanelsModuleFirst(
     };
   }
 
-  const candidates = collectCandidates(
-    grid,
-    vertices,
-    pixelsPerMeter,
-    productId,
-    context,
-    requiredCount,
-    MATRIX_COUNT_SEARCH_DELTA,
-  );
-
-  const best = pickBest(candidates, requiredCount);
+  let best: ModuleMatrixCandidate | null = null;
+  let allCandidates: ModuleMatrixCandidate[] = [];
+  for (let center = requiredCount; center >= 1 && !best; center -= 6) {
+    const batch = collectCandidates(
+      grid,
+      vertices,
+      pixelsPerMeter,
+      productId,
+      context,
+      center,
+      ELONGATED_COUNT_SEARCH_DELTA,
+    );
+    if (batch.length > 0) {
+      allCandidates = batch;
+      best = pickBest(batch, requiredCount);
+    }
+    if (center <= requiredCount - 48) break;
+  }
+  if (!best && allCandidates.length > 0) {
+    best = pickBest(allCandidates, requiredCount);
+  }
 
   if (!best) {
     return {

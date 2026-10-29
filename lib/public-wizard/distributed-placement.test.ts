@@ -31,7 +31,7 @@ function uniqueRounded(points: Array<{ x: number; y: number }>): number {
   return new Set(points.map((p) => `${Math.round(p.x)}:${Math.round(p.y)}`)).size;
 }
 
-test("10×7.5 m 120×60 ceiling spreads 21 elongated panels across the room", () => {
+test("10×7.5 m 120×60 ceiling spreads elongated panels across the room", () => {
   const vertices = rect(10, 7.5);
   const areaM2 = 75;
   const productId = "led_panel_1200x300_4000" as const;
@@ -42,9 +42,10 @@ test("10×7.5 m 120×60 ceiling spreads 21 elongated panels across the room", ()
     ceilingType: "grid_1200_600" as const,
   };
 
-  const layout = placeElongatedPanelsOnModules(vertices, PPM, 21, productId, context, "grid_1200_600");
-  assert.equal(layout.placedCount, 21);
-  assert.equal(uniqueRounded(layout.fixtures), 21);
+  const nominal = calculateRequiredFixtureCount(areaM2, 500, productId, CEILING);
+  const layout = placeElongatedPanelsOnModules(vertices, PPM, nominal, productId, context, "grid_1200_600");
+  assert.ok(layout.placedCount >= nominal - 3 && layout.placedCount <= nominal + 3);
+  assert.equal(uniqueRounded(layout.fixtures), layout.placedCount);
 
   const quality = evaluateLayoutQuality(layout.fixtures, boundsOf(vertices));
   assert.equal(quality.rejected, false);
