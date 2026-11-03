@@ -1,5 +1,6 @@
 "use client";
 
+import { preloadRoom3DViewer } from "@/lib/public-wizard/room3d-loader";
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import type { EditorPlanView } from "@/types/public-wizard";
 
@@ -17,6 +18,9 @@ export function EditorPlanViewToggle({ disabled }: { disabled?: boolean }) {
           ? "bg-[var(--lp-primary)] text-white"
           : "bg-white text-[var(--lp-text)] border border-[var(--lp-border)]"
       } disabled:opacity-40`}
+      onMouseEnter={id === "3d" ? preloadRoom3DViewer : undefined}
+      onFocus={id === "3d" ? preloadRoom3DViewer : undefined}
+      onTouchStart={id === "3d" ? preloadRoom3DViewer : undefined}
       onClick={() => setEditorPlanView(id)}
     >
       {label}

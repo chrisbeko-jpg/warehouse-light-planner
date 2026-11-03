@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { loadRoom3DViewer, preloadRoom3DViewer } from "@/lib/public-wizard/room3d-loader";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
@@ -39,7 +40,7 @@ const SIDE_PANEL_WIDTH = 320;
 const HIT_RADIUS = 14;
 
 const Room3DViewer = dynamic(
-  () => import("@/components/public-wizard/room3d/Room3DViewer").then((m) => m.Room3DViewer),
+  () => loadRoom3DViewer().then((m) => m.Room3DViewer),
   {
     ssr: false,
     loading: () => (
@@ -74,6 +75,7 @@ export function StepEditor() {
   const obstacles = usePublicWizardStore((s) => s.obstacles);
   const addObstacle = usePublicWizardStore((s) => s.addObstacle);
   const removeObstacle = usePublicWizardStore((s) => s.removeObstacle);
+  const moveObstacle = usePublicWizardStore((s) => s.moveObstacle);
   const selectedFixtureId = usePublicWizardStore((s) => s.selectedFixtureId);
   const showHeatmap = usePublicWizardStore((s) => s.showHeatmap);
   const lightingPlanGenerated = usePublicWizardStore((s) => s.lightingPlanGenerated);
@@ -151,6 +153,12 @@ export function StepEditor() {
   const roomReady = roomVertices.length >= 3 && Boolean(pixelsPerMeter);
   const panelWidth = sidePanelCollapsed ? 0 : SIDE_PANEL_WIDTH;
   const indicativeResult = getIndicativeResult();
+
+  useEffect(() => {
+    if (!roomReady || !fixtures.length) return;
+    const timer = window.setTimeout(preloadRoom3DViewer, 300);
+    return () => window.clearTimeout(timer);
+  }, [roomReady, fixtures.length]);
 
   useEffect(() => {
     if (manualDimensionsRoute) return;
@@ -588,7 +596,7 @@ export function StepEditor() {
           />
           {roomComplete && <section className="space-y-2 border-t p-4 text-xs" aria-label="Obstakels">
             <h3 className="font-bold text-sm">Wanden en pilaren</h3>
-            <p>Teken binnenwanden en pilaren over de plattegrond. Armaturen blijven minimaal 15 cm vrij. De foto zelf vormt geen obstakel.</p>
+            <p>Teken binnenwanden en pilaren over de plattegrond. Armaturen blijven minimaal 15 cm vrij. De foto zelf vormt geen obstakel. Sleep een geplaatste wand of pilaar om deze te verplaatsen.</p>
             <label className="flex justify-between gap-2">Wanddikte (cm)<input aria-label="Wanddikte in centimeter" type="number" min="5" max="200" value={Math.round(wallThickness*100)} onChange={e=>setWallThickness(Math.max(0.05,Number(e.target.value)/100))} className="w-20 rounded border p-1" /></label>
             <label className="flex justify-between gap-2">Pilaar diameter (cm)<input aria-label="Pilaar diameter in centimeter" type="number" min="10" max="500" value={Math.round(columnDiameter*100)} onChange={e=>setColumnDiameter(Math.max(0.1,Number(e.target.value)/100))} className="w-20 rounded border p-1" /></label>
             <div className="flex flex-wrap gap-2">
@@ -832,7 +840,23 @@ export function StepEditor() {
                     />
                   </>
                 )}
-                {pixelsPerMeter && obstacles.map(o => o.kind === "wall" ? <Line key={o.id} points={[o.start.x,o.start.y,o.end.x,o.end.y]} stroke="#475569" strokeWidth={Math.max(3/viewState.scale,o.thicknessM*pixelsPerMeter)} lineCap="round" listening={false} /> : <Circle key={o.id} x={o.center.x} y={o.center.y} radius={o.radiusM*pixelsPerMeter} fill="#475569" stroke="#f59e0b" strokeWidth={2/viewState.scale} listening={false} />)}
+                {pixelsPerMeter && obstacles.map(o => {
+                  const anchor = o.kind === "wall" ? o.start : o.center;
+                  const draggable = !isPanning && editorMode === "select";
+                  return <Group key={o.id} x={anchor.x} y={anchor.y} draggable={draggable} listening={draggable}
+                    onClick={e=>{e.cancelBubble=true;selectFixture(null);}}
+                    onDragStart={e=>{e.cancelBubble=true;}}
+                    onDragEnd={e=>{
+                      e.cancelBubble=true;
+                      moveObstacle(o.id,e.target.x()-anchor.x,e.target.y()-anchor.y);
+                      const moved=usePublicWizardStore.getState().obstacles.find(item=>item.id===o.id);
+                      if (moved) e.target.position(moved.kind === "wall" ? moved.start : moved.center);
+                    }}>
+                    {o.kind === "wall"
+                      ? <Line points={[0,0,o.end.x-o.start.x,o.end.y-o.start.y]} stroke="#475569" strokeWidth={Math.max(3/viewState.scale,o.thicknessM*pixelsPerMeter)} hitStrokeWidth={Math.max(14/viewState.scale,o.thicknessM*pixelsPerMeter)} lineCap="round" />
+                      : <Circle radius={o.radiusM*pixelsPerMeter} fill="#475569" stroke="#f59e0b" strokeWidth={2/viewState.scale} />}
+                  </Group>;
+                })}
                 {editorMode === "draw-wall" && obstacleStart && pointerImage && <Line points={[obstacleStart.x,obstacleStart.y,pointerImage.x,pointerImage.y]} stroke="#f59e0b" strokeWidth={Math.max(3/viewState.scale,wallThickness*(pixelsPerMeter ?? 1))} dash={[8,4]} listening={false} />}
                 <EditorFixtureRects
                   fixtures={fixtures}

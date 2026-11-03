@@ -2,7 +2,6 @@
 
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Line } from "@react-three/drei";
 import * as THREE from "three";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 
@@ -28,7 +27,7 @@ import type {
 } from "@/types/public-wizard";
 import { createParquetTexture } from "@/components/public-wizard/room3d/floor-textures";
 
-const MAX_SPOT_LIGHTS = 28;
+const MAX_VISUAL_LIGHTS = 8;
 
 function WallMeshes({
   walls,
@@ -142,14 +141,12 @@ function CeilingGrid({
   pixelsPerMeter,
   ceilingType,
   ceilingHeightM,
-  showCeiling,
   ceilingColor,
 }: {
   vertices: Point2D[];
   pixelsPerMeter: number;
   ceilingType: CeilingTypeId;
   ceilingHeightM: number;
-  showCeiling: boolean;
   ceilingColor: string;
 }) {
   const raster = useMemo(
@@ -189,16 +186,25 @@ function CeilingGrid({
     return geo;
   }, [floorShape]);
 
+  const rasterGeometry = useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(lines.flat(2), 3));
+    return geometry;
+  }, [lines]);
+
   return (
     <group>
-      {showCeiling && (
-        <mesh geometry={ceilingGeo} position={[0, ceilingHeightM, 0]}>
-          <meshStandardMaterial color={ceilingColor} side={THREE.DoubleSide} transparent opacity={0.22} depthWrite={false} />
-        </mesh>
-      )}
-      {lines.map((points, index) => (
-        <Line key={index} points={points} color="#64748b" lineWidth={1} />
-      ))}
+      <mesh geometry={ceilingGeo} position={[0, ceilingHeightM, 0]}>
+        {/* Normal faces down: the room side is a closed ceiling. */}
+        <meshStandardMaterial color={ceilingColor} side={THREE.FrontSide} />
+      </mesh>
+      <mesh geometry={ceilingGeo} position={[0, ceilingHeightM, 0]}>
+        {/* The top side is always transparent, without a visitor setting. */}
+        <meshStandardMaterial color={ceilingColor} side={THREE.BackSide} transparent opacity={0.22} depthWrite={false} />
+      </mesh>
+      <lineSegments geometry={rasterGeometry}>
+        <lineBasicMaterial color="#64748b" />
+      </lineSegments>
     </group>
   );
 }
@@ -255,7 +261,10 @@ function SpotLights({
   origin: ReturnType<typeof makeRoom3DOrigin>;
   ceilingHeightM: number;
 }) {
-  const lights = useMemo(() => fixtures.slice(0, MAX_SPOT_LIGHTS).map(fixture => {
+  const lights = useMemo(() => Array.from(
+    {length:Math.min(MAX_VISUAL_LIGHTS,fixtures.length)},
+    (_,index)=>fixtures[Math.floor(index*fixtures.length/Math.min(MAX_VISUAL_LIGHTS,fixtures.length))]!,
+  ).map(fixture => {
     const product = getPublicProduct(fixture.productId);
     const position = canvasPointToFloorM(fixture, origin);
     const target = new THREE.Object3D();
@@ -332,7 +341,6 @@ export function Room3DScene({
         pixelsPerMeter={pixelsPerMeter}
         ceilingType={ceilingType}
         ceilingHeightM={ceilingHeightM}
-        showCeiling={room3D.showCeiling}
         ceilingColor={room3D.ceilingColor}
       />
       <ObstacleMeshes obstacles={obstacles} origin={origin} height={ceilingHeightM} />

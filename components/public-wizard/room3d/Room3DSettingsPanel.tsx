@@ -21,18 +21,6 @@ export function Room3DSettingsPanel({ wallCount }: { wallCount: number }) {
   return (
     <div className="space-y-4 text-xs">
       <div>
-        <p className="mb-1 font-semibold">Transparant plafond tonen</p>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={room3D.showCeiling}
-            onChange={(e) => patchRoom3D({ showCeiling: e.target.checked })}
-          />
-          {room3D.showCeiling ? "Aan" : "Uit"}
-        </label>
-      </div>
-
-      <div>
         <p className="mb-1 font-semibold">Vloer</p>
         <div className="flex flex-col gap-1">
           {FLOOR_PRESETS.map((preset) => (

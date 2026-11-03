@@ -91,6 +91,7 @@ export interface PublicWizardStore {
   obstacles: PublicObstacle[];
   addObstacle: (obstacle: PublicObstacle) => void;
   removeObstacle: (id: string) => void;
+  moveObstacle: (id: string, deltaX: number, deltaY: number) => void;
   selectedFixtureId: string | null;
   showHeatmap: boolean;
   historyPast: PlacedPublicFixture[][];
@@ -588,6 +589,25 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     set({ obstacles, fixtures: get().fixtures.filter(f => fixtureClearsObstacles(f,ppm,f.productId,f.rotation,obstacles)),
       primaryPanelFixtures: null, alternativeMixedFixtures: null, historyPast: [], historyFuture: [], editorMode: "select" });
     if (get().lightingPlanGenerated) get().generateLightingPlan();
+  },
+
+  moveObstacle: (id, deltaX, deltaY) => {
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return;
+    const state = get();
+    const obstacle = state.obstacles.find(o => o.id === id);
+    if (!obstacle || !state.pixelsPerMeter) return;
+    const points = obstacle.kind === "wall" ? [obstacle.start,obstacle.end] : [obstacle.center];
+    const padding = (obstacle.kind === "column" ? obstacle.radiusM : obstacle.thicknessM/2)*state.pixelsPerMeter;
+    const minX = Math.min(...points.map(p=>p.x))-padding, maxX = Math.max(...points.map(p=>p.x))+padding;
+    const minY = Math.min(...points.map(p=>p.y))-padding, maxY = Math.max(...points.map(p=>p.y))+padding;
+    const dx = Math.max(-minX,Math.min(deltaX,state.backgroundWidth-maxX));
+    const dy = Math.max(-minY,Math.min(deltaY,state.backgroundHeight-maxY));
+    const translate = (p:Point2D) => ({x:p.x+dx,y:p.y+dy});
+    const moved:PublicObstacle = obstacle.kind === "wall"
+      ? {...obstacle,start:translate(obstacle.start),end:translate(obstacle.end)}
+      : {...obstacle,center:translate(obstacle.center)};
+    set({obstacles:state.obstacles.map(o=>o.id===id?moved:o),primaryPanelFixtures:null,alternativeMixedFixtures:null,historyPast:[],historyFuture:[],selectedFixtureId:null});
+    if (state.lightingPlanGenerated) get().generateLightingPlan();
   },
 
   removeObstacle: (id) => {

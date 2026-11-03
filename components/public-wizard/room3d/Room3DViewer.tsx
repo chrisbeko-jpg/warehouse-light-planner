@@ -155,7 +155,7 @@ export function Room3DViewer({
       <div className="relative min-h-0 flex-1">
         <Canvas
           shadows={false}
-          dpr={[1, 1.75]}
+          dpr={[1, 1.5]}
           gl={{ preserveDrawingBuffer: true, antialias: true }}
           camera={{ fov: 50, near: 0.05, far: 200 }}
           onCreated={({ gl }) => {
