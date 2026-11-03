@@ -34,7 +34,7 @@ import type { Point2D } from "@/types/floor-plan";
 import type { CeilingTypeId, PlacedPublicFixture, PublicProductId } from "@/types/public-wizard";
 import {
   ELONGATED_COUNT_SEARCH_DELTA,
-  fixtureCountCandidates,
+  elongatedLayoutCountCandidates,
 } from "@/lib/public-wizard/indicative-lumen-method";
 
 export interface ElongatedModulePlacementResult {
@@ -244,7 +244,7 @@ function collectCandidates(
   const gridRotation = defaultElongatedPanelRotationForGrid(grid);
   const rotations = [gridRotation] as const;
 
-  const counts = new Set(fixtureCountCandidates(requiredCount, countDelta));
+  const counts = new Set(elongatedLayoutCountCandidates(requiredCount, countDelta));
 
   for (const rotation of rotations) {
     const validModules = validModulesForRotation(grid, vertices, pixelsPerMeter, productId, rotation);
@@ -285,15 +285,29 @@ function collectCandidates(
   return candidates;
 }
 
-function pickBest(candidates: ModuleMatrixCandidate[], nominalCount: number): ModuleMatrixCandidate | null {
+function professionalMatrixBonus(c: ModuleMatrixCandidate): number {
+  const cols = c.cols;
+  const rows = c.rows;
+  if (cols >= 3 && rows >= 3) return 12_000;
+  if (cols >= 3 || rows >= 3) return 4_000;
+  return 0;
+}
+
+function pickBest(
+  candidates: ModuleMatrixCandidate[],
+  nominalCount: number,
+  prioritizeLux: boolean,
+): ModuleMatrixCandidate | null {
   const pool = candidates;
   if (pool.length === 0) return null;
 
   const zeroAdj = pool.filter((c) => c.adjacentPairs === 0);
   let shortlist = zeroAdj.length > 0 ? zeroAdj : pool;
 
-  const luxOk = shortlist.filter((c) => c.meetsLuxTarget);
-  if (luxOk.length > 0) shortlist = luxOk;
+  if (prioritizeLux) {
+    const luxOk = shortlist.filter((c) => c.meetsLuxTarget);
+    if (luxOk.length > 0) shortlist = luxOk;
+  }
 
   const hasProfessionalMatrix = shortlist.some((c) => c.cols >= 3 && c.rows >= 3);
 
@@ -301,20 +315,26 @@ function pickBest(candidates: ModuleMatrixCandidate[], nominalCount: number): Mo
     if (a.adjacentPairs !== b.adjacentPairs) return a.adjacentPairs - b.adjacentPairs;
     const narrowTwoCol = (c: ModuleMatrixCandidate) => {
       if (c.cols !== 2) return 0;
-      if (hasProfessionalMatrix && c.rows >= 4) return -150_000;
-      if (c.rows >= 6) return -90_000;
-      return -25_000;
+      if (hasProfessionalMatrix && c.rows >= 4) return -200_000;
+      if (c.rows >= 6) return -120_000;
+      return -40_000;
     };
     const aNarrow = narrowTwoCol(a);
     const bNarrow = narrowTwoCol(b);
     if (aNarrow !== bNarrow) return bNarrow - aNarrow;
-    if (a.placedCount > nominalCount + 2 && b.placedCount <= nominalCount + 2) return 1;
-    if (b.placedCount > nominalCount + 2 && a.placedCount <= nominalCount + 2) return -1;
+
+    const aMax = a.maxSampleDistanceM ?? Infinity;
+    const bMax = b.maxSampleDistanceM ?? Infinity;
+    if (Math.abs(aMax - bMax) > 0.12) return aMax - bMax;
+
+    const aProf = professionalMatrixBonus(a);
+    const bProf = professionalMatrixBonus(b);
+    if (aProf !== bProf) return bProf - aProf;
+
     const flushPenalty = (c: ModuleMatrixCandidate) => {
       const w = c.spacing?.minWallMarginM ?? 0;
       if (w < 0.12) return -80_000;
       if (!isAutoWallClearanceAcceptable(w)) {
-        // Prefer full-room matrices over compact 2×N when walls are still reasonable (≥18 cm).
         if (w >= 0.18 && (c.maxSampleDistanceM ?? Infinity) < 2.05 && c.cols >= 3 && c.rows >= 3) {
           return -2_500;
         }
@@ -323,30 +343,27 @@ function pickBest(candidates: ModuleMatrixCandidate[], nominalCount: number): Mo
       }
       return 0;
     };
-    const aScore = a.score + flushPenalty(a);
-    const bScore = b.score + flushPenalty(b);
+    const aScore = a.score + flushPenalty(a) + aProf;
+    const bScore = b.score + flushPenalty(b) + bProf;
     if (bScore !== aScore) return bScore - aScore;
-    const aMax = a.maxSampleDistanceM ?? Infinity;
-    const bMax = b.maxSampleDistanceM ?? Infinity;
-    if (Math.abs(aMax - bMax) > 0.15) return aMax - bMax;
+
     const aWallOk = isAutoWallClearanceAcceptable(a.spacing?.minWallMarginM ?? 0);
     const bWallOk = isAutoWallClearanceAcceptable(b.spacing?.minWallMarginM ?? 0);
     if (aWallOk && !bWallOk) return -1;
     if (bWallOk && !aWallOk) return 1;
-    if (a.meetsLuxTarget && b.meetsLuxTarget) {
-      if (a.placedCount !== b.placedCount) return a.placedCount - b.placedCount;
+
+    if (prioritizeLux) {
+      if (a.meetsLuxTarget && b.meetsLuxTarget && a.placedCount !== b.placedCount) {
+        return a.placedCount - b.placedCount;
+      }
+      if (a.meetsLuxTarget !== b.meetsLuxTarget) return a.meetsLuxTarget ? -1 : 1;
+    } else if (!prioritizeLux && a.placedCount !== b.placedCount) {
+      return a.placedCount - b.placedCount;
     }
-    if (b.score !== a.score) return b.score - a.score;
+
     const aCount = Math.abs(a.placedCount - nominalCount);
     const bCount = Math.abs(b.placedCount - nominalCount);
     if (aCount !== bCount) return aCount - bCount;
-    if (a.cols !== b.cols) return b.cols - a.cols;
-    const aWall = a.spacing?.minWallMarginM ?? 0;
-    const bWall = b.spacing?.minWallMarginM ?? 0;
-    if (Math.abs(aWall - bWall) > 0.02) return bWall - aWall;
-    if (Math.abs(b.score - a.score) < 12_000 && a.rotation !== b.rotation) {
-      return a.rotation - b.rotation;
-    }
     const aBalance = Math.abs(a.rows - a.cols);
     const bBalance = Math.abs(b.rows - b.cols);
     if (aBalance !== bBalance) return aBalance - bBalance;
@@ -414,26 +431,43 @@ export function placeElongatedPanelsModuleFirst(
     };
   }
 
-  let best: ModuleMatrixCandidate | null = null;
-  let allCandidates: ModuleMatrixCandidate[] = [];
-  for (let center = requiredCount; center >= 1 && !best; center -= 6) {
-    const batch = collectCandidates(
+  const prioritizeLux = context.elongatedMeetLuxTarget === true;
+  const countDelta = prioritizeLux ? 16 : ELONGATED_COUNT_SEARCH_DELTA;
+  let allCandidates = collectCandidates(
+    grid,
+    vertices,
+    pixelsPerMeter,
+    productId,
+    context,
+    requiredCount,
+    countDelta,
+  );
+  if (allCandidates.length === 0) {
+    for (let center = requiredCount; center >= 1 && allCandidates.length === 0; center -= 6) {
+      allCandidates = collectCandidates(
+        grid,
+        vertices,
+        pixelsPerMeter,
+        productId,
+        context,
+        center,
+        countDelta,
+      );
+      if (center <= requiredCount - 48) break;
+    }
+  }
+  let best = pickBest(allCandidates, requiredCount, prioritizeLux);
+  if (prioritizeLux && best && !best.meetsLuxTarget) {
+    const extra = collectCandidates(
       grid,
       vertices,
       pixelsPerMeter,
       productId,
       context,
-      center,
-      ELONGATED_COUNT_SEARCH_DELTA,
+      requiredCount,
+      Math.max(countDelta, 24),
     );
-    if (batch.length > 0) {
-      allCandidates = batch;
-      best = pickBest(batch, requiredCount);
-    }
-    if (center <= requiredCount - 48) break;
-  }
-  if (!best && allCandidates.length > 0) {
-    best = pickBest(allCandidates, requiredCount);
+    best = pickBest(extra, requiredCount, prioritizeLux) ?? best;
   }
 
   if (!best) {

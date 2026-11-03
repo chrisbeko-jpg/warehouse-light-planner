@@ -47,6 +47,8 @@ export interface PanelLayoutContext {
   targetLux: number;
   ceilingHeightM: number;
   ceilingType?: CeilingTypeId;
+  /** When true, pick the smallest count that meets the lux target (e.g. “extra armaturen voorstellen”). */
+  elongatedMeetLuxTarget?: boolean;
 }
 
 export interface SpreadMetrics {

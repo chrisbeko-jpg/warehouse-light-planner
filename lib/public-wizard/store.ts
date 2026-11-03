@@ -21,6 +21,7 @@ import {
 } from "@/lib/public-wizard/placement";
 import { panelRotationForRoom } from "@/lib/public-wizard/matrix-placement";
 import { proposeMixedPanelDownlightPlan } from "@/lib/public-wizard/mixed-lighting-plan";
+import { formatLuxShortfallWarning, summarizeLuxShortfall } from "@/lib/public-wizard/lux-shortfall";
 import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import { getRoomFunction } from "@/lib/public-wizard/room-functions";
 import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
@@ -129,7 +130,8 @@ export interface PublicWizardStore {
   cancelPolygonDraft: () => void;
   setAiRecognitionState: (attempted: boolean, failed: boolean) => void;
   setRoomVertices: (vertices: Point2D[]) => void;
-  generateLightingPlan: () => boolean;
+  generateLightingPlan: (options?: { meetLuxTarget?: boolean }) => boolean;
+  suggestAdditionalElongatedFixtures: () => boolean;
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;
@@ -460,7 +462,8 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     });
   },
 
-  generateLightingPlan: () => {
+  generateLightingPlan: (options) => {
+    const meetLuxTarget = options?.meetLuxTarget === true;
     const {
       roomVertices,
       pixelsPerMeter,
@@ -491,6 +494,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
         targetLux,
         ceilingHeightM,
         ceilingType,
+        elongatedMeetLuxTarget: meetLuxTarget,
       },
     );
     const indicative = calculateIndicativeResult(
@@ -501,7 +505,17 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       count,
     );
     let layoutWarning = layout.warning ?? null;
-    if (!indicative.meetsTarget) {
+    if (!indicative.meetsTarget && isElongatedPanel(productId)) {
+      const summary = summarizeLuxShortfall(
+        room.areaM2,
+        targetLux,
+        ceilingHeightM,
+        productId,
+        layout.placedCount,
+        indicative.indicativeAverageLux,
+      );
+      layoutWarning = formatLuxShortfallWarning(summary);
+    } else if (!indicative.meetsTarget) {
       const note = `De nette indeling haalt het luxdoel indicatief niet: ${indicative.indicativeAverageLux} lux bij een doel van ${targetLux} lux.`;
       layoutWarning = layoutWarning ? `${layoutWarning} ${note}` : note;
     }
@@ -552,6 +566,8 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     });
     return true;
   },
+
+  suggestAdditionalElongatedFixtures: () => get().generateLightingPlan({ meetLuxTarget: true }),
 
   pushHistory: () => {
     const { fixtures, historyPast } = get();

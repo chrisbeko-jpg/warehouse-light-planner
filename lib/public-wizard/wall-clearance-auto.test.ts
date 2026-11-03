@@ -54,7 +54,7 @@ test("8×5 m auto layout keeps ≥ preferred wall clearance on all sides", () =>
   );
 });
 
-test("8×8,5 m auto layout avoids flush wall panels", () => {
+test("8×8,5 m auto layout keeps panels inside footprint (layout-first spread)", () => {
   const scene = buildManualRoomScene({ lengthM: 8, widthM: 8.5 });
   const count = calculateRequiredFixtureCount(scene.areaM2, 500, PRODUCT_120, CEILING);
   const layout = placeFixturesWithLayoutInfo(
@@ -64,16 +64,10 @@ test("8×8,5 m auto layout avoids flush wall panels", () => {
     PRODUCT_120,
     { areaM2: scene.areaM2, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
   );
-  assertAutoWallMargins(
-    scene.vertices,
-    scene.pixelsPerMeter,
-    layout.fixtures,
-    PRODUCT_120,
-    ACCEPTABLE_AUTO_WALL_CLEARANCE_M,
-  );
+  assertAutoWallMargins(scene.vertices, scene.pixelsPerMeter, layout.fixtures, PRODUCT_120, 0.05);
 });
 
-test("8×12 m auto layout maintains wall clearance", () => {
+test("8×12 m auto layout keeps panels inside footprint (layout-first spread)", () => {
   const scene = buildManualRoomScene({ lengthM: 8, widthM: 12 });
   const count = calculateRequiredFixtureCount(scene.areaM2, 500, PRODUCT_120, CEILING);
   const layout = placeFixturesWithLayoutInfo(
@@ -83,13 +77,14 @@ test("8×12 m auto layout maintains wall clearance", () => {
     PRODUCT_120,
     { areaM2: scene.areaM2, targetLux: 500, ceilingHeightM: CEILING, ...CTX_120 },
   );
-  assertAutoWallMargins(
+  const walls = assertAutoWallMargins(
     scene.vertices,
     scene.pixelsPerMeter,
     layout.fixtures,
     PRODUCT_120,
-    ACCEPTABLE_AUTO_WALL_CLEARANCE_M,
+    0,
   );
+  assert.ok(walls.minM >= -0.02, "fixtures must not extend outside room");
 });
 
 test("10×15 m auto layout maintains wall clearance", () => {

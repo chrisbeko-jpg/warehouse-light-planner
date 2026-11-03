@@ -24,7 +24,13 @@ test("mixed plan is not offered when panel layout already meets lux", () => {
     PPM,
     18,
     "led_panel_1200x300_4000",
-    { areaM2: 56, targetLux: 500, ceilingHeightM: 2.7, ceilingType: "grid_1200_600" },
+    {
+      areaM2: 56,
+      targetLux: 500,
+      ceilingHeightM: 2.7,
+      ceilingType: "grid_1200_600",
+      elongatedMeetLuxTarget: true,
+    },
     "grid_1200_600",
   );
   const mixed = proposeMixedPanelDownlightPlan({

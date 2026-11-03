@@ -100,6 +100,9 @@ export function StepEditor() {
   const setRoomVertices = usePublicWizardStore((s) => s.setRoomVertices);
   const setAiRecognitionState = usePublicWizardStore((s) => s.setAiRecognitionState);
   const generateLightingPlan = usePublicWizardStore((s) => s.generateLightingPlan);
+  const suggestAdditionalElongatedFixtures = usePublicWizardStore(
+    (s) => s.suggestAdditionalElongatedFixtures,
+  );
   const selectFixture = usePublicWizardStore((s) => s.selectFixture);
   const moveFixtureByIdWithHistory = usePublicWizardStore((s) => s.moveFixtureByIdWithHistory);
   const deleteSelectedFixture = usePublicWizardStore((s) => s.deleteSelectedFixture);
@@ -556,6 +559,8 @@ export function StepEditor() {
             }}
             layoutWarning={layoutWarning}
             editorMessage={editorMessage}
+            preferredProductId={preferredProductId}
+            onSuggestAdditionalFixtures={() => suggestAdditionalElongatedFixtures()}
             onToggleHeatmap={() => setShowHeatmap(!showHeatmap)}
             onContinue={() => {
               if (fixtures.length > 0) nextStep();
@@ -1017,6 +1022,8 @@ function SidePanel({
   onAddDownlight,
   layoutWarning,
   editorMessage,
+  preferredProductId,
+  onSuggestAdditionalFixtures,
   onToggleHeatmap,
   onContinue,
 }: {
@@ -1047,6 +1054,8 @@ function SidePanel({
   onAddDownlight: () => void;
   layoutWarning: string | null;
   editorMessage: string | null;
+  preferredProductId: string;
+  onSuggestAdditionalFixtures: () => void;
   onToggleHeatmap: () => void;
   onContinue: () => void;
 }) {
@@ -1153,9 +1162,20 @@ function SidePanel({
               </div>
             )}
             {layoutWarning && (
-              <p className="rounded-lg bg-orange-50 p-2 text-xs text-orange-800" data-testid="layout-warning">
-                {layoutWarning}
-              </p>
+              <div className="space-y-2 rounded-lg bg-orange-50 p-2 text-xs text-orange-800" data-testid="layout-warning">
+                <p className="font-semibold">Verlichtingsniveau lager dan doelwaarde</p>
+                <p>{layoutWarning.replace(/^Verlichtingsniveau lager dan doelwaarde\.?\s*/i, "")}</p>
+                {preferredProductId === "led_panel_1200x300_4000" && (
+                  <button
+                    type="button"
+                    className="lp-btn-secondary w-full text-xs font-semibold"
+                    data-testid="suggest-additional-fixtures-button"
+                    onClick={onSuggestAdditionalFixtures}
+                  >
+                    Aanvullende armaturen voorstellen
+                  </button>
+                )}
+              </div>
             )}
             {editorMessage && (
               <p className="rounded-lg bg-[var(--lp-green-soft)] p-2 text-xs text-[var(--lp-green-dark)]" data-testid="editor-message">

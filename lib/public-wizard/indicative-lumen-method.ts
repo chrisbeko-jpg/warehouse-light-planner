@@ -19,7 +19,36 @@ export const INDICATIVE_REFLECTANCE = {
 
 export const INDICATIVE_LUX_TOLERANCE = 0.95;
 
-export const ELONGATED_COUNT_SEARCH_DELTA = 3;
+/** Symmetric search around nominal count (layout-first mode). */
+export const ELONGATED_COUNT_SEARCH_DELTA = 2;
+
+export function isProfessionalMatrixCount(panelCount: number): boolean {
+  if (panelCount < 9) return false;
+  for (let cols = 3; cols <= 12; cols++) {
+    if (panelCount % cols !== 0) continue;
+    const rows = panelCount / cols;
+    if (rows >= 3 && cols >= 3) return true;
+  }
+  return false;
+}
+
+/** Nominal ±delta plus nearby professional matrix totals (e.g. 15 when nominal is 18). */
+export function elongatedLayoutCountCandidates(
+  nominalCount: number,
+  delta = ELONGATED_COUNT_SEARCH_DELTA,
+): number[] {
+  const counts = new Set(fixtureCountCandidates(nominalCount, delta));
+  const professionalUpper = nominalCount + Math.max(delta, ELONGATED_COUNT_SEARCH_DELTA);
+  for (let n = Math.max(6, nominalCount - 5); n <= professionalUpper; n++) {
+    if (isProfessionalMatrixCount(n)) counts.add(n);
+  }
+  if (delta > ELONGATED_COUNT_SEARCH_DELTA) {
+    for (let n = nominalCount + 1; n <= nominalCount + delta; n++) {
+      counts.add(n);
+    }
+  }
+  return [...counts].sort((a, b) => a - b);
+}
 
 export const CALCULATION_DISCLAIMER_ELONGATED =
   "Indicatieve lichtberekening op basis van de lumenmethode (N = E×A / Φ×UF×MF). Geen gevalideerde Relux- of DIALux-berekening. Voor definitieve toetsing aan projecteisen is een fotometrische lichtberekening noodzakelijk.";

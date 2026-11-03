@@ -29,7 +29,7 @@ test("plafondhoogte beïnvloedt UF en benodigd aantal (8×6)", () => {
   assert.ok(counts[3]! >= counts[0]!);
 });
 
-test("8×6×2,7 m — geen standaard 2-kolomsmatrix bij 500 lux", () => {
+test("8×6×2,7 m — standaard 3×5 (15) layout-first, luxwaarschuwing bij 500 lux", () => {
   const scene = buildManualRoomScene({ lengthM: 8, widthM: 6 });
   const nominal = calculateRequiredFixtureCount(AREA, 500, PRODUCT, 2.7);
   const layout = placeElongatedPanelsModuleFirst(
@@ -39,10 +39,13 @@ test("8×6×2,7 m — geen standaard 2-kolomsmatrix bij 500 lux", () => {
     PRODUCT,
     { areaM2: AREA, targetLux: 500, ceilingHeightM: 2.7, ceilingType: "grid_1200_600" },
   );
-  assert.ok(layout.matrixCols! >= 3, `expected ≥3 cols, got ${layout.matrixCols}×${layout.matrixRows}`);
+  assert.equal(layout.placedCount, 15, `expected 15 panels, nominal ${nominal}`);
+  assert.equal(layout.matrixCols, 3);
+  assert.equal(layout.matrixRows, 5);
   assert.equal(layout.placedCount, layout.moduleIndices.length);
   const lux = calculateIndicativeResult(AREA, 500, 2.7, layout.fixtures, nominal);
-  assert.ok(lux.meetsTarget, `lux ${lux.indicativeAverageLux} below target`);
+  assert.equal(lux.meetsTarget, false);
+  assert.ok(lux.indicativeAverageLux < 500);
 });
 
 test("CMS lumens override ignored until photometry is confirmed (120×30)", () => {
