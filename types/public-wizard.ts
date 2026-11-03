@@ -16,7 +16,11 @@ export type CeilingTypeId = "grid_600" | "grid_1200_600" | "concrete";
 
 export type WizardInputMethod = "floorplan" | "dimensions";
 
-export type RoomFunctionId = "workplace_office" | "meeting_room" | "reception_hall" | "other_spaces";
+export type RoomFunctionId =
+  | "workplace_office"
+  | "meeting_room"
+  | "reception_hall"
+  | "other_spaces";
 
 export interface ManualDimensions {
   lengthM: number;
@@ -52,7 +56,15 @@ export type LeadStatus =
 
 export type PublicObstacle =
   | { id: string; kind: "wall"; start: Point2D; end: Point2D; thicknessM: number }
-  | { id: string; kind: "column"; center: Point2D; radiusM: number };
+  | { id: string; kind: "column"; center: Point2D; radiusM: number }
+  | {
+      id: string;
+      kind: "rect";
+      center: Point2D;
+      widthM: number;
+      lengthM: number;
+      rotation?: number;
+    };
 
 export interface PlacedPublicFixture {
   id: string;

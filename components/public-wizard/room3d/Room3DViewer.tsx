@@ -13,7 +13,13 @@ import {
   wallSegmentsM,
 } from "@/lib/public-wizard/room3d-coords";
 import type { Point2D } from "@/types/floor-plan";
-import type { CeilingTypeId, PlacedPublicFixture, Room3DCameraPreset, Room3DSettings, PublicObstacle } from "@/types/public-wizard";
+import type {
+  CeilingTypeId,
+  PlacedPublicFixture,
+  PublicObstacle,
+  Room3DCameraPreset,
+  Room3DSettings,
+} from "@/types/public-wizard";
 
 function CameraRig({
   preset,

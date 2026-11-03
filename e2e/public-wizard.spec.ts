@@ -100,15 +100,16 @@ test.describe("Public LED site & wizard", () => {
     await expect(page.getByText(/plattegrond/i).first()).toBeVisible();
   });
 
-  test("wizard CMS endpoint serves three room choices", async ({ request }) => {
+  test("wizard CMS endpoint serves four room choices", async ({ request }) => {
     const res = await request.get("/api/cms/wizard");
     expect(res.ok()).toBeTruthy();
     const data = (await res.json()) as {
       roomChoices: { id: string; title: string; suggestedLux: number }[];
       atmosphereChoices: { id: string; enabled: boolean }[];
     };
-    expect(data.roomChoices.length).toBe(3);
+    expect(data.roomChoices.length).toBe(4);
     expect(data.roomChoices.map((c) => c.id).sort()).toEqual([
+      "meeting_room",
       "other_spaces",
       "reception_hall",
       "workplace_office",

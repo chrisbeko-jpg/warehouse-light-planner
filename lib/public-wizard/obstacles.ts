@@ -42,6 +42,34 @@ export function fixtureClearsObstacles(
       const dy = Math.max(top-o.center.y, 0, o.center.y-bottom);
       return Math.hypot(dx,dy) > o.radiusM*ppm + clearance;
     }
+    if (o.kind === "rect") {
+      const halfW = (o.widthM / 2) * ppm;
+      const halfL = (o.lengthM / 2) * ppm;
+      const rad = ((o.rotation ?? 0) * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const corners = [
+        { x: left, y: top },
+        { x: right, y: top },
+        { x: right, y: bottom },
+        { x: left, y: bottom },
+      ];
+      for (const c of corners) {
+        const lx = c.x - o.center.x;
+        const ly = c.y - o.center.y;
+        const rx = lx * cos + ly * sin;
+        const ry = -lx * sin + ly * cos;
+        if (Math.abs(rx) <= halfW + clearance && Math.abs(ry) <= halfL + clearance) return false;
+      }
+      const cx = o.center.x;
+      const cy = o.center.y;
+      const lx = cx - o.center.x;
+      const ly = cy - o.center.y;
+      const rx = lx * cos + ly * sin;
+      const ry = -lx * sin + ly * cos;
+      if (Math.abs(rx) <= halfW + clearance && Math.abs(ry) <= halfL + clearance) return false;
+      return true;
+    }
     if (crossesBox(o.start,o.end,left,top,right,bottom)) return false;
     const corners = [{x:left,y:top},{x:right,y:top},{x:right,y:bottom},{x:left,y:bottom}];
     const toBox = (p: Point2D) => Math.hypot(Math.max(left-p.x,0,p.x-right),Math.max(top-p.y,0,p.y-bottom));

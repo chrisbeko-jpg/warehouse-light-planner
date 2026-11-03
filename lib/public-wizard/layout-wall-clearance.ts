@@ -2,11 +2,14 @@ import { getFixtureFootprintCorners } from "@/lib/public-wizard/placement-constr
 import type { Point2D } from "@/types/floor-plan";
 import type { PublicProductId } from "@/types/public-wizard";
 
-/** Preferred free space from room boundary to fixture outer edge (automatic placement only). */
+/** Soft preference for symmetric margins — not a mounting requirement. */
 export const PREFERRED_AUTO_WALL_CLEARANCE_M = 0.6;
 
-/** Still acceptable when no layout reaches the preferred distance. */
+/** Legacy threshold for tests that expect “comfortable” margins when geometry allows. */
 export const ACCEPTABLE_AUTO_WALL_CLEARANCE_M = 0.4;
+
+/** Lichttechnisch beoordelingsgebied (m) — see lighting-assessment.ts */
+export { LIGHTING_ASSESSMENT_INSET_M } from "@/lib/public-wizard/lighting-assessment";
 
 export interface LayoutWallMarginsM {
   leftM: number;
@@ -63,25 +66,14 @@ export function computeLayoutWallMarginsM(
   return { leftM: l, rightM: r, topM: t, bottomM: b, minM: Math.min(l, r, t, b) };
 }
 
-/** Score delta for auto-layout (positive = better). */
+/** Secondary tie-breaker only — must not block valid in-room grid placement. */
 export function autoWallClearanceScoreAdjustment(minWallM: number): number {
-  if (minWallM >= PREFERRED_AUTO_WALL_CLEARANCE_M) return 9000;
-  if (minWallM >= PREFERRED_AUTO_WALL_CLEARANCE_M - 0.05) {
-    return 6500 + (minWallM - (PREFERRED_AUTO_WALL_CLEARANCE_M - 0.05)) * 50_000;
-  }
+  if (minWallM >= PREFERRED_AUTO_WALL_CLEARANCE_M) return 900;
   if (minWallM >= ACCEPTABLE_AUTO_WALL_CLEARANCE_M) {
-    return 2500 + (minWallM - ACCEPTABLE_AUTO_WALL_CLEARANCE_M) * 20_000;
+    return 200 + (minWallM - ACCEPTABLE_AUTO_WALL_CLEARANCE_M) * 400;
   }
-  if (minWallM >= 0.2) {
-    return -4000 + (minWallM - 0.2) * 13_000;
-  }
-  if (minWallM >= 0.1) {
-    return -18_000 + (minWallM - 0.1) * 140_000;
-  }
-  if (minWallM >= 0.05) {
-    return -28_000 + (minWallM - 0.05) * 200_000;
-  }
-  return -45_000;
+  if (minWallM >= 0.05) return 0;
+  return -8000;
 }
 
 /**
@@ -97,8 +89,9 @@ export function isAutoWallClearanceAcceptable(minWallM: number): boolean {
 }
 
 export function autoWallClearanceMatrixPickAdjustment(minWallM: number): number {
-  if (isAutoWallClearanceAcceptable(minWallM)) return 0;
-  return -100_000 + minWallM * 50_000;
+  if (isAutoWallClearanceAcceptable(minWallM)) return 50;
+  if (minWallM >= 0.05) return 0;
+  return -4000;
 }
 
 /** @deprecated use autoWallClearanceScoreAdjustment */

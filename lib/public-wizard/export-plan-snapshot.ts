@@ -63,8 +63,20 @@ function drawPlan(
   ctx.strokeStyle = "#475569";
   for (const o of obstacles) {
     ctx.beginPath();
-    if (o.kind === "column") { ctx.arc(o.center.x,o.center.y,o.radiusM*pixelsPerMeter,0,Math.PI*2);ctx.fill(); }
-    else {ctx.lineWidth=o.thicknessM*pixelsPerMeter;ctx.lineCap="round";ctx.moveTo(o.start.x,o.start.y);ctx.lineTo(o.end.x,o.end.y);ctx.stroke();}
+    if (o.kind === "column") {
+      ctx.arc(o.center.x, o.center.y, o.radiusM * pixelsPerMeter, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (o.kind === "wall") {
+      ctx.lineWidth = o.thicknessM * pixelsPerMeter;
+      ctx.lineCap = "round";
+      ctx.moveTo(o.start.x, o.start.y);
+      ctx.lineTo(o.end.x, o.end.y);
+      ctx.stroke();
+    } else {
+      const halfW = (o.widthM * pixelsPerMeter) / 2;
+      const halfL = (o.lengthM * pixelsPerMeter) / 2;
+      ctx.fillRect(o.center.x - halfW, o.center.y - halfL, o.widthM * pixelsPerMeter, o.lengthM * pixelsPerMeter);
+    }
   }
   for (const fixture of fixtures) {
     const product = getPublicProduct(fixture.productId);

@@ -35,6 +35,7 @@ test("mergeWizardContent returns four distinct room choices after legacy stored 
     ["meeting_room", "other_spaces", "reception_hall", "workplace_office"],
   );
   assert.equal(merged.roomChoices.find((c) => c.id === "workplace_office")?.suggestedLux, 500);
+  assert.equal(merged.roomChoices.find((c) => c.id === "meeting_room")?.suggestedLux, 400);
   assert.equal(merged.roomChoices.find((c) => c.id === "reception_hall")?.suggestedLux, 250);
   assert.equal(merged.roomChoices.find((c) => c.id === "other_spaces")?.suggestedLux, 150);
 });

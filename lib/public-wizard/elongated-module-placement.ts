@@ -20,6 +20,7 @@ import {
 } from "@/lib/public-wizard/elongated-layout-coverage";
 import type { MatrixSpacingMetrics } from "@/lib/public-wizard/matrix-spacing-metrics";
 import { computeMatrixSpacingMetrics } from "@/lib/public-wizard/matrix-spacing-metrics";
+import { isFixturePlacementAllowed } from "@/lib/public-wizard/plan-obstacles";
 import { isPanelFootprintInsideRoom } from "@/lib/public-wizard/placement-constraints";
 import {
   buildRoomCeilingGrid,
@@ -58,12 +59,25 @@ function validModulesForRotation(
   pixelsPerMeter: number,
   productId: PublicProductId,
   rotation: number,
+  obstacles: PanelLayoutContext["obstacles"],
 ): ModuleIndex[] {
   const valid: ModuleIndex[] = [];
+  const blocks = obstacles ?? [];
   for (const { col, row } of listAllModuleIndices(grid)) {
     if (!isElongatedPanelContainedInModule(grid, col, row, productId, rotation)) continue;
     const center = elongatedPanelCenterPx(grid, col, row, productId, rotation);
-    if (isPanelFootprintInsideRoom(center, pixelsPerMeter, vertices, productId, rotation)) {
+    const inside = isPanelFootprintInsideRoom(center, pixelsPerMeter, vertices, productId, rotation);
+    if (
+      isFixturePlacementAllowed(
+        center,
+        pixelsPerMeter,
+        vertices,
+        productId,
+        rotation,
+        blocks,
+        inside,
+      )
+    ) {
       valid.push({ col, row });
     }
   }
@@ -247,7 +261,14 @@ function collectCandidates(
   const counts = new Set(elongatedLayoutCountCandidates(requiredCount, countDelta));
 
   for (const rotation of rotations) {
-    const validModules = validModulesForRotation(grid, vertices, pixelsPerMeter, productId, rotation);
+    const validModules = validModulesForRotation(
+      grid,
+      vertices,
+      pixelsPerMeter,
+      productId,
+      rotation,
+      context.obstacles,
+    );
     if (validModules.length === 0) continue;
 
     const validRows = [...new Set(validModules.map((m) => m.row))].sort((a, b) => a - b);

@@ -30,7 +30,13 @@ import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
 import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import { pointInPolygon } from "@/lib/public-wizard/placement";
 import type { Point2D } from "@/types/floor-plan";
-import type { CeilingTypeId, PlacedPublicFixture, PublicProductId, PublicObstacle } from "@/types/public-wizard";
+import { augmentFixturesToTargetCount, dynamicMatrixSearchLimits } from "@/lib/public-wizard/layout-augment";
+import type {
+  CeilingTypeId,
+  PlacedPublicFixture,
+  PublicObstacle,
+  PublicProductId,
+} from "@/types/public-wizard";
 
 export const PANEL_SIZE_M = 0.6;
 
@@ -536,6 +542,7 @@ function computeBestModuleMatrixLayout(
 
   const bounds = polygonBounds(vertices);
   const roomAspect = grid.roomWidthM / Math.max(grid.roomHeightM, 0.01);
+  const limits = dynamicMatrixSearchLimits(requiredCount);
   const best = selectBestDistributedModuleMatrix({
     sortedRows,
     colsByRow,
@@ -547,6 +554,8 @@ function computeBestModuleMatrixLayout(
     productId,
     context,
     rotation: 0,
+    maxMatrixDim: limits.maxMatrixDim,
+    countSearchDelta: limits.countSearchDelta,
   });
 
   if (!best) return null;
@@ -689,7 +698,7 @@ export function placePanelsOnCeilingGrid(
   const matrixRows = layout?.rows;
   const matrixCols = layout?.cols;
 
-  const fixtures: PlacedPublicFixture[] = bestPoints.map((point) => ({
+  let fixtures: PlacedPublicFixture[] = bestPoints.map((point) => ({
     id: nextId(),
     productId,
     x: point.x,
@@ -697,11 +706,22 @@ export function placePanelsOnCeilingGrid(
     rotation: 0,
   }));
 
+  if (fixtures.length < targetCount && !isElongatedPanel(productId)) {
+    fixtures = augmentFixturesToTargetCount(
+      fixtures,
+      targetCount,
+      vertices,
+      pixelsPerMeter,
+      productId,
+      context,
+    );
+  }
+
   let warning: string | undefined;
   if (fixtures.length > targetCount && matrixRows && matrixCols) {
     warning = `Theoretisch benodigd: ${targetCount} panelen. Gekozen nette verdeling: ${fixtures.length} panelen (${matrixRows}×${matrixCols} matrix).`;
   } else if (fixtures.length < targetCount) {
-    warning = `Theoretisch benodigd: ${targetCount} panelen. Gekozen nette verdeling: ${fixtures.length} panelen (minimaal 60 cm wandafstand).`;
+    warning = `Theoretisch benodigd: ${targetCount} panelen. Geplaatst: ${fixtures.length} panelen (geen extra geldige plafondmodules binnen de ruimte).`;
   }
 
   return {

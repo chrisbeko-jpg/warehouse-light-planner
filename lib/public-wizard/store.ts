@@ -61,7 +61,14 @@ import {
 } from "@/lib/public-wizard/viewport";
 import { SCALE_RESET_PATCH } from "@/lib/public-wizard/scale-reset-patch";
 
-export type PublicEditorMode = "select" | "calibrate-scale" | "draw-room" | "draw-wall" | "draw-column" | "pan";
+export type PublicEditorMode =
+  | "select"
+  | "calibrate-scale"
+  | "draw-room"
+  | "draw-wall"
+  | "draw-column"
+  | "draw-rect"
+  | "pan";
 
 export type EditorPhase = "scale" | "room" | "plan";
 
@@ -581,10 +588,29 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   addObstacle: (obstacle) => {
     const ppm = get().pixelsPerMeter;
     if (!ppm) return;
-    const points = obstacle.kind === "wall" ? [obstacle.start, obstacle.end] : [obstacle.center];
-    if (points.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return;
-    if (obstacle.kind === "wall" && (!Number.isFinite(obstacle.thicknessM) || obstacle.thicknessM <= 0 || Math.hypot(obstacle.end.x-obstacle.start.x, obstacle.end.y-obstacle.start.y) < ppm*0.05)) return;
-    if (obstacle.kind === "column" && (!Number.isFinite(obstacle.radiusM) || obstacle.radiusM <= 0)) return;
+    const points =
+      obstacle.kind === "wall" ? [obstacle.start, obstacle.end] : [obstacle.center];
+    if (points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return;
+    if (
+      obstacle.kind === "wall" &&
+      (!Number.isFinite(obstacle.thicknessM) ||
+        obstacle.thicknessM <= 0 ||
+        Math.hypot(obstacle.end.x - obstacle.start.x, obstacle.end.y - obstacle.start.y) < ppm * 0.05)
+    ) {
+      return;
+    }
+    if (obstacle.kind === "column" && (!Number.isFinite(obstacle.radiusM) || obstacle.radiusM <= 0)) {
+      return;
+    }
+    if (
+      obstacle.kind === "rect" &&
+      (!Number.isFinite(obstacle.widthM) ||
+        !Number.isFinite(obstacle.lengthM) ||
+        obstacle.widthM <= 0 ||
+        obstacle.lengthM <= 0)
+    ) {
+      return;
+    }
     const obstacles = [...get().obstacles, obstacle];
     set({ obstacles, fixtures: get().fixtures.filter(f => fixtureClearsObstacles(f,ppm,f.productId,f.rotation,obstacles)),
       primaryPanelFixtures: null, alternativeMixedFixtures: null, historyPast: [], historyFuture: [], editorMode: "select" });
@@ -596,16 +622,23 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     const state = get();
     const obstacle = state.obstacles.find(o => o.id === id);
     if (!obstacle || !state.pixelsPerMeter) return;
-    const points = obstacle.kind === "wall" ? [obstacle.start,obstacle.end] : [obstacle.center];
-    const padding = (obstacle.kind === "column" ? obstacle.radiusM : obstacle.thicknessM/2)*state.pixelsPerMeter;
+    const points = obstacle.kind === "wall" ? [obstacle.start, obstacle.end] : [obstacle.center];
+    const paddingM =
+      obstacle.kind === "column"
+        ? obstacle.radiusM
+        : obstacle.kind === "rect"
+          ? Math.max(obstacle.widthM, obstacle.lengthM) / 2
+          : obstacle.thicknessM / 2;
+    const padding = paddingM * state.pixelsPerMeter;
     const minX = Math.min(...points.map(p=>p.x))-padding, maxX = Math.max(...points.map(p=>p.x))+padding;
     const minY = Math.min(...points.map(p=>p.y))-padding, maxY = Math.max(...points.map(p=>p.y))+padding;
     const dx = Math.max(-minX,Math.min(deltaX,state.backgroundWidth-maxX));
     const dy = Math.max(-minY,Math.min(deltaY,state.backgroundHeight-maxY));
     const translate = (p:Point2D) => ({x:p.x+dx,y:p.y+dy});
-    const moved:PublicObstacle = obstacle.kind === "wall"
-      ? {...obstacle,start:translate(obstacle.start),end:translate(obstacle.end)}
-      : {...obstacle,center:translate(obstacle.center)};
+    const moved: PublicObstacle =
+      obstacle.kind === "wall"
+        ? { ...obstacle, start: translate(obstacle.start), end: translate(obstacle.end) }
+        : { ...obstacle, center: translate(obstacle.center) };
     set({obstacles:state.obstacles.map(o=>o.id===id?moved:o),primaryPanelFixtures:null,alternativeMixedFixtures:null,historyPast:[],historyFuture:[],selectedFixtureId:null});
     if (state.lightingPlanGenerated) get().generateLightingPlan();
   },
@@ -735,7 +768,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     if (!position) {
       set({
         editorMessage:
-          "Er is binnen de huidige ruimte geen geschikte vrije positie meer met minimaal 60 cm wandafstand.",
+          "Geen vrije plafondmodule meer binnen de ruimte (rekening houdend met obstakels).",
       });
       return false;
     }

@@ -337,13 +337,30 @@ export function StepEditor() {
       if (!pixelsPerMeter) return;
 
       if (editorMode === "draw-column") {
-        addObstacle({ id: `ob-${Date.now()}`, kind: "column", center: clamped, radiusM: columnDiameter/2 });
+        addObstacle({ id: `ob-${Date.now()}`, kind: "column", center: clamped, radiusM: columnDiameter / 2 });
+        return;
+      }
+      if (editorMode === "draw-rect") {
+        addObstacle({
+          id: `ob-${Date.now()}`,
+          kind: "rect",
+          center: clamped,
+          widthM: 0.6,
+          lengthM: 1.2,
+          rotation: 0,
+        });
         return;
       }
       if (editorMode === "draw-wall") {
         if (!obstacleStart) setObstacleStart(clamped);
         else {
-          addObstacle({ id: `ob-${Date.now()}`, kind: "wall", start: obstacleStart, end: clamped, thicknessM: wallThickness });
+          addObstacle({
+            id: `ob-${Date.now()}`,
+            kind: "wall",
+            start: obstacleStart,
+            end: clamped,
+            thicknessM: wallThickness,
+          });
           setObstacleStart(null);
         }
         return;
@@ -589,6 +606,21 @@ export function StepEditor() {
             editorMessage={editorMessage}
             preferredProductId={preferredProductId}
             onSuggestAdditionalFixtures={() => suggestAdditionalElongatedFixtures()}
+            onStartInnerWall={() => {
+              setEditorPlanView("2d");
+              setObstacleStart(null);
+              setEditorMode("draw-wall");
+            }}
+            onStartRoundColumn={() => {
+              setEditorPlanView("2d");
+              setObstacleStart(null);
+              setEditorMode("draw-column");
+            }}
+            onStartRectObstacle={() => {
+              setEditorPlanView("2d");
+              setObstacleStart(null);
+              setEditorMode("draw-rect");
+            }}
             onToggleHeatmap={() => setShowHeatmap(!showHeatmap)}
             onContinue={() => {
               if (fixtures.length > 0) nextStep();
@@ -602,14 +634,43 @@ export function StepEditor() {
             <div className="flex flex-wrap gap-2">
               <button type="button" className="lp-btn-secondary text-xs" onClick={()=>{setEditorPlanView("2d");setObstacleStart(null);setEditorMode("draw-wall");}}>+ Wand tekenen</button>
               <button type="button" className="lp-btn-secondary text-xs" onClick={()=>{setEditorPlanView("2d");setObstacleStart(null);setEditorMode("draw-column");}}>+ Ronde pilaar</button>
-              {(editorMode === "draw-wall" || editorMode === "draw-column") && <button type="button" className="lp-btn-secondary text-xs" onClick={()=>{setObstacleStart(null);setEditorMode("select");}}>Annuleren</button>}
+              <button type="button" className="lp-btn-secondary text-xs" onClick={()=>{setEditorPlanView("2d");setObstacleStart(null);setEditorMode("draw-rect");}}>+ Rechthoekig obstakel</button>
+              {(editorMode === "draw-wall" || editorMode === "draw-column" || editorMode === "draw-rect") && <button type="button" className="lp-btn-secondary text-xs" onClick={()=>{setObstacleStart(null);setEditorMode("select");}}>Annuleren</button>}
             </div>
-            {obstacles.map((o,i)=><div key={o.id} className="flex items-center justify-between border-b py-1"><span>{o.kind==="wall"?"Wand":"Ronde pilaar"} {i+1}</span><button type="button" aria-label={`Verwijder obstakel ${i+1}`} className="underline" onClick={()=>removeObstacle(o.id)}>Verwijderen</button></div>)}
+            {obstacles.map((o, i) => (
+              <div key={o.id} className="flex items-center justify-between border-b py-1">
+                <span>
+                  {o.kind === "wall" ? "Wand" : o.kind === "column" ? "Ronde pilaar" : "Rechthoekig obstakel"}{" "}
+                  {i + 1}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Verwijder obstakel ${i + 1}`}
+                  className="underline"
+                  onClick={() => removeObstacle(o.id)}
+                >
+                  Verwijderen
+                </button>
+              </div>
+            ))}
           </section>}
         </aside>
 
         <div ref={canvasRef} data-testid="editor-canvas-area" className="relative min-w-0 flex-1 bg-[var(--lp-editor-bg)]">
-          {(editorMode === "draw-wall" || editorMode === "draw-column") && <p role="status" className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded bg-black/80 p-3 text-sm text-white">{editorMode === "draw-column" ? "Klik op het middelpunt van de pilaar." : obstacleStart ? "Klik op het eindpunt van de wand." : "Klik op het beginpunt van de wand."}</p>}
+          {(editorMode === "draw-wall" || editorMode === "draw-column" || editorMode === "draw-rect") && (
+            <p
+              role="status"
+              className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded bg-black/80 p-3 text-sm text-white"
+            >
+              {editorMode === "draw-column"
+                ? "Klik op het middelpunt van de pilaar."
+                : editorMode === "draw-rect"
+                  ? "Klik op het middelpunt van het rechthoekige obstakel."
+                  : obstacleStart
+                    ? "Klik op het eindpunt van de wand."
+                    : "Klik op het beginpunt van de wand."}
+            </p>
+          )}
           {scaleInstruction && (
             <div
               className="pointer-events-none absolute left-1/2 top-3 z-10 flex max-w-[min(100%,28rem)] -translate-x-1/2 flex-col items-center gap-2 px-3 sm:flex-row"
@@ -840,23 +901,69 @@ export function StepEditor() {
                     />
                   </>
                 )}
-                {pixelsPerMeter && obstacles.map(o => {
-                  const anchor = o.kind === "wall" ? o.start : o.center;
-                  const draggable = !isPanning && editorMode === "select";
-                  return <Group key={o.id} x={anchor.x} y={anchor.y} draggable={draggable} listening={draggable}
-                    onClick={e=>{e.cancelBubble=true;selectFixture(null);}}
-                    onDragStart={e=>{e.cancelBubble=true;}}
-                    onDragEnd={e=>{
-                      e.cancelBubble=true;
-                      moveObstacle(o.id,e.target.x()-anchor.x,e.target.y()-anchor.y);
-                      const moved=usePublicWizardStore.getState().obstacles.find(item=>item.id===o.id);
-                      if (moved) e.target.position(moved.kind === "wall" ? moved.start : moved.center);
-                    }}>
-                    {o.kind === "wall"
-                      ? <Line points={[0,0,o.end.x-o.start.x,o.end.y-o.start.y]} stroke="#475569" strokeWidth={Math.max(3/viewState.scale,o.thicknessM*pixelsPerMeter)} hitStrokeWidth={Math.max(14/viewState.scale,o.thicknessM*pixelsPerMeter)} lineCap="round" />
-                      : <Circle radius={o.radiusM*pixelsPerMeter} fill="#475569" stroke="#f59e0b" strokeWidth={2/viewState.scale} />}
-                  </Group>;
-                })}
+                {pixelsPerMeter &&
+                  obstacles.map((o) => {
+                    const anchor = o.kind === "wall" ? o.start : o.center;
+                    const draggable = !isPanning && editorMode === "select";
+                    return (
+                      <Group
+                        key={o.id}
+                        x={anchor.x}
+                        y={anchor.y}
+                        draggable={draggable}
+                        listening={draggable}
+                        onClick={(e) => {
+                          e.cancelBubble = true;
+                          selectFixture(null);
+                        }}
+                        onDragStart={(e) => {
+                          e.cancelBubble = true;
+                        }}
+                        onDragEnd={(e) => {
+                          e.cancelBubble = true;
+                          moveObstacle(o.id, e.target.x() - anchor.x, e.target.y() - anchor.y);
+                          const moved = usePublicWizardStore.getState().obstacles.find((item) => item.id === o.id);
+                          if (moved) {
+                            e.target.position(moved.kind === "wall" ? moved.start : moved.center);
+                          }
+                        }}
+                      >
+                        {o.kind === "wall" ? (
+                          <Line
+                            points={[0, 0, o.end.x - o.start.x, o.end.y - o.start.y]}
+                            stroke="#475569"
+                            strokeWidth={Math.max(3 / viewState.scale, o.thicknessM * pixelsPerMeter)}
+                            hitStrokeWidth={Math.max(14 / viewState.scale, o.thicknessM * pixelsPerMeter)}
+                            lineCap="round"
+                          />
+                        ) : o.kind === "column" ? (
+                          <Circle
+                            radius={o.radiusM * pixelsPerMeter}
+                            fill="#475569"
+                            stroke="#f59e0b"
+                            strokeWidth={2 / viewState.scale}
+                          />
+                        ) : (
+                          <Line
+                            points={[
+                              -(o.widthM * pixelsPerMeter) / 2,
+                              -(o.lengthM * pixelsPerMeter) / 2,
+                              (o.widthM * pixelsPerMeter) / 2,
+                              -(o.lengthM * pixelsPerMeter) / 2,
+                              (o.widthM * pixelsPerMeter) / 2,
+                              (o.lengthM * pixelsPerMeter) / 2,
+                              -(o.widthM * pixelsPerMeter) / 2,
+                              (o.lengthM * pixelsPerMeter) / 2,
+                            ]}
+                            closed
+                            fill="rgba(71,85,105,0.35)"
+                            stroke="#475569"
+                            strokeWidth={2 / viewState.scale}
+                          />
+                        )}
+                      </Group>
+                    );
+                  })}
                 {editorMode === "draw-wall" && obstacleStart && pointerImage && <Line points={[obstacleStart.x,obstacleStart.y,pointerImage.x,pointerImage.y]} stroke="#f59e0b" strokeWidth={Math.max(3/viewState.scale,wallThickness*(pixelsPerMeter ?? 1))} dash={[8,4]} listening={false} />}
                 <EditorFixtureRects
                   fixtures={fixtures}
@@ -1085,6 +1192,9 @@ function SidePanel({
   editorMessage,
   preferredProductId,
   onSuggestAdditionalFixtures,
+  onStartInnerWall,
+  onStartRoundColumn,
+  onStartRectObstacle,
   onToggleHeatmap,
   onContinue,
 }: {
@@ -1117,6 +1227,9 @@ function SidePanel({
   editorMessage: string | null;
   preferredProductId: string;
   onSuggestAdditionalFixtures: () => void;
+  onStartInnerWall: () => void;
+  onStartRoundColumn: () => void;
+  onStartRectObstacle: () => void;
   onToggleHeatmap: () => void;
   onContinue: () => void;
 }) {
@@ -1267,6 +1380,18 @@ function SidePanel({
                 >
                   {WIZARD_COPY.editor.regenerate}
                 </button>
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-semibold text-[var(--lp-text-secondary)]">Obstakels</p>
+                  <button type="button" className="lp-btn-secondary w-full text-xs" onClick={onStartInnerWall}>
+                    Binnenwand toevoegen
+                  </button>
+                  <button type="button" className="lp-btn-secondary w-full text-xs" onClick={onStartRoundColumn}>
+                    Ronde kolom plaatsen
+                  </button>
+                  <button type="button" className="lp-btn-secondary w-full text-xs" onClick={onStartRectObstacle}>
+                    Rechthoekig obstakel plaatsen
+                  </button>
+                </div>
                 <button
                   type="button"
                   data-testid="add-panel-button"

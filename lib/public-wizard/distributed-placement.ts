@@ -13,6 +13,11 @@ import {
   minDistanceToPolygonBoundaryM,
   orientedFixtureSizeM,
 } from "@/lib/public-wizard/placement-constraints";
+import {
+  lightingCoverageScoreAdjustment,
+  summarizeLightingCoverage,
+} from "@/lib/public-wizard/lighting-assessment";
+import { dynamicMatrixSearchLimits } from "@/lib/public-wizard/layout-augment";
 import { countAdjacentLuminaires, minEdgeToEdgeGapM } from "@/lib/public-wizard/luminaire-adjacency";
 import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import type { Point2D } from "@/types/floor-plan";
@@ -70,9 +75,10 @@ export function enumerateFullMatrixSizes(
   calculatedCount: number,
   maxMatrixDim = 12,
   delta = MATRIX_COUNT_SEARCH_DELTA,
+  maxTotalCap?: number,
 ): Array<{ rows: number; cols: number; total: number }> {
   const minTotal = Math.max(1, calculatedCount - delta);
-  const maxTotal = Math.min(120, calculatedCount + delta);
+  const maxTotal = Math.min(maxTotalCap ?? 120, calculatedCount + delta);
   const sizes: Array<{ rows: number; cols: number; total: number }> = [];
   for (let rows = 1; rows <= maxMatrixDim; rows++) {
     for (let cols = 1; cols <= maxMatrixDim; cols++) {
@@ -173,12 +179,22 @@ export function scoreDistributedFixtureLayout(options: {
 
   if (!lux.meetsTarget) {
     score -= (context.targetLux - lux.indicativeAverageLux) * 15;
-    if (placedCount < calculatedCount && product.category === "led_panel") return -Infinity;
   }
 
-  const countDelta = Math.abs(placedCount - calculatedCount);
-  score -= countDelta * 1400;
-  if (countDelta === 0) score += 3500;
+  const coverage = summarizeLightingCoverage(
+    fixtures,
+    vertices,
+    pixelsPerMeter,
+    context.ceilingHeightM,
+    context.targetLux,
+  );
+  score += lightingCoverageScoreAdjustment(coverage, context.targetLux);
+
+  const countDelta = placedCount - calculatedCount;
+  if (countDelta < 0) score -= Math.abs(countDelta) * 900;
+  else score -= countDelta * 400;
+  if (countDelta === 0) score += 2500;
+  if (countDelta > 0 && lux.meetsTarget) score += 800;
 
   const wallMargins = computeLayoutWallMarginsM(
     points,
@@ -229,6 +245,7 @@ export interface DistributedModuleMatrixInput {
   rotation?: number;
   maxMatrixDim?: number;
   countSearchDelta?: number;
+  maxTotalCap?: number;
 }
 
 function spacingM(a: Point2D, b: Point2D, pixelsPerMeter: number): number {
@@ -398,9 +415,16 @@ export function selectBestDistributedModuleMatrix(
     roomAspect,
     maxMatrixDim = 12,
     countSearchDelta = MATRIX_COUNT_SEARCH_DELTA,
+    maxTotalCap,
   } = input;
 
-  const sizes = enumerateFullMatrixSizes(calculatedCount, maxMatrixDim, countSearchDelta).sort(
+  const limits = dynamicMatrixSearchLimits(calculatedCount);
+  const sizes = enumerateFullMatrixSizes(
+    calculatedCount,
+    maxMatrixDim ?? limits.maxMatrixDim,
+    countSearchDelta ?? limits.countSearchDelta,
+    maxTotalCap ?? limits.maxTotal,
+  ).sort(
     (a, b) => {
       const deltaA = Math.abs(a.total - calculatedCount);
       const deltaB = Math.abs(b.total - calculatedCount);

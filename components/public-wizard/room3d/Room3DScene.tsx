@@ -21,9 +21,9 @@ import type { Point2D } from "@/types/floor-plan";
 import type {
   CeilingTypeId,
   PlacedPublicFixture,
+  PublicObstacle,
   Room3DSettings,
   Room3DWindow,
-  PublicObstacle,
 } from "@/types/public-wizard";
 import { createParquetTexture } from "@/components/public-wizard/room3d/floor-textures";
 
@@ -284,15 +284,55 @@ function SpotLights({
   })}</group>;
 }
 
-function ObstacleMeshes({obstacles,origin,height}:{obstacles:PublicObstacle[];origin:ReturnType<typeof makeRoom3DOrigin>;height:number}) {
-  return <group>{obstacles.map(o => {
-    if(o.kind === "column") {
-      const p=canvasPointToFloorM(o.center,origin);
-      return <mesh key={o.id} position={[p.x,height/2,p.z]}><cylinderGeometry args={[o.radiusM,o.radiusM,height,32]} /><meshStandardMaterial color="#cbd5e1" /></mesh>;
-    }
-    const start=canvasPointToFloorM(o.start,origin),end=canvasPointToFloorM(o.end,origin);
-    return <mesh key={o.id} position={[(start.x+end.x)/2,height/2,(start.z+end.z)/2]} rotation={[0,wallRotationY({start,end}),0]}><boxGeometry args={[Math.hypot(end.x-start.x,end.z-start.z),height,o.thicknessM]} /><meshStandardMaterial color="#cbd5e1" /></mesh>;
-  })}</group>;
+function ObstacleMeshes({
+  obstacles,
+  origin,
+  height,
+}: {
+  obstacles: PublicObstacle[];
+  origin: ReturnType<typeof makeRoom3DOrigin>;
+  height: number;
+}) {
+  return (
+    <group>
+      {obstacles.map((o) => {
+        if (o.kind === "column") {
+          const p = canvasPointToFloorM(o.center, origin);
+          return (
+            <mesh key={o.id} position={[p.x, height / 2, p.z]}>
+              <cylinderGeometry args={[o.radiusM, o.radiusM, height, 32]} />
+              <meshStandardMaterial color="#cbd5e1" />
+            </mesh>
+          );
+        }
+        if (o.kind === "rect") {
+          const p = canvasPointToFloorM(o.center, origin);
+          return (
+            <mesh
+              key={o.id}
+              position={[p.x, height / 2, p.z]}
+              rotation={[0, ((o.rotation ?? 0) * Math.PI) / 180, 0]}
+            >
+              <boxGeometry args={[o.widthM, height, o.lengthM]} />
+              <meshStandardMaterial color="#94a3b8" />
+            </mesh>
+          );
+        }
+        const start = canvasPointToFloorM(o.start, origin);
+        const end = canvasPointToFloorM(o.end, origin);
+        return (
+          <mesh
+            key={o.id}
+            position={[(start.x + end.x) / 2, height / 2, (start.z + end.z) / 2]}
+            rotation={[0, wallRotationY({ start, end }), 0]}
+          >
+            <boxGeometry args={[Math.hypot(end.x - start.x, end.z - start.z), height, o.thicknessM]} />
+            <meshStandardMaterial color="#cbd5e1" />
+          </mesh>
+        );
+      })}
+    </group>
+  );
 }
 
 export interface Room3DSceneProps {
