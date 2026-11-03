@@ -1,3 +1,4 @@
+import { fixtureClearsObstacles } from "@/lib/public-wizard/obstacles";
 import { placeInUsableArea } from "@/lib/public-wizard/irregular-placement";
 import { calculatePolygonAreaM2 } from "@/lib/polygon-area";
 import {
@@ -122,11 +123,29 @@ export function placeFixturesWithLayoutInfo(
   const bounds = polygonBounds(vertices);
   const area = createRoomPolygon(vertices, pixelsPerMeter).areaM2;
   const boxArea = (bounds.maxX-bounds.minX)*(bounds.maxY-bounds.minY)/(pixelsPerMeter*pixelsPerMeter);
-  if (layoutContext?.obstacles?.length || area < boxArea * 0.98) {
+  if (area < boxArea * 0.98) {
     const fixtures = placeInUsableArea(vertices, pixelsPerMeter, count, productId,
       layoutContext?.ceilingType ?? "grid_600", layoutContext?.obstacles ?? []);
     return { fixtures, requestedCount:count, placedCount:fixtures.length,
       warning: fixtures.length<count ? "Niet alle armaturen passen vrij van wanden en obstakels. Controleer de indeling en het luxniveau." : undefined };
+  }
+  if (layoutContext?.obstacles?.length) {
+    const base = placeFixturesWithLayoutInfo(vertices, pixelsPerMeter, count, productId,
+      { ...layoutContext, obstacles: [] });
+    const obstacles = layoutContext.obstacles;
+    const clear = (fixture: PlacedPublicFixture) => fixtureClearsObstacles(
+      fixture, pixelsPerMeter, fixture.productId, fixture.rotation, obstacles);
+    const fixtures = base.fixtures.filter(clear);
+    // Keep complete rows intact; only relocate fixtures whose footprints hit an obstacle.
+    for (const fixture of base.fixtures.filter(f => !clear(f))) {
+      const position = findFreeGridPosition(vertices, pixelsPerMeter, fixtures,
+        fixture.productId, fixture, { ceilingType:layoutContext.ceilingType, rotation:fixture.rotation, obstacles });
+      if (position) fixtures.push({ ...fixture, ...position });
+    }
+    return { ...base, fixtures, placedCount:fixtures.length,
+      warning: fixtures.length < base.fixtures.length
+        ? "Niet alle armaturen passen vrij van wanden en obstakels. Controleer de indeling en het luxniveau."
+        : base.warning };
   }
   const product = getPublicProduct(productId);
   if (product.category === "led_panel") {

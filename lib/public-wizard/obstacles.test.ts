@@ -47,3 +47,15 @@ test("new obstacles regenerate existing plans and constrain drag, add, duplicate
  store.resetScaleDependentState();assert.equal(usePublicWizardStore.getState().obstacles.length,0);
  store.resetWizard();
 });
+
+test("a column only displaces blocked panels and preserves the surrounding matrix",()=>{
+ const context={areaM2:80,targetLux:500,ceilingHeightM:2.7,ceilingType:"grid_600" as const};
+ const base=placeFixturesWithLayoutInfo(room,100,20,"led_panel_4000",context);
+ const hit=base.fixtures[0]!;
+ const obstacle:PublicObstacle={id:"column-on-panel",kind:"column",center:{x:hit.x,y:hit.y},radiusM:0.2};
+ const result=placeFixturesWithLayoutInfo(room,100,20,"led_panel_4000",{...context,obstacles:[obstacle]});
+ assert.equal(result.fixtures.length,base.fixtures.length);
+ const unaffected=base.fixtures.filter(f=>fixtureClearsObstacles(f,100,f.productId,f.rotation,[obstacle]));
+ for(const f of unaffected) assert.ok(result.fixtures.some(g=>g.x===f.x && g.y===f.y));
+ for(const f of result.fixtures) assert.ok(fixtureClearsObstacles(f,100,f.productId,f.rotation,[obstacle]));
+});
