@@ -8,6 +8,7 @@ import {
 } from "@/lib/public-wizard/indicative-lumen-method";
 import { placeElongatedPanelsModuleFirst } from "@/lib/public-wizard/elongated-module-placement";
 import { buildManualRoomScene } from "@/lib/public-wizard/manual-room";
+import { getPublicProduct, setActiveProductCatalog } from "@/lib/public-wizard/products";
 
 const PRODUCT = "led_panel_1200x300_4000" as const;
 const AREA = 48;
@@ -42,6 +43,14 @@ test("8×6×2,7 m — geen standaard 2-kolomsmatrix bij 500 lux", () => {
   assert.equal(layout.placedCount, layout.moduleIndices.length);
   const lux = calculateIndicativeResult(AREA, 500, 2.7, layout.fixtures, nominal);
   assert.ok(lux.meetsTarget, `lux ${lux.indicativeAverageLux} below target`);
+});
+
+test("CMS lumens override ignored until photometry is confirmed (120×30)", () => {
+  setActiveProductCatalog([
+    { id: PRODUCT, lumens: 3800, watts: 36, unitPriceEuro: 50 },
+  ]);
+  assert.equal(getPublicProduct(PRODUCT).lumens, 3200);
+  setActiveProductCatalog(null);
 });
 
 test("8×6 — lagere luxdoelen vereisen minder armaturen", () => {

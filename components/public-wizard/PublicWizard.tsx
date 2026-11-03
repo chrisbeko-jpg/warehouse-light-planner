@@ -36,6 +36,10 @@ export function PublicWizard() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { products?: Parameters<typeof setActiveProductCatalog>[0] } | null) => {
         if (data?.products?.length) setActiveProductCatalog(data.products);
+        const state = usePublicWizardStore.getState();
+        if (state.lightingPlanGenerated && state.step === "editor" && state.roomVertices.length >= 3) {
+          state.generateLightingPlan();
+        }
       })
       .catch(() => undefined);
   }, []);

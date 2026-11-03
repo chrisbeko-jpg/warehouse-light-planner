@@ -245,8 +245,14 @@ export function getPublicProduct(id: PublicProductId): PublicProductDefinition {
   return {
     ...base,
     name: over.name?.trim() ? over.name : base.name,
-    lumens: finite(over.lumens, base.lumens),
-    watts: finite(over.watts, base.watts),
+    lumens:
+      base.photometryConfirmed && over.lumens != null
+        ? finite(over.lumens, base.lumens)
+        : base.lumens,
+    watts:
+      base.photometryConfirmed && over.watts != null
+        ? finite(over.watts, base.watts)
+        : base.watts,
     beamAngleDeg: finite(over.beamAngleDeg, base.beamAngleDeg),
     widthM: finite(over.widthM, base.widthM),
     heightM: finite(over.heightM, base.heightM),
