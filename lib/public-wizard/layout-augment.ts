@@ -1,5 +1,6 @@
 import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
 import type { PanelLayoutContext } from "@/lib/public-wizard/ceiling-grid";
+import { summarizeLightingCoverage } from "@/lib/public-wizard/lighting-assessment";
 import {
   buildRoomCeilingGrid,
   gridPanelCenterPx,
@@ -100,6 +101,132 @@ export function augmentFixturesToTargetCount(
   }
 
   return current;
+}
+
+function listFreeModuleCenters(
+  fixtures: PlacedPublicFixture[],
+  vertices: Point2D[],
+  pixelsPerMeter: number,
+  productId: PublicProductId,
+  context: PanelLayoutContext,
+): Point2D[] {
+  const ceilingType = context.ceilingType ?? "grid_600";
+  const grid = buildRoomCeilingGrid(vertices, pixelsPerMeter, ceilingType);
+  if (!grid) return [];
+
+  const obstacles = context.obstacles ?? [];
+  const rotation = fixtures[0]?.rotation ?? 0;
+  const candidates: Point2D[] = [];
+
+  for (const { col, row } of listAllModuleIndices(grid)) {
+    const point = gridPanelCenterPx(grid, col, row);
+    if (occupied(point, fixtures)) continue;
+    const inside = isPanelFootprintInsideRoom(
+      point,
+      pixelsPerMeter,
+      vertices,
+      productId,
+      rotation,
+    );
+    if (
+      !isFixturePlacementAllowed(
+        point,
+        pixelsPerMeter,
+        vertices,
+        productId,
+        rotation,
+        obstacles,
+        inside,
+      )
+    ) {
+      continue;
+    }
+    candidates.push(point);
+  }
+  return candidates;
+}
+
+/** Place extra panels on free modules where local coverage (min lux) is still weak. */
+export function augmentFixturesForCoverage(
+  fixtures: PlacedPublicFixture[],
+  vertices: Point2D[],
+  pixelsPerMeter: number,
+  productId: PublicProductId,
+  context: PanelLayoutContext,
+  options?: { maxExtra?: number },
+): { fixtures: PlacedPublicFixture[]; added: number } {
+  if (fixtures.length === 0 || vertices.length < 3) {
+    return { fixtures, added: 0 };
+  }
+
+  const { targetLux, ceilingHeightM } = context;
+  const nominal = context.areaM2 > 0 ? fixtures.length : 0;
+  const maxExtra =
+    options?.maxExtra ??
+    context.coverageAugmentMaxExtra ??
+    Math.min(48, Math.max(8, Math.ceil(Math.max(nominal, 12) * 0.18)));
+
+  const needsImprovement = (summary: ReturnType<typeof summarizeLightingCoverage>) =>
+    summary.sampleCount > 0 &&
+    (summary.minLux < targetLux * 0.92 || summary.belowTargetFraction > 0.1);
+
+  let current = [...fixtures];
+  let summary = summarizeLightingCoverage(
+    current,
+    vertices,
+    pixelsPerMeter,
+    ceilingHeightM,
+    targetLux,
+  );
+  if (!needsImprovement(summary)) {
+    return { fixtures: current, added: 0 };
+  }
+
+  const candidates = listFreeModuleCenters(current, vertices, pixelsPerMeter, productId, context);
+  const rotation = current[0]?.rotation ?? 0;
+  let added = 0;
+
+  while (added < maxExtra && candidates.length > 0 && needsImprovement(summary)) {
+    let bestIndex = -1;
+    let bestMinLux = -Infinity;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const point = candidates[i]!;
+      const trial = [
+        ...current,
+        { id: "trial", productId, x: point.x, y: point.y, rotation },
+      ];
+      const trialSummary = summarizeLightingCoverage(
+        trial,
+        vertices,
+        pixelsPerMeter,
+        ceilingHeightM,
+        targetLux,
+      );
+      if (trialSummary.minLux > bestMinLux) {
+        bestMinLux = trialSummary.minLux;
+        bestIndex = i;
+      }
+    }
+
+    if (bestIndex < 0 || bestMinLux <= summary.minLux + 0.5) break;
+
+    const chosen = candidates.splice(bestIndex, 1)[0]!;
+    current = [
+      ...current,
+      { id: nextId(), productId, x: chosen.x, y: chosen.y, rotation },
+    ];
+    added += 1;
+    summary = summarizeLightingCoverage(
+      current,
+      vertices,
+      pixelsPerMeter,
+      ceilingHeightM,
+      targetLux,
+    );
+  }
+
+  return { fixtures: current, added };
 }
 
 export function dynamicMatrixSearchLimits(requiredCount: number): {

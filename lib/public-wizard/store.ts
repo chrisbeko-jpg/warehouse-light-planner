@@ -5,6 +5,7 @@ import {
   calculateIndicativeResult,
   calculateRequiredFixtureCount,
 } from "@/lib/public-wizard/calculation";
+import { summarizeLightingCoverage } from "@/lib/public-wizard/lighting-assessment";
 import {
   cctFromAtmosphere,
   selectConfiguredProduct,
@@ -143,7 +144,10 @@ export interface PublicWizardStore {
   cancelPolygonDraft: () => void;
   setAiRecognitionState: (attempted: boolean, failed: boolean) => void;
   setRoomVertices: (vertices: Point2D[]) => void;
-  generateLightingPlan: (options?: { meetLuxTarget?: boolean }) => boolean;
+  generateLightingPlan: (options?: {
+    meetLuxTarget?: boolean;
+    fillCoverageGaps?: boolean;
+  }) => boolean;
   suggestAdditionalElongatedFixtures: () => boolean;
   pushHistory: () => void;
   undo: () => void;
@@ -480,6 +484,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
 
   generateLightingPlan: (options) => {
     const meetLuxTarget = options?.meetLuxTarget === true;
+    const fillCoverageGaps = options?.fillCoverageGaps === true;
     const {
       roomVertices,
       pixelsPerMeter,
@@ -511,6 +516,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
         ceilingHeightM,
         ceilingType,
         elongatedMeetLuxTarget: meetLuxTarget,
+        coverageAugmentMaxExtra: fillCoverageGaps ? 72 : undefined,
         obstacles: get().obstacles,
       },
     );
@@ -535,6 +541,21 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     } else if (!indicative.meetsTarget) {
       const note = `De nette indeling haalt het luxdoel indicatief niet: ${indicative.indicativeAverageLux} lux bij een doel van ${targetLux} lux.`;
       layoutWarning = layoutWarning ? `${layoutWarning} ${note}` : note;
+    }
+
+    const coverage = summarizeLightingCoverage(
+      layout.fixtures,
+      roomVertices,
+      pixelsPerMeter,
+      ceilingHeightM,
+      targetLux,
+    );
+    if (
+      coverage.sampleCount > 0 &&
+      (coverage.minLux < targetLux * 0.9 || coverage.belowTargetFraction > 0.12)
+    ) {
+      const gapNote = `Indicatief minimaal ${coverage.minLux} lux op een deel van het werkgebied (doel ${targetLux} lux). Gebruik ‘Aanvullende armaturen voorstellen’ of teken binnenwanden zodat panelen niet in gangen/trappen vallen.`;
+      layoutWarning = layoutWarning ? `${layoutWarning} ${gapNote}` : gapNote;
     }
 
     const downlightProductId = resolved?.downlightProductId ?? get().downlightProductId;
@@ -648,7 +669,13 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     if (get().lightingPlanGenerated) get().generateLightingPlan();
   },
 
-  suggestAdditionalElongatedFixtures: () => get().generateLightingPlan({ meetLuxTarget: true }),
+  suggestAdditionalElongatedFixtures: () => {
+    const { preferredProductId } = get();
+    if (isElongatedPanel(preferredProductId)) {
+      return get().generateLightingPlan({ meetLuxTarget: true, fillCoverageGaps: true });
+    }
+    return get().generateLightingPlan({ fillCoverageGaps: true });
+  },
 
   pushHistory: () => {
     const { fixtures, historyPast } = get();

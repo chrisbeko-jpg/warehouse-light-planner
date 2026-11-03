@@ -1339,7 +1339,8 @@ function SidePanel({
               <div className="space-y-2 rounded-lg bg-orange-50 p-2 text-xs text-orange-800" data-testid="layout-warning">
                 <p className="font-semibold">Verlichtingsniveau lager dan doelwaarde</p>
                 <p>{layoutWarning.replace(/^Verlichtingsniveau lager dan doelwaarde\.?\s*/i, "")}</p>
-                {preferredProductId === "led_panel_1200x300_4000" && (
+                {(preferredProductId.startsWith("led_panel") ||
+                  preferredProductId.startsWith("led_panel_surface")) && (
                   <button
                     type="button"
                     className="lp-btn-secondary w-full text-xs font-semibold"

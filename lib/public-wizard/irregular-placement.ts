@@ -81,5 +81,11 @@ export function placeInUsableArea(
     if (score>bestScore) {bestScore=score;best=layout.points;}
   }
   const stamp=Date.now();
-  return best.map((p,index)=>({id:`fx-grid-${stamp}-${index}`,productId,x:p.x,y:p.y,rotation}));
+  return best.map((p, index) => ({
+    id: `fx-grid-${stamp}-${index}`,
+    productId,
+    x: p.x,
+    y: p.y,
+    rotation,
+  }));
 }

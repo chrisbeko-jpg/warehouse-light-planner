@@ -1,5 +1,10 @@
 import { fixtureClearsObstacles } from "@/lib/public-wizard/obstacles";
 import { placeInUsableArea } from "@/lib/public-wizard/irregular-placement";
+import {
+  augmentFixturesForCoverage,
+  augmentFixturesToTargetCount,
+} from "@/lib/public-wizard/layout-augment";
+import { summarizeLightingCoverage } from "@/lib/public-wizard/lighting-assessment";
 import { calculatePolygonAreaM2 } from "@/lib/polygon-area";
 import {
   findNearestFreeGridPosition,
@@ -124,10 +129,56 @@ export function placeFixturesWithLayoutInfo(
   const area = createRoomPolygon(vertices, pixelsPerMeter).areaM2;
   const boxArea = (bounds.maxX-bounds.minX)*(bounds.maxY-bounds.minY)/(pixelsPerMeter*pixelsPerMeter);
   if (area < boxArea * 0.98) {
-    const fixtures = placeInUsableArea(vertices, pixelsPerMeter, count, productId,
-      layoutContext?.ceilingType ?? "grid_600", layoutContext?.obstacles ?? []);
-    return { fixtures, requestedCount:count, placedCount:fixtures.length,
-      warning: fixtures.length<count ? "Niet alle armaturen passen vrij van wanden en obstakels. Controleer de indeling en het luxniveau." : undefined };
+    const ctx: PanelLayoutContext = {
+      areaM2: area,
+      targetLux: layoutContext?.targetLux ?? 500,
+      ceilingHeightM: layoutContext?.ceilingHeightM ?? 2.7,
+      ceilingType: layoutContext?.ceilingType ?? "grid_600",
+      obstacles: layoutContext?.obstacles,
+    };
+    let fixtures = placeInUsableArea(
+      vertices,
+      pixelsPerMeter,
+      count,
+      productId,
+      ctx.ceilingType ?? "grid_600",
+      ctx.obstacles ?? [],
+    );
+    fixtures = augmentFixturesToTargetCount(
+      fixtures,
+      count,
+      vertices,
+      pixelsPerMeter,
+      productId,
+      ctx,
+    );
+    const coverageAugment = augmentFixturesForCoverage(
+      fixtures,
+      vertices,
+      pixelsPerMeter,
+      productId,
+      ctx,
+    );
+    fixtures = coverageAugment.fixtures;
+    const coverage = summarizeLightingCoverage(
+      fixtures,
+      vertices,
+      pixelsPerMeter,
+      ctx.ceilingHeightM,
+      ctx.targetLux,
+    );
+    let warning: string | undefined;
+    if (fixtures.length < count) {
+      warning =
+        "Niet alle armaturen passen vrij van wanden en obstakels. Controleer de indeling en het luxniveau.";
+    } else if (
+      coverage.sampleCount > 0 &&
+      (coverage.minLux < ctx.targetLux * 0.9 || coverage.belowTargetFraction > 0.15)
+    ) {
+      warning =
+        "Indicatief zijn er nog donkere zones. Teken binnenwanden/obstakels en gebruik ‘Lichtplan opnieuw verdelen’, of voeg handmatig armaturen toe.";
+    }
+    return { fixtures, requestedCount: count, placedCount: fixtures.length, warning };
   }
   if (layoutContext?.obstacles?.length) {
     const base = placeFixturesWithLayoutInfo(vertices, pixelsPerMeter, count, productId,

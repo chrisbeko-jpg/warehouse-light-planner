@@ -30,7 +30,11 @@ import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
 import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import { pointInPolygon } from "@/lib/public-wizard/placement";
 import type { Point2D } from "@/types/floor-plan";
-import { augmentFixturesToTargetCount, dynamicMatrixSearchLimits } from "@/lib/public-wizard/layout-augment";
+import {
+  augmentFixturesForCoverage,
+  augmentFixturesToTargetCount,
+  dynamicMatrixSearchLimits,
+} from "@/lib/public-wizard/layout-augment";
 import type {
   CeilingTypeId,
   PlacedPublicFixture,
@@ -57,6 +61,8 @@ export interface PanelLayoutContext {
   ceilingType?: CeilingTypeId;
   /** When true, pick the smallest count that meets the lux target (e.g. “extra armaturen voorstellen”). */
   elongatedMeetLuxTarget?: boolean;
+  /** Override max extra panels for local coverage fill (see layout-augment). */
+  coverageAugmentMaxExtra?: number;
 }
 
 export interface SpreadMetrics {
@@ -715,6 +721,20 @@ export function placePanelsOnCeilingGrid(
       productId,
       context,
     );
+  }
+
+  if (!isElongatedPanel(productId)) {
+    const coverageAugment = augmentFixturesForCoverage(
+      fixtures,
+      vertices,
+      pixelsPerMeter,
+      productId,
+      context,
+      context.coverageAugmentMaxExtra != null
+        ? { maxExtra: context.coverageAugmentMaxExtra }
+        : undefined,
+    );
+    fixtures = coverageAugment.fixtures;
   }
 
   let warning: string | undefined;
