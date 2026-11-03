@@ -13,7 +13,7 @@ export interface AtmosphereDefinition {
 export const ATMOSPHERES: AtmosphereDefinition[] = [
   {
     id: "warm",
-    title: "Warm wit",
+    title: "Warm en comfortabel",
     subtitle: "3000K",
     cctLabel: "3000K",
     preferredProductId: "led_panel_3000",
@@ -22,7 +22,7 @@ export const ATMOSPHERES: AtmosphereDefinition[] = [
   },
   {
     id: "neutraal",
-    title: "Neutraal wit",
+    title: "Helder & functioneel",
     subtitle: "4000K",
     cctLabel: "4000K",
     preferredProductId: "led_panel_4000",
@@ -31,7 +31,7 @@ export const ATMOSPHERES: AtmosphereDefinition[] = [
   },
   {
     id: "premium_architectural",
-    title: "Premium / architecturaal",
+    title: "Luxe en architectonisch",
     subtitle: "Maatwerk armaturen",
     cctLabel: "3000K",
     preferredProductId: "led_panel_3000",

@@ -1,3 +1,4 @@
+import { placeInUsableArea } from "@/lib/public-wizard/irregular-placement";
 import { calculatePolygonAreaM2 } from "@/lib/polygon-area";
 import {
   findNearestFreeGridPosition,
@@ -118,6 +119,15 @@ export function placeFixturesWithLayoutInfo(
   productId: PublicProductId,
   layoutContext?: PanelLayoutContext,
 ): CeilingLayoutResult {
+  const bounds = polygonBounds(vertices);
+  const area = createRoomPolygon(vertices, pixelsPerMeter).areaM2;
+  const boxArea = (bounds.maxX-bounds.minX)*(bounds.maxY-bounds.minY)/(pixelsPerMeter*pixelsPerMeter);
+  if (layoutContext?.obstacles?.length || area < boxArea * 0.98) {
+    const fixtures = placeInUsableArea(vertices, pixelsPerMeter, count, productId,
+      layoutContext?.ceilingType ?? "grid_600", layoutContext?.obstacles ?? []);
+    return { fixtures, requestedCount:count, placedCount:fixtures.length,
+      warning: fixtures.length<count ? "Niet alle armaturen passen vrij van wanden en obstakels. Controleer de indeling en het luxniveau." : undefined };
+  }
   const product = getPublicProduct(productId);
   if (product.category === "led_panel") {
     const ctx =
@@ -240,7 +250,7 @@ export function duplicateFixture(
     fixtures,
     source.productId,
     { x: source.x + offsetPx, y: source.y },
-    { rotation: source.rotation, ceilingType: frame?.ceilingType },
+    { ...frame, rotation: source.rotation },
   );
   if (!free) return fixtures;
   return [

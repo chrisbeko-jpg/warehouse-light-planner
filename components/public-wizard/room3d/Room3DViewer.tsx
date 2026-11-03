@@ -13,15 +13,17 @@ import {
   wallSegmentsM,
 } from "@/lib/public-wizard/room3d-coords";
 import type { Point2D } from "@/types/floor-plan";
-import type { CeilingTypeId, PlacedPublicFixture, Room3DCameraPreset, Room3DSettings } from "@/types/public-wizard";
+import type { CeilingTypeId, PlacedPublicFixture, Room3DCameraPreset, Room3DSettings, PublicObstacle } from "@/types/public-wizard";
 
 function CameraRig({
   preset,
+  revision,
   bounds,
   ceilingHeightM,
   controlsRef,
 }: {
   preset: Room3DCameraPreset;
+  revision: number;
   bounds: ReturnType<typeof roomAxisBoundsM>;
   ceilingHeightM: number;
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
@@ -35,6 +37,9 @@ function CameraRig({
     switch (preset) {
       case "top":
         position = new THREE.Vector3(bounds.centerX, span * 2.2, bounds.centerZ);
+        break;
+      case "bottom":
+        position = new THREE.Vector3(bounds.centerX + span * 0.35, -span * 0.7, bounds.centerZ + span * 0.35);
         break;
       case "interior":
         position = new THREE.Vector3(
@@ -66,7 +71,7 @@ function CameraRig({
       controlsRef.current.target.copy(target);
       controlsRef.current.update();
     }
-  }, [preset, bounds, ceilingHeightM, span, camera, controlsRef]);
+  }, [preset, revision, bounds, ceilingHeightM, span, camera, controlsRef]);
 
   return null;
 }
@@ -78,6 +83,7 @@ export interface Room3DViewerProps {
   ceilingType: CeilingTypeId;
   fixtures: PlacedPublicFixture[];
   room3D: Room3DSettings;
+  obstacles?: PublicObstacle[];
 }
 
 export function Room3DViewer({
@@ -87,10 +93,12 @@ export function Room3DViewer({
   ceilingType,
   fixtures,
   room3D,
+  obstacles = [],
 }: Room3DViewerProps) {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [preset, setPreset] = useState<Room3DCameraPreset>("fit");
+  const [cameraRevision, setCameraRevision] = useState(0);
   const [panelOpen, setPanelOpen] = useState(true);
 
   const origin = useMemo(
@@ -99,16 +107,6 @@ export function Room3DViewer({
   );
   const bounds = useMemo(() => roomAxisBoundsM(vertices, origin), [vertices, origin]);
   const walls = useMemo(() => wallSegmentsM(vertices, origin), [vertices, origin]);
-
-  const ghostFrontWallIndices = useMemo(() => {
-    if (preset !== "isometric") return new Set<number>();
-    const set = new Set<number>();
-    for (const wall of walls) {
-      if (wall.normalZ < -0.2) set.add(wall.index);
-      if (wall.normalX < -0.2) set.add(wall.index);
-    }
-    return set;
-  }, [preset, walls]);
 
   const exportPng = useCallback(() => {
     const canvas = canvasRef.current;
@@ -127,6 +125,7 @@ export function Room3DViewer({
             ["fit", "Reset camera"],
             ["isometric", "Isometrisch"],
             ["top", "Bovenaanzicht"],
+            ["bottom", "Onderaanzicht"],
             ["interior", "Binnenaanzicht"],
           ] as const
         ).map(([id, label]) => (
@@ -136,7 +135,7 @@ export function Room3DViewer({
             className={`rounded-md border px-2 py-1 text-xs ${
               preset === id ? "border-[var(--lp-primary)] bg-[var(--lp-primary)]/10" : "border-[var(--lp-border)]"
             }`}
-            onClick={() => setPreset(id)}
+            onClick={() => { setPreset(id); setCameraRevision((value) => value + 1); }}
           >
             {label}
           </button>
@@ -146,7 +145,7 @@ export function Room3DViewer({
         </button>
         <button
           type="button"
-          className="ml-auto rounded-md border border-[var(--lp-border)] px-2 py-1 text-xs lg:hidden"
+          className="ml-auto rounded-md border border-[var(--lp-border)] px-2 py-1 text-xs"
           onClick={() => setPanelOpen((v) => !v)}
         >
           Instellingen
@@ -166,6 +165,7 @@ export function Room3DViewer({
           <Suspense fallback={null}>
             <CameraRig
               preset={preset}
+              revision={cameraRevision}
               bounds={bounds}
               ceilingHeightM={ceilingHeightM}
               controlsRef={controlsRef}
@@ -177,7 +177,7 @@ export function Room3DViewer({
               ceilingType={ceilingType}
               fixtures={fixtures}
               room3D={room3D}
-              ghostFrontWallIndices={ghostFrontWallIndices}
+              obstacles={obstacles}
             />
             <OrbitControls
               ref={controlsRef}
@@ -186,13 +186,14 @@ export function Room3DViewer({
               dampingFactor={0.08}
               minDistance={1.2}
               maxDistance={Math.max(bounds.spanX, bounds.spanZ) * 4}
-              maxPolarAngle={Math.PI * 0.49}
+              minPolarAngle={0.01}
+              maxPolarAngle={Math.PI - 0.01}
             />
           </Suspense>
         </Canvas>
 
         <p className="pointer-events-none absolute bottom-2 left-2 max-w-md rounded bg-black/60 px-2 py-1 text-[10px] text-white sm:text-xs">
-          Indicatieve sfeerweergave — geen fotometrische berekening. Lux en materiaaladvies blijven leidend.
+          Slepen: rondkijken · Scrollen: zoomen · Rechtermuisknop: verschuiven. Wanden volgen de getekende ruimte; voorliggende wanden worden automatisch verborgen.
         </p>
 
         {panelOpen && (

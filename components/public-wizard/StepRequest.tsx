@@ -43,6 +43,7 @@ export function StepRequest() {
   const ceilingType = usePublicWizardStore((s) => s.ceilingType);
   const preferredProductId = usePublicWizardStore((s) => s.preferredProductId);
   const fixtures = usePublicWizardStore((s) => s.fixtures);
+  const obstacles = usePublicWizardStore((s) => s.obstacles);
   const requiredFixtureCount = usePublicWizardStore((s) => s.requiredFixtureCount);
   const roomVertices = usePublicWizardStore((s) => s.roomVertices);
   const pixelsPerMeter = usePublicWizardStore((s) => s.pixelsPerMeter);
@@ -103,6 +104,7 @@ export function StepRequest() {
         backgroundHeight,
         roomVertices,
         fixtures,
+        obstacles,
         pixelsPerMeter,
         targetLux,
         ceilingHeightM,
@@ -120,6 +122,7 @@ export function StepRequest() {
           ceilingType,
           preferredProductId,
           fixtures,
+          obstacles,
           requiredFixtureCount,
           roomVertices,
           pixelsPerMeter,

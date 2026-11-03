@@ -27,6 +27,7 @@ import type {
   PublicLeadRecord,
   PublicProductId,
   PlacedPublicFixture,
+  PublicObstacle,
   RoomFunctionId,
   AtmosphereId,
   CeilingTypeId,
@@ -47,6 +48,7 @@ interface SubmitBody {
   ceilingType?: CeilingTypeId | null;
   preferredProductId: PublicProductId;
   fixtures: PlacedPublicFixture[];
+  obstacles?: PublicObstacle[];
   roomVertices: { x: number; y: number }[];
   pixelsPerMeter: number;
   inputMethod: WizardInputMethod;
@@ -118,6 +120,7 @@ export async function POST(request: Request) {
         ceilingType: body.ceilingType ?? null,
         preferredProductId: body.preferredProductId,
         fixtures: body.fixtures,
+        obstacles: body.obstacles ?? [],
         roomVertices: body.roomVertices,
         pixelsPerMeter: body.pixelsPerMeter,
         inputMethod: body.inputMethod,

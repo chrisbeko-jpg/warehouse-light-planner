@@ -115,9 +115,11 @@ function mergeRoomChoices(
       ...defaultItem,
       ...storedItem,
       id: defaultItem.id,
-      title: storedItem.title?.trim() ? storedItem.title : defaultItem.title,
-      description: storedItem.description?.trim() ? storedItem.description : defaultItem.description,
+      title: defaultItem.title,
+      description: defaultItem.description,
       suggestedLux: defaultItem.suggestedLux,
+      active: true,
+      sortOrder: defaultItem.sortOrder,
       mediaId,
       imageId: mediaId ?? undefined,
     };

@@ -158,6 +158,7 @@ function page(slug: string, title: string, seoTitle: string, description: string
 const ROOM_DESCRIPTIONS: Record<(typeof ROOM_FUNCTIONS)[number]["id"], string> = {
   workplace_office:
     "Voor kantoorwerkplekken waar een gelijkmatige en comfortabele basisverlichting nodig is.",
+  meeting_room: "Voor vergaderruimtes en overlegplekken.",
   reception_hall:
     "Voor entrees, verkeersruimtes en ontvangstzones met functionele basisverlichting.",
   other_spaces: "Voor algemene ruimtes waar een lager basisverlichtingsniveau volstaat.",

@@ -1,3 +1,4 @@
+import { fixtureClearsObstacles } from "@/lib/public-wizard/obstacles";
 import { create } from "zustand";
 import { computePixelsPerMeter } from "@/lib/floor-plan-scale";
 import {
@@ -45,6 +46,7 @@ import type {
   ManualDimensions,
   PlacedPublicFixture,
   PublicProductId,
+  PublicObstacle,
   Room3DSettings,
   Room3DWindow,
   RoomFunctionId,
@@ -59,7 +61,7 @@ import {
 } from "@/lib/public-wizard/viewport";
 import { SCALE_RESET_PATCH } from "@/lib/public-wizard/scale-reset-patch";
 
-export type PublicEditorMode = "select" | "calibrate-scale" | "draw-room" | "pan";
+export type PublicEditorMode = "select" | "calibrate-scale" | "draw-room" | "draw-wall" | "draw-column" | "pan";
 
 export type EditorPhase = "scale" | "room" | "plan";
 
@@ -86,6 +88,9 @@ export interface PublicWizardStore {
   aiRecognitionAttempted: boolean;
   aiRecognitionFailed: boolean;
   fixtures: PlacedPublicFixture[];
+  obstacles: PublicObstacle[];
+  addObstacle: (obstacle: PublicObstacle) => void;
+  removeObstacle: (id: string) => void;
   selectedFixtureId: string | null;
   showHeatmap: boolean;
   historyPast: PlacedPublicFixture[][];
@@ -195,6 +200,7 @@ const initialState = {
   aiRecognitionAttempted: false,
   aiRecognitionFailed: false,
   fixtures: initialFixtures,
+  obstacles: [] as PublicObstacle[],
   selectedFixtureId: null as string | null,
   showHeatmap: false,
   historyPast: [] as PlacedPublicFixture[][],
@@ -320,6 +326,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       roomVertices: scene.vertices,
       roomAreaM2: scene.areaM2,
       fixtures: [],
+      obstacles: [],
       selectedFixtureId: null,
       showHeatmap: false,
       historyPast: [],
@@ -383,6 +390,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       roomVertices: [],
       roomAreaM2: null,
       fixtures: [],
+      obstacles: [],
       lightingPlanGenerated: false,
       editorPhase: "scale",
       editorMode: "calibrate-scale",
@@ -495,6 +503,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
         ceilingHeightM,
         ceilingType,
         elongatedMeetLuxTarget: meetLuxTarget,
+        obstacles: get().obstacles,
       },
     );
     const indicative = calculateIndicativeResult(
@@ -523,6 +532,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     const downlightProductId = resolved?.downlightProductId ?? get().downlightProductId;
     let alternativeMixedFixtures: PlacedPublicFixture[] | null = null;
     if (
+      get().obstacles.length === 0 &&
       !indicative.meetsTarget &&
       isElongatedPanel(productId) &&
       ceilingType === "grid_1200_600"
@@ -567,6 +577,24 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     return true;
   },
 
+  addObstacle: (obstacle) => {
+    const ppm = get().pixelsPerMeter;
+    if (!ppm) return;
+    const points = obstacle.kind === "wall" ? [obstacle.start, obstacle.end] : [obstacle.center];
+    if (points.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return;
+    if (obstacle.kind === "wall" && (!Number.isFinite(obstacle.thicknessM) || obstacle.thicknessM <= 0 || Math.hypot(obstacle.end.x-obstacle.start.x, obstacle.end.y-obstacle.start.y) < ppm*0.05)) return;
+    if (obstacle.kind === "column" && (!Number.isFinite(obstacle.radiusM) || obstacle.radiusM <= 0)) return;
+    const obstacles = [...get().obstacles, obstacle];
+    set({ obstacles, fixtures: get().fixtures.filter(f => fixtureClearsObstacles(f,ppm,f.productId,f.rotation,obstacles)),
+      primaryPanelFixtures: null, alternativeMixedFixtures: null, historyPast: [], historyFuture: [], editorMode: "select" });
+    if (get().lightingPlanGenerated) get().generateLightingPlan();
+  },
+
+  removeObstacle: (id) => {
+    set({ obstacles: get().obstacles.filter(o => o.id !== id), primaryPanelFixtures: null, alternativeMixedFixtures: null });
+    if (get().lightingPlanGenerated) get().generateLightingPlan();
+  },
+
   suggestAdditionalElongatedFixtures: () => get().generateLightingPlan({ meetLuxTarget: true }),
 
   pushHistory: () => {
@@ -582,7 +610,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     if (historyPast.length === 0) return;
     const previous = historyPast[historyPast.length - 1]!;
     set({
-      fixtures: cloneFixtures(previous),
+      fixtures: cloneFixtures(previous).filter(f => !get().pixelsPerMeter || fixtureClearsObstacles(f, get().pixelsPerMeter!, f.productId, f.rotation, get().obstacles)),
       historyPast: historyPast.slice(0, -1),
       historyFuture: [cloneFixtures(fixtures), ...historyFuture],
       selectedFixtureId: null,
@@ -594,7 +622,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     if (historyFuture.length === 0) return;
     const next = historyFuture[0]!;
     set({
-      fixtures: cloneFixtures(next),
+      fixtures: cloneFixtures(next).filter(f => !get().pixelsPerMeter || fixtureClearsObstacles(f, get().pixelsPerMeter!, f.productId, f.rotation, get().obstacles)),
       historyFuture: historyFuture.slice(1),
       historyPast: [...historyPast, cloneFixtures(fixtures)],
       selectedFixtureId: null,
@@ -606,8 +634,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
   moveSelectedFixture: (x, y) => {
     const { selectedFixtureId, fixtures } = get();
     if (!selectedFixtureId) return;
-    get().pushHistory();
-    set({ fixtures: moveFixture(fixtures, selectedFixtureId, x, y) });
+    get().moveFixtureByIdWithHistory(selectedFixtureId, x, y);
   },
 
   moveFixtureById: (id, x, y) => {
@@ -625,7 +652,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       previous,
       fixtures,
       id,
-      { ceilingType: get().ceilingType ?? undefined, rotation: fixture.rotation },
+      { ceilingType: get().ceilingType ?? undefined, rotation: fixture.rotation, obstacles: get().obstacles },
     );
     if (!snapped) {
       set({ editorMessage: "Geen geldige rasterpositie. Armatuur teruggezet." });
@@ -683,7 +710,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       fixtures,
       panelId,
       undefined,
-      { ceilingType: ceilingType ?? undefined, rotation },
+      { ceilingType: ceilingType ?? undefined, rotation, obstacles: get().obstacles },
     );
     if (!position) {
       set({
@@ -718,7 +745,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
       fixtures,
       downlightProductId,
       undefined,
-      { ceilingType: get().ceilingType ?? undefined },
+      { ceilingType: get().ceilingType ?? undefined, obstacles: get().obstacles },
     );
     if (!position) {
       set({
@@ -749,6 +776,7 @@ export const usePublicWizardStore = create<PublicWizardStore>((set, get) => ({
     get().pushHistory();
     const next = duplicateFixture(fixtures, selectedFixtureId, pixelsPerMeter, roomVertices, {
       ceilingType: get().ceilingType ?? undefined,
+      obstacles: get().obstacles,
     });
     if (next.length === fixtures.length) {
       set({

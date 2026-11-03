@@ -11,6 +11,7 @@ export const SCALE_RESET_PATCH: Pick<
   | "roomVertices"
   | "roomAreaM2"
   | "fixtures"
+  | "obstacles"
   | "selectedFixtureId"
   | "showHeatmap"
   | "historyPast"
@@ -38,6 +39,7 @@ export const SCALE_RESET_PATCH: Pick<
   roomVertices: [],
   roomAreaM2: null,
   fixtures: [],
+  obstacles: [],
   selectedFixtureId: null,
   showHeatmap: false,
   historyPast: [],

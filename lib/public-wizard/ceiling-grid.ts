@@ -1,3 +1,4 @@
+import { fixtureClearsObstacles, fixturesOverlap } from "@/lib/public-wizard/obstacles";
 import { listModuleCenterPoints, placeElongatedPanelsOnModules } from "@/lib/public-wizard/matrix-placement";
 import {
   buildRoomCeilingGrid,
@@ -29,7 +30,7 @@ import { evaluateLayoutQuality } from "@/lib/public-wizard/layout-quality";
 import { getPublicProduct, isElongatedPanel } from "@/lib/public-wizard/products";
 import { pointInPolygon } from "@/lib/public-wizard/placement";
 import type { Point2D } from "@/types/floor-plan";
-import type { CeilingTypeId, PlacedPublicFixture, PublicProductId } from "@/types/public-wizard";
+import type { CeilingTypeId, PlacedPublicFixture, PublicProductId, PublicObstacle } from "@/types/public-wizard";
 
 export const PANEL_SIZE_M = 0.6;
 
@@ -43,6 +44,7 @@ export interface CeilingLayoutResult {
 }
 
 export interface PanelLayoutContext {
+  obstacles?: PublicObstacle[];
   areaM2: number;
   targetLux: number;
   ceilingHeightM: number;
@@ -727,6 +729,7 @@ function positionOccupied(
 }
 
 export interface SnapFrame {
+  obstacles?: PublicObstacle[];
   ceilingType?: CeilingTypeId;
   rotation?: number;
 }
@@ -769,7 +772,10 @@ export function findNearestFreeGridPosition(
   frame?: SnapFrame,
 ): Point2D | null {
   const candidates = snapCandidates(vertices, pixelsPerMeter, productId, frame);
-  const free = candidates.filter((c) => !positionOccupied(c, occupied));
+  const free = candidates.filter((c) => !positionOccupied(c, occupied) &&
+    isFixtureCenterValid(c, pixelsPerMeter, vertices, productId, frame?.rotation ?? 0, {enforceWallClearance:false}) &&
+    fixtureClearsObstacles(c, pixelsPerMeter, productId, frame?.rotation ?? 0, frame?.obstacles) &&
+    !occupied.some(f => fixturesOverlap({...c,id:"candidate",productId,rotation:frame?.rotation ?? 0},f,pixelsPerMeter)));
   if (free.length === 0) return null;
   free.sort(
     (a, b) =>
@@ -801,7 +807,9 @@ export function snapFixtureToGrid(
     ) {
       return false;
     }
-    return !positionOccupied(candidate, occupied, excludeId);
+    return !positionOccupied(candidate, occupied, excludeId) &&
+      fixtureClearsObstacles(candidate, pixelsPerMeter, productId, rotation, frame?.obstacles) &&
+      !occupied.some(f => f.id !== excludeId && fixturesOverlap({...candidate,id:"candidate",productId,rotation},f,pixelsPerMeter));
   };
 
   const ceilingType = frame?.ceilingType;

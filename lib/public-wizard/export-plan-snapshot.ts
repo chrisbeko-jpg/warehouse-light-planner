@@ -5,7 +5,8 @@ import {
 import { getPublicProduct } from "@/lib/public-wizard/products";
 import { flattenVertices } from "@/lib/polygon-area";
 import type { Point2D } from "@/types/floor-plan";
-import type { PlacedPublicFixture } from "@/types/public-wizard";
+import { orientedFixtureSizeM } from "@/lib/public-wizard/placement-constraints";
+import type { PlacedPublicFixture, PublicObstacle } from "@/types/public-wizard";
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -25,6 +26,7 @@ function drawPlan(
   heatmap: boolean,
   targetLux: number,
   ceilingHeightM: number,
+  obstacles: PublicObstacle[] = [],
 ) {
   ctx.drawImage(img, 0, 0, img.width, img.height);
 
@@ -57,11 +59,20 @@ function drawPlan(
     ctx.stroke();
   }
 
+  ctx.fillStyle = "#475569";
+  ctx.strokeStyle = "#475569";
+  for (const o of obstacles) {
+    ctx.beginPath();
+    if (o.kind === "column") { ctx.arc(o.center.x,o.center.y,o.radiusM*pixelsPerMeter,0,Math.PI*2);ctx.fill(); }
+    else {ctx.lineWidth=o.thicknessM*pixelsPerMeter;ctx.lineCap="round";ctx.moveTo(o.start.x,o.start.y);ctx.lineTo(o.end.x,o.end.y);ctx.stroke();}
+  }
   for (const fixture of fixtures) {
     const product = getPublicProduct(fixture.productId);
-    const sizePx = product.widthM * pixelsPerMeter;
+    const size = orientedFixtureSizeM(fixture.productId, fixture.rotation);
+    const sizePx = size.widthM * pixelsPerMeter;
+    const heightPx = size.heightM * pixelsPerMeter;
     const x = fixture.x - sizePx / 2;
-    const y = fixture.y - sizePx / 2;
+    const y = fixture.y - heightPx / 2;
     ctx.fillStyle = product.category === "downlight" ? "#94a3b8" : "#18A66A";
     ctx.strokeStyle = "#087A4C";
     ctx.lineWidth = Math.max(1, sizePx * 0.04);
@@ -71,8 +82,8 @@ function drawPlan(
       ctx.fill();
       ctx.stroke();
     } else {
-      ctx.fillRect(x, y, sizePx, sizePx);
-      ctx.strokeRect(x, y, sizePx, sizePx);
+      ctx.fillRect(x, y, sizePx, heightPx);
+      ctx.strokeRect(x, y, sizePx, heightPx);
     }
   }
 }
@@ -83,6 +94,7 @@ export async function exportPlanSnapshots(params: {
   backgroundHeight: number;
   roomVertices: Point2D[];
   fixtures: PlacedPublicFixture[];
+  obstacles?: PublicObstacle[];
   pixelsPerMeter: number;
   targetLux: number;
   ceilingHeightM: number;
@@ -105,6 +117,7 @@ export async function exportPlanSnapshots(params: {
     false,
     params.targetLux,
     params.ceilingHeightM,
+    params.obstacles,
   );
 
   const heatCanvas = document.createElement("canvas");
@@ -121,6 +134,7 @@ export async function exportPlanSnapshots(params: {
     true,
     params.targetLux,
     params.ceilingHeightM,
+    params.obstacles,
   );
 
   const lightPlanPng = lightCanvas.toDataURL("image/png").split(",")[1] ?? "";

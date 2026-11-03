@@ -21,7 +21,7 @@ export function Room3DSettingsPanel({ wallCount }: { wallCount: number }) {
   return (
     <div className="space-y-4 text-xs">
       <div>
-        <p className="mb-1 font-semibold">Plafond tonen</p>
+        <p className="mb-1 font-semibold">Transparant plafond tonen</p>
         <label className="flex items-center gap-2">
           <input
             type="checkbox"

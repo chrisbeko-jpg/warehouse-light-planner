@@ -10,20 +10,26 @@ export interface RoomFunctionDefinition {
 export const ROOM_FUNCTIONS: RoomFunctionDefinition[] = [
   {
     id: "workplace_office",
-    name: "Werkplek kantoor",
+    name: "Werkplek",
     suggestedLux: 500,
     imageGradient: "from-zinc-700 to-zinc-900",
   },
   {
+    id: "meeting_room",
+    name: "Vergaderruimte",
+    suggestedLux: 400,
+    imageGradient: "from-zinc-600 to-zinc-900",
+  },
+  {
     id: "reception_hall",
-    name: "Ontvangst / Halzones",
+    name: "Gangzone",
     suggestedLux: 250,
     imageGradient: "from-yellow-900/30 to-zinc-800",
   },
   {
     id: "other_spaces",
-    name: "Overige ruimtes",
-    suggestedLux: 200,
+    name: "Overig",
+    suggestedLux: 150,
     imageGradient: "from-stone-700 to-zinc-900",
   },
 ];
@@ -31,7 +37,7 @@ export const ROOM_FUNCTIONS: RoomFunctionDefinition[] = [
 const LEGACY_ROOM_ID_MAP: Record<string, RoomFunctionId> = {
   open_kantoor: "workplace_office",
   gesloten_kantoor: "workplace_office",
-  vergader: "workplace_office",
+  vergader: "meeting_room",
   entree: "reception_hall",
   gang: "reception_hall",
   pantry: "other_spaces",

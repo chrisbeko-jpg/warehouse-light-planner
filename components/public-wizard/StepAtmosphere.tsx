@@ -41,19 +41,19 @@ export function StepAtmosphere() {
   const atmosphere = usePublicWizardStore((s) => s.atmosphere);
   const selectAtmosphere = usePublicWizardStore((s) => s.selectAtmosphere);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
-  const [cmsChoices, setCmsChoices] = useState<WizardAtmosphereChoiceView[]>([]);
+  const [cmsChoices, setCmsChoices] = useState<WizardAtmosphereChoiceView[] | null>(null);
 
   useEffect(() => {
     void fetch("/api/cms/wizard", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { atmosphereChoices?: WizardAtmosphereChoiceView[] } | null) => {
-        if (data?.atmosphereChoices?.length) setCmsChoices(data.atmosphereChoices);
+        setCmsChoices(data?.atmosphereChoices ?? []);
       })
-      .catch(() => undefined);
+      .catch(() => setCmsChoices([]));
   }, []);
 
   const atmosphereChoices = useMemo(() => {
-    if (cmsChoices.length === 0) {
+    if (!cmsChoices?.length) {
       return ATMOSPHERES.map((item) => ({
         id: item.id,
         title: item.title,
@@ -66,8 +66,25 @@ export function StepAtmosphere() {
         badgeText: item.id === "premium_architectural" ? "ONLY PREMIUM" : undefined,
       }));
     }
-    return cmsChoices;
+    return ATMOSPHERES.map((item) => {
+      const saved = cmsChoices.find((choice) => choice.id === item.id || (item.id === "premium_architectural" && choice.id === "luxe"));
+      return {
+        ...saved,
+        id: item.id,
+        title: item.title,
+        subtitle: saved?.subtitle ?? item.subtitle,
+        description: saved?.description ?? item.presentationText,
+        imageMediaId: saved?.imageMediaId ?? null,
+        imageUrl: saved?.imageUrl ?? getAtmosphereFallback(item.id),
+        imageAlt: saved?.imageAlt ?? item.title,
+        enabled: saved?.enabled ?? item.id !== "premium_architectural",
+      };
+    });
   }, [cmsChoices]);
+
+  if (cmsChoices === null) {
+    return <p role="status" className="lp-body py-8">Keuzes laden…</p>;
+  }
 
   return (
     <div>

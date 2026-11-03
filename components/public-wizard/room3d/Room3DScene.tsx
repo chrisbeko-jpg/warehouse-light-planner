@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import { Line } from "@react-three/drei";
 import * as THREE from "three";
+import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
+
+RectAreaLightUniformsLib.init();
 import { buildCeilingRaster } from "@/lib/public-wizard/ceiling-raster";
 import { getPublicProduct } from "@/lib/public-wizard/products";
 import { orientedFixtureSizeM } from "@/lib/public-wizard/placement-constraints";
@@ -11,6 +15,7 @@ import {
   floorPolygonM,
   makeRoom3DOrigin,
   wallSegmentsM,
+  wallRotationY,
   type WallSegmentM,
 } from "@/lib/public-wizard/room3d-coords";
 import type { Point2D } from "@/types/floor-plan";
@@ -19,35 +24,40 @@ import type {
   PlacedPublicFixture,
   Room3DSettings,
   Room3DWindow,
+  PublicObstacle,
 } from "@/types/public-wizard";
 import { createParquetTexture } from "@/components/public-wizard/room3d/floor-textures";
 
 const MAX_SPOT_LIGHTS = 28;
-
-function wallAngleY(start: { x: number; z: number }, end: { x: number; z: number }) {
-  return Math.atan2(end.x - start.x, end.z - start.z);
-}
 
 function WallMeshes({
   walls,
   ceilingHeightM,
   wallColor,
   windows,
-  ghostFrontWallIndices,
 }: {
   walls: WallSegmentM[];
   ceilingHeightM: number;
   wallColor: string;
   windows: Room3DWindow[];
-  ghostFrontWallIndices: Set<number>;
 }) {
+  const groupRef = useRef<THREE.Group>(null);
+  useFrame(({ camera }) => {
+    groupRef.current?.children.forEach((group, i) => {
+      const wall = walls[i];
+      if (!wall) return;
+      const dx = camera.position.x - (wall.start.x + wall.end.x) / 2;
+      const dz = camera.position.z - (wall.start.z + wall.end.z) / 2;
+      // Cut away only the walls between the viewer and the room interior.
+      group.visible = dx * wall.normalX + dz * wall.normalZ <= 0.02;
+    });
+  });
   return (
-    <group>
+    <group ref={groupRef}>
       {walls.map((wall) => {
         const midX = (wall.start.x + wall.end.x) / 2;
         const midZ = (wall.start.z + wall.end.z) / 2;
-        const angle = wallAngleY(wall.start, wall.end);
-        const opacity = ghostFrontWallIndices.has(wall.index) ? 0.12 : 1;
+        const angle = wallRotationY(wall);
         const wallWindows = windows.filter((w) => w.wallIndex === wall.index);
         return (
           <group key={wall.index} position={[midX, ceilingHeightM / 2, midZ]} rotation={[0, angle, 0]}>
@@ -55,9 +65,6 @@ function WallMeshes({
               <boxGeometry args={[wall.lengthM, ceilingHeightM, 0.08]} />
               <meshStandardMaterial
                 color={wallColor}
-                transparent={opacity < 1}
-                opacity={opacity}
-                depthWrite={opacity >= 1}
               />
             </mesh>
             {wallWindows.map((win) => {
@@ -98,7 +105,7 @@ function FixtureMeshes({
       {fixtures.map((fixture) => {
         const product = getPublicProduct(fixture.productId);
         const { x, z } = canvasPointToFloorM(fixture, origin);
-        const { widthM, heightM } = orientedFixtureSizeM(fixture.productId, fixture.rotation ?? 0);
+        const { widthM, heightM } = orientedFixtureSizeM(fixture.productId, 0);
         const rotY = -((fixture.rotation ?? 0) * Math.PI) / 180;
         const warm = product.cct <= 3500;
         const emissive = warm ? "#ffd8a8" : "#f5f5ff";
@@ -112,7 +119,7 @@ function FixtureMeshes({
         if (isDownlight) {
           const d = product.diameterM ?? 0.22;
           return (
-            <mesh key={fixture.id} position={[x, y, z]} rotation={[Math.PI / 2, 0, 0]}>
+            <mesh key={fixture.id} position={[x, y, z]}>
               <cylinderGeometry args={[d / 2, d / 2, 0.04, 24]} />
               <meshStandardMaterial color="#f8fafc" emissive={emissive} emissiveIntensity={0.85} />
             </mesh>
@@ -186,7 +193,7 @@ function CeilingGrid({
     <group>
       {showCeiling && (
         <mesh geometry={ceilingGeo} position={[0, ceilingHeightM, 0]}>
-          <meshStandardMaterial color={ceilingColor} side={THREE.DoubleSide} />
+          <meshStandardMaterial color={ceilingColor} side={THREE.DoubleSide} transparent opacity={0.22} depthWrite={false} />
         </mesh>
       )}
       {lines.map((points, index) => (
@@ -209,8 +216,8 @@ function FloorMesh({
     const pts = floorPolygonM(vertices, origin);
     const s = new THREE.Shape();
     pts.forEach((p, i) => {
-      if (i === 0) s.moveTo(p.x, p.z);
-      else s.lineTo(p.x, p.z);
+      if (i === 0) s.moveTo(p.x, -p.z);
+      else s.lineTo(p.x, -p.z);
     });
     s.closePath();
     return s;
@@ -218,7 +225,7 @@ function FloorMesh({
 
   const geo = useMemo(() => {
     const g = new THREE.ShapeGeometry(shape);
-    g.rotateX(Math.PI / 2);
+    g.rotateX(-Math.PI / 2);
     return g;
   }, [shape]);
 
@@ -248,28 +255,35 @@ function SpotLights({
   origin: ReturnType<typeof makeRoom3DOrigin>;
   ceilingHeightM: number;
 }) {
-  const subset = fixtures.slice(0, MAX_SPOT_LIGHTS);
-  return (
-    <group>
-      {subset.map((fixture) => {
-        const product = getPublicProduct(fixture.productId);
-        const { x, z } = canvasPointToFloorM(fixture, origin);
-        const warm = product.cct <= 3500;
-        return (
-          <spotLight
-            key={`light-${fixture.id}`}
-            position={[x, ceilingHeightM - 0.05, z]}
-            angle={0.65}
-            penumbra={0.45}
-            intensity={warm ? 0.35 : 0.42}
-            color={warm ? "#ffe4c4" : "#f0f4ff"}
-            distance={ceilingHeightM * 2.2}
-            castShadow={false}
-          />
-        );
-      })}
-    </group>
-  );
+  const lights = useMemo(() => fixtures.slice(0, MAX_SPOT_LIGHTS).map(fixture => {
+    const product = getPublicProduct(fixture.productId);
+    const position = canvasPointToFloorM(fixture, origin);
+    const target = new THREE.Object3D();
+    target.position.set(position.x, 0, position.z);
+    return { fixture, product, position, target };
+  }), [fixtures, origin]);
+  return <group>{lights.map(({fixture, product, position, target}) => {
+    const color = product.cct <= 3500 ? "#ffe4c4" : "#f0f4ff";
+    if (product.category === "led_panel") return <rectAreaLight key={fixture.id}
+      position={[position.x,ceilingHeightM-0.04,position.z]}
+      rotation={[-Math.PI/2,0,(fixture.rotation??0)*Math.PI/180]}
+      width={product.widthM} height={product.heightM} intensity={3} color={color} />;
+    return <group key={fixture.id}><primitive object={target} /><spotLight
+      position={[position.x,ceilingHeightM-0.05,position.z]} target={target}
+      angle={0.85} penumbra={0.8} intensity={0.4} color={color}
+      distance={ceilingHeightM*2.2} castShadow={false} /></group>;
+  })}</group>;
+}
+
+function ObstacleMeshes({obstacles,origin,height}:{obstacles:PublicObstacle[];origin:ReturnType<typeof makeRoom3DOrigin>;height:number}) {
+  return <group>{obstacles.map(o => {
+    if(o.kind === "column") {
+      const p=canvasPointToFloorM(o.center,origin);
+      return <mesh key={o.id} position={[p.x,height/2,p.z]}><cylinderGeometry args={[o.radiusM,o.radiusM,height,32]} /><meshStandardMaterial color="#cbd5e1" /></mesh>;
+    }
+    const start=canvasPointToFloorM(o.start,origin),end=canvasPointToFloorM(o.end,origin);
+    return <mesh key={o.id} position={[(start.x+end.x)/2,height/2,(start.z+end.z)/2]} rotation={[0,wallRotationY({start,end}),0]}><boxGeometry args={[Math.hypot(end.x-start.x,end.z-start.z),height,o.thicknessM]} /><meshStandardMaterial color="#cbd5e1" /></mesh>;
+  })}</group>;
 }
 
 export interface Room3DSceneProps {
@@ -279,7 +293,7 @@ export interface Room3DSceneProps {
   ceilingType: CeilingTypeId;
   fixtures: PlacedPublicFixture[];
   room3D: Room3DSettings;
-  ghostFrontWallIndices: Set<number>;
+  obstacles?: PublicObstacle[];
 }
 
 export function Room3DScene({
@@ -289,7 +303,7 @@ export function Room3DScene({
   ceilingType,
   fixtures,
   room3D,
-  ghostFrontWallIndices,
+  obstacles = [],
 }: Room3DSceneProps) {
   const origin = useMemo(
     () => makeRoom3DOrigin(vertices, pixelsPerMeter),
@@ -312,7 +326,6 @@ export function Room3DScene({
         ceilingHeightM={ceilingHeightM}
         wallColor={room3D.wallColor}
         windows={room3D.windows}
-        ghostFrontWallIndices={ghostFrontWallIndices}
       />
       <CeilingGrid
         vertices={vertices}
@@ -322,6 +335,7 @@ export function Room3DScene({
         showCeiling={room3D.showCeiling}
         ceilingColor={room3D.ceilingColor}
       />
+      <ObstacleMeshes obstacles={obstacles} origin={origin} height={ceilingHeightM} />
       <FixtureMeshes fixtures={fixtures} origin={origin} ceilingHeightM={ceilingHeightM} />
       <SpotLights fixtures={fixtures} origin={origin} ceilingHeightM={ceilingHeightM} />
     </>

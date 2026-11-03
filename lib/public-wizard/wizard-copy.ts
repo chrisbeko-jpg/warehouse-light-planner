@@ -11,6 +11,7 @@ export const WIZARD_COPY = {
     descriptions: {
       workplace_office:
         "Voor kantoorwerkplekken waar een gelijkmatige en comfortabele basisverlichting nodig is.",
+      meeting_room: "Voor vergaderruimtes en overlegplekken.",
       reception_hall:
         "Voor entrees, verkeersruimtes en ontvangstzones met functionele basisverlichting.",
       other_spaces: "Voor algemene ruimtes waar een lager basisverlichtingsniveau volstaat.",

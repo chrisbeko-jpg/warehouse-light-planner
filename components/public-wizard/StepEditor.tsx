@@ -71,6 +71,9 @@ export function StepEditor() {
   const roomVertices = usePublicWizardStore((s) => s.roomVertices);
   const roomAreaM2 = usePublicWizardStore((s) => s.roomAreaM2);
   const fixtures = usePublicWizardStore((s) => s.fixtures);
+  const obstacles = usePublicWizardStore((s) => s.obstacles);
+  const addObstacle = usePublicWizardStore((s) => s.addObstacle);
+  const removeObstacle = usePublicWizardStore((s) => s.removeObstacle);
   const selectedFixtureId = usePublicWizardStore((s) => s.selectedFixtureId);
   const showHeatmap = usePublicWizardStore((s) => s.showHeatmap);
   const lightingPlanGenerated = usePublicWizardStore((s) => s.lightingPlanGenerated);
@@ -87,6 +90,7 @@ export function StepEditor() {
 
   const prevStep = usePublicWizardStore((s) => s.prevStep);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
+  const setEditorPlanView = usePublicWizardStore((s) => s.setEditorPlanView);
   const setEditorMode = usePublicWizardStore((s) => s.setEditorMode);
   const setEditorPhase = usePublicWizardStore((s) => s.setEditorPhase);
   const setSidePanelCollapsed = usePublicWizardStore((s) => s.setSidePanelCollapsed);
@@ -122,6 +126,9 @@ export function StepEditor() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
+  const [obstacleStart, setObstacleStart] = useState<Point2D | null>(null);
+  const [wallThickness, setWallThickness] = useState(0.15);
+  const [columnDiameter, setColumnDiameter] = useState(0.4);
   const [recognizing, setRecognizing] = useState(false);
   const [showScaleDialog, setShowScaleDialog] = useState(false);
   const [showScaleResetDialog, setShowScaleResetDialog] = useState(false);
@@ -321,6 +328,18 @@ export function StepEditor() {
 
       if (!pixelsPerMeter) return;
 
+      if (editorMode === "draw-column") {
+        addObstacle({ id: `ob-${Date.now()}`, kind: "column", center: clamped, radiusM: columnDiameter/2 });
+        return;
+      }
+      if (editorMode === "draw-wall") {
+        if (!obstacleStart) setObstacleStart(clamped);
+        else {
+          addObstacle({ id: `ob-${Date.now()}`, kind: "wall", start: obstacleStart, end: clamped, thicknessM: wallThickness });
+          setObstacleStart(null);
+        }
+        return;
+      }
       if (editorMode !== "select") return;
 
       const clicked = fixtures.find((f) => {
@@ -336,6 +355,7 @@ export function StepEditor() {
       selectFixture(clicked?.id ?? null);
     },
     [
+      obstacleStart, columnDiameter, wallThickness, addObstacle,
       isPanning,
       editorMode,
       backgroundDataUrl,
@@ -381,11 +401,11 @@ export function StepEditor() {
         { x: fixture.x, y: fixture.y },
         fixtures,
         fixture.id,
-        { ceilingType: ceilingType ?? undefined, rotation: fixture.rotation },
+        { ceilingType: ceilingType ?? undefined, rotation: fixture.rotation, obstacles },
       );
       setSnapPreview(snapped);
     },
-    [pixelsPerMeter, fixtures, roomVertices, ceilingType],
+    [pixelsPerMeter, fixtures, roomVertices, ceilingType, obstacles],
   );
 
   const handleFixtureDragEnd = useCallback(
@@ -566,9 +586,22 @@ export function StepEditor() {
               if (fixtures.length > 0) nextStep();
             }}
           />
+          {roomComplete && <section className="space-y-2 border-t p-4 text-xs" aria-label="Obstakels">
+            <h3 className="font-bold text-sm">Wanden en pilaren</h3>
+            <p>Teken binnenwanden en pilaren over de plattegrond. Armaturen blijven minimaal 15 cm vrij. De foto zelf vormt geen obstakel.</p>
+            <label className="flex justify-between gap-2">Wanddikte (cm)<input aria-label="Wanddikte in centimeter" type="number" min="5" max="200" value={Math.round(wallThickness*100)} onChange={e=>setWallThickness(Math.max(0.05,Number(e.target.value)/100))} className="w-20 rounded border p-1" /></label>
+            <label className="flex justify-between gap-2">Pilaar diameter (cm)<input aria-label="Pilaar diameter in centimeter" type="number" min="10" max="500" value={Math.round(columnDiameter*100)} onChange={e=>setColumnDiameter(Math.max(0.1,Number(e.target.value)/100))} className="w-20 rounded border p-1" /></label>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="lp-btn-secondary text-xs" onClick={()=>{setEditorPlanView("2d");setObstacleStart(null);setEditorMode("draw-wall");}}>+ Wand tekenen</button>
+              <button type="button" className="lp-btn-secondary text-xs" onClick={()=>{setEditorPlanView("2d");setObstacleStart(null);setEditorMode("draw-column");}}>+ Ronde pilaar</button>
+              {(editorMode === "draw-wall" || editorMode === "draw-column") && <button type="button" className="lp-btn-secondary text-xs" onClick={()=>{setObstacleStart(null);setEditorMode("select");}}>Annuleren</button>}
+            </div>
+            {obstacles.map((o,i)=><div key={o.id} className="flex items-center justify-between border-b py-1"><span>{o.kind==="wall"?"Wand":"Ronde pilaar"} {i+1}</span><button type="button" aria-label={`Verwijder obstakel ${i+1}`} className="underline" onClick={()=>removeObstacle(o.id)}>Verwijderen</button></div>)}
+          </section>}
         </aside>
 
         <div ref={canvasRef} data-testid="editor-canvas-area" className="relative min-w-0 flex-1 bg-[var(--lp-editor-bg)]">
+          {(editorMode === "draw-wall" || editorMode === "draw-column") && <p role="status" className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded bg-black/80 p-3 text-sm text-white">{editorMode === "draw-column" ? "Klik op het middelpunt van de pilaar." : obstacleStart ? "Klik op het eindpunt van de wand." : "Klik op het beginpunt van de wand."}</p>}
           {scaleInstruction && (
             <div
               className="pointer-events-none absolute left-1/2 top-3 z-10 flex max-w-[min(100%,28rem)] -translate-x-1/2 flex-col items-center gap-2 px-3 sm:flex-row"
@@ -636,6 +669,7 @@ export function StepEditor() {
               ceilingType={ceilingType}
               fixtures={fixtures}
               room3D={room3D}
+              obstacles={obstacles}
             />
           )}
 
@@ -798,6 +832,8 @@ export function StepEditor() {
                     />
                   </>
                 )}
+                {pixelsPerMeter && obstacles.map(o => o.kind === "wall" ? <Line key={o.id} points={[o.start.x,o.start.y,o.end.x,o.end.y]} stroke="#475569" strokeWidth={Math.max(3/viewState.scale,o.thicknessM*pixelsPerMeter)} lineCap="round" listening={false} /> : <Circle key={o.id} x={o.center.x} y={o.center.y} radius={o.radiusM*pixelsPerMeter} fill="#475569" stroke="#f59e0b" strokeWidth={2/viewState.scale} listening={false} />)}
+                {editorMode === "draw-wall" && obstacleStart && pointerImage && <Line points={[obstacleStart.x,obstacleStart.y,pointerImage.x,pointerImage.y]} stroke="#f59e0b" strokeWidth={Math.max(3/viewState.scale,wallThickness*(pixelsPerMeter ?? 1))} dash={[8,4]} listening={false} />}
                 <EditorFixtureRects
                   fixtures={fixtures}
                   pixelsPerMeter={pixelsPerMeter}
@@ -977,6 +1013,7 @@ const EditorFixtureRects = memo(function EditorFixtureRects({
             stroke={isSelected ? "#ffffff" : "#087A4C"}
             strokeWidth={(isSelected ? 3 : 1) / viewScale}
             cornerRadius={product.category === "downlight" ? Math.min(widthPx, heightPx) / 2 : 4}
+            listening={editorMode === "select"}
             draggable={canDrag}
             onDragStart={(e) => {
               e.cancelBubble = true;

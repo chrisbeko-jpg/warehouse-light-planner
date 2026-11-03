@@ -34,7 +34,8 @@ export const FALLBACK_IMAGES = {
   } satisfies Record<AtmosphereId, string>,
   rooms: {
     workplace_office: imagePath("open-kantoor-verlichting.webp"),
-    reception_hall: imagePath("entree-verlichting.webp"),
+    meeting_room: imagePath("vergaderruimte-verlichting.webp"),
+    reception_hall: imagePath("gang-verlichting.webp"),
     other_spaces: imagePath("overig-ruimte-verlichting.webp"),
   } satisfies Record<RoomFunctionId, string>,
   ceilings: {

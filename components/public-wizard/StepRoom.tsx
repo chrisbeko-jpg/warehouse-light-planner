@@ -21,19 +21,19 @@ export function StepRoom() {
   const roomFunction = usePublicWizardStore((s) => s.roomFunction);
   const selectRoomFunction = usePublicWizardStore((s) => s.selectRoomFunction);
   const nextStep = usePublicWizardStore((s) => s.nextStep);
-  const [cmsChoices, setCmsChoices] = useState<WizardRoomChoiceView[]>([]);
+  const [cmsChoices, setCmsChoices] = useState<WizardRoomChoiceView[] | null>(null);
 
   useEffect(() => {
     void fetch("/api/cms/wizard", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { roomChoices?: WizardRoomChoiceView[] } | null) => {
-        if (data?.roomChoices?.length) setCmsChoices(data.roomChoices);
+        setCmsChoices(data?.roomChoices ?? []);
       })
-      .catch(() => undefined);
+      .catch(() => setCmsChoices([]));
   }, []);
 
   const roomChoices = useMemo(() => {
-    if (cmsChoices.length === 0) {
+    if (!cmsChoices?.length) {
       return ROOM_FUNCTIONS.map((room) => ({
         id: room.id,
         title: room.name,
@@ -46,12 +46,16 @@ export function StepRoom() {
     return cmsChoices;
   }, [cmsChoices]);
 
+  if (cmsChoices === null) {
+    return <p role="status" className="lp-body py-8">Keuzes laden…</p>;
+  }
+
   return (
     <div>
       <h2 className="lp-heading-2 mb-2">{WIZARD_COPY.room.title}</h2>
       <p className="lp-body mb-5">{WIZARD_COPY.room.intro}</p>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {roomChoices.map((room) => {
           const fallback = getRoomFunction(room.id as RoomFunctionId);
           const imageSrc = room.imageUrl ?? getRoomFallback(room.id) ?? undefined;

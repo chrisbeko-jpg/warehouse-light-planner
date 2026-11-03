@@ -29,6 +29,6 @@ export function selectConfiguredProduct(
   atmosphere: AtmosphereId,
 ): PublicProductId {
   const cct = cctFromAtmosphere(atmosphere);
-  if (room === "workplace_office") return selectPanelProduct(ceiling, cct);
+  if (room === "workplace_office" || room === "meeting_room") return selectPanelProduct(ceiling, cct);
   return selectDownlightProduct(ceiling, cct);
 }

@@ -83,6 +83,11 @@ export interface WallSegmentM {
 export function wallSegmentsM(vertices: Point2D[], origin: Room3DOrigin): WallSegmentM[] {
   const floor = floorPolygonM(vertices, origin);
   const segments: WallSegmentM[] = [];
+  const signedArea = floor.reduce((sum, p, i) => {
+    const next = floor[(i + 1) % floor.length]!;
+    return sum + p.x * next.z - next.x * p.z;
+  }, 0);
+  const winding = signedArea >= 0 ? 1 : -1;
   for (let i = 0; i < floor.length; i++) {
     const start = floor[i]!;
     const end = floor[(i + 1) % floor.length]!;
@@ -90,8 +95,8 @@ export function wallSegmentsM(vertices: Point2D[], origin: Room3DOrigin): WallSe
     const dz = end.z - start.z;
     const lengthM = Math.hypot(dx, dz);
     if (lengthM < 1e-6) continue;
-    const nx = dz / lengthM;
-    const nz = -dx / lengthM;
+    const nx = winding * dz / lengthM;
+    const nz = -winding * dx / lengthM;
     segments.push({
       index: i,
       start,
@@ -155,3 +160,8 @@ export const DEFAULT_WINDOW_3D: Omit<Room3DWindow, "id"> = {
   heightM: 1.2,
   sillHeightM: 0.9,
 };
+
+/** Rotation for a mesh whose length follows its local X axis. */
+export function wallRotationY(wall: Pick<WallSegmentM, "start" | "end">): number {
+  return Math.atan2(-(wall.end.z - wall.start.z), wall.end.x - wall.start.x);
+}

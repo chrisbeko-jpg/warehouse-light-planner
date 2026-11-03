@@ -16,7 +16,7 @@ export type CeilingTypeId = "grid_600" | "grid_1200_600" | "concrete";
 
 export type WizardInputMethod = "floorplan" | "dimensions";
 
-export type RoomFunctionId = "workplace_office" | "reception_hall" | "other_spaces";
+export type RoomFunctionId = "workplace_office" | "meeting_room" | "reception_hall" | "other_spaces";
 
 export interface ManualDimensions {
   lengthM: number;
@@ -49,6 +49,10 @@ export type LeadStatus =
   | "verzonden"
   | "gewonnen"
   | "verloren";
+
+export type PublicObstacle =
+  | { id: string; kind: "wall"; start: Point2D; end: Point2D; thicknessM: number }
+  | { id: string; kind: "column"; center: Point2D; radiusM: number };
 
 export interface PlacedPublicFixture {
   id: string;
@@ -88,7 +92,7 @@ export interface Room3DSettings {
   dayLightEnabled: boolean;
 }
 
-export type Room3DCameraPreset = "fit" | "isometric" | "top" | "interior";
+export type Room3DCameraPreset = "fit" | "isometric" | "top" | "bottom" | "interior";
 
 export interface PublicRoomPolygon {
   vertices: Point2D[];
@@ -182,6 +186,7 @@ export interface PublicLeadRecord {
     preferredProductId: PublicProductId;
     fixtures: PlacedPublicFixture[];
     roomVertices: Point2D[];
+    obstacles?: PublicObstacle[];
     pixelsPerMeter: number;
     inputMethod: WizardInputMethod;
     manualDimensions: ManualDimensions | null;

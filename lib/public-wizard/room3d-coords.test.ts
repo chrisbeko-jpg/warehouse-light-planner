@@ -9,6 +9,7 @@ import {
   roomAxisBoundsM,
   validateWindowOnWall,
   wallSegmentsM,
+  wallRotationY,
   windowsOverlap,
 } from "@/lib/public-wizard/room3d-coords";
 
@@ -73,4 +74,18 @@ test("validateWindowOnWall clamps offset inside wall span", () => {
     [],
   );
   assert.ok(validated);
+});
+
+test("3D wall endpoints match an irregular drawn room in both winding orders", () => {
+  const polygon = [{x: 0,y: 0}, {x: 800,y: 0}, {x: 800,y: 300}, {x: 400,y: 300}, {x: 300,y: 500}, {x: 0,y: 500}];
+  for (const vertices of [polygon, [...polygon].reverse()]) {
+    const walls = wallSegmentsM(vertices, makeRoom3DOrigin(vertices, 100));
+    for (const wall of walls) {
+      const angle = wallRotationY(wall);
+      assert.ok(Math.abs(Math.cos(angle) * wall.lengthM - (wall.end.x - wall.start.x)) < 1e-8);
+      assert.ok(Math.abs(-Math.sin(angle) * wall.lengthM - (wall.end.z - wall.start.z)) < 1e-8);
+    }
+    const top = walls.find(w => w.start.z === 0 && w.end.z === 0)!;
+    assert.equal(top.normalZ, -1);
+  }
 });
