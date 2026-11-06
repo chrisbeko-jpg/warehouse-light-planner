@@ -9,21 +9,43 @@ function LoginForm() {
   const next = searchParams.get("next") ?? "/internal/aanvragen";
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!token.trim()) {
       setError("Voer een token in.");
       return;
     }
-    document.cookie = `internal_admin_token=${encodeURIComponent(token.trim())}; path=/; max-age=86400; SameSite=Strict`;
-    router.push(next);
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/internal-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ token: token.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Inloggen mislukt.");
+        return;
+      }
+      router.push(next);
+    } catch {
+      setError("Inloggen mislukt.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--ls-bg)] p-4">
       <form onSubmit={handleSubmit} className="w-full max-w-md rounded-2xl bg-white p-6 shadow">
         <h1 className="mb-4 text-xl font-bold">Interne toegang</h1>
+        <p className="mb-3 text-sm text-slate-600">
+          Uw sessie wordt veilig in een HttpOnly-cookie opgeslagen (geen token in JavaScript).
+        </p>
         <label className="block text-sm font-medium">
           Admin token
           <input
@@ -34,8 +56,8 @@ function LoginForm() {
           />
         </label>
         {error && <p className="mt-2 text-sm text-[var(--ls-danger)]">{error}</p>}
-        <button type="submit" className="btn-primary mt-4 w-full">
-          Inloggen
+        <button type="submit" className="btn-primary mt-4 w-full" disabled={submitting}>
+          {submitting ? "Bezig…" : "Inloggen"}
         </button>
       </form>
     </main>

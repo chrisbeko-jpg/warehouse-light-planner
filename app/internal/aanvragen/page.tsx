@@ -14,27 +14,15 @@ const STATUSES: LeadStatus[] = [
   "verloren",
 ];
 
-function getTokenFromCookie(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(/internal_admin_token=([^;]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : null;
-}
-
 export default function InternalLeadsPage() {
   const [leads, setLeads] = useState<PublicLeadRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchLeads = useCallback(async () => {
-    const token = getTokenFromCookie();
-    if (!token) {
-      setError("Geen token gevonden.");
-      setLoading(false);
-      return;
-    }
     try {
       const response = await fetch("/api/internal/leads", {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       if (!response.ok) throw new Error("Kon aanvragen niet laden");
       const data = (await response.json()) as { leads: PublicLeadRecord[] };
@@ -51,12 +39,10 @@ export default function InternalLeadsPage() {
   }, [fetchLeads]);
 
   const updateStatus = async (reference: string, status: LeadStatus) => {
-    const token = getTokenFromCookie();
-    if (!token) return;
     await fetch("/api/internal/leads", {
       method: "PATCH",
+      credentials: "include",
       headers: {
-        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ reference, status }),
@@ -65,12 +51,10 @@ export default function InternalLeadsPage() {
   };
 
   const downloadPdf = async (reference: string) => {
-    const token = getTokenFromCookie();
-    if (!token) return;
     const response = await fetch("/api/internal/leads", {
       method: "POST",
+      credentials: "include",
       headers: {
-        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ reference, action: "download-pdf" }),

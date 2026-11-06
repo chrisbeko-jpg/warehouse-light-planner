@@ -3,6 +3,13 @@ import type { NextRequest } from "next/server";
 
 const LEDPANEEL_HOSTS = new Set(["ledpaneel.nl", "www.ledpaneel.nl"]);
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let o = 0;
+  for (let i = 0; i < a.length; i++) o |= a.charCodeAt(i)! ^ b.charCodeAt(i)!;
+  return o === 0;
+}
+
 function isLedpaneelSite(host: string): boolean {
   return LEDPANEEL_HOSTS.has(host) || process.env.NEXT_PUBLIC_SITE_MODE === "ledpaneel";
 }
@@ -21,11 +28,14 @@ export function middleware(request: NextRequest) {
 
   if (pathname.startsWith("/internal") && !pathname.startsWith("/internal/login")) {
     const expectedToken = process.env.INTERNAL_ADMIN_TOKEN ?? "";
-    const cookieToken = request.cookies.get("internal_admin_token")?.value ?? "";
+    const sessionCookie = request.cookies.get("internal_admin_session")?.value ?? "";
+    const legacyCookie = request.cookies.get("internal_admin_token")?.value ?? "";
     const authHeader = request.headers.get("authorization")?.replace("Bearer ", "") ?? "";
     const isAuthorized =
       expectedToken.length > 0 &&
-      (cookieToken === expectedToken || authHeader === expectedToken);
+      (timingSafeEqual(sessionCookie, expectedToken) ||
+        timingSafeEqual(legacyCookie, expectedToken) ||
+        timingSafeEqual(authHeader, expectedToken));
     if (!isAuthorized) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/internal/login";

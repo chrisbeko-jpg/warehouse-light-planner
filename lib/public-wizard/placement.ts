@@ -1,9 +1,6 @@
 import { fixtureClearsObstacles } from "@/lib/public-wizard/obstacles";
 import { placeInUsableArea } from "@/lib/public-wizard/irregular-placement";
-import {
-  augmentFixturesForCoverage,
-  augmentFixturesToTargetCount,
-} from "@/lib/public-wizard/layout-augment";
+import { augmentFixturesToTargetCount } from "@/lib/public-wizard/layout-augment";
 import { summarizeLightingCoverage } from "@/lib/public-wizard/lighting-assessment";
 import { calculatePolygonAreaM2 } from "@/lib/polygon-area";
 import {
@@ -152,14 +149,6 @@ export function placeFixturesWithLayoutInfo(
       productId,
       ctx,
     );
-    const coverageAugment = augmentFixturesForCoverage(
-      fixtures,
-      vertices,
-      pixelsPerMeter,
-      productId,
-      ctx,
-    );
-    fixtures = coverageAugment.fixtures;
     const coverage = summarizeLightingCoverage(
       fixtures,
       vertices,

@@ -39,7 +39,7 @@ async function saveDraftResponse(action: () => Promise<CmsSaveResult>) {
 }
 
 export async function GET(request: Request) {
-  if (!verifyInternalToken(request)) {
+  if (!(await verifyInternalToken(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const draft = new URL(request.url).searchParams.get("draft") === "1";
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  if (!verifyInternalToken(request)) {
+  if (!(await verifyInternalToken(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = (await request.json()) as {
@@ -88,7 +88,7 @@ export async function PUT(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!verifyInternalToken(request)) {
+  if (!(await verifyInternalToken(request))) {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
   const storageError = getStorageConfigurationError();

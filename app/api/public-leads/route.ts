@@ -11,7 +11,6 @@ import {
 } from "@/lib/public-wizard/lead-storage";
 import {
   resolveLeadContactDelivery,
-  validateLeadForm,
 } from "@/lib/public-wizard/lead-form";
 import {
   calculateMaterialPrice,
@@ -21,43 +20,21 @@ import {
 } from "@/lib/public-wizard/pricing";
 import { calculateIndicativeResult } from "@/lib/public-wizard/calculation";
 import { createRoomPolygon } from "@/lib/public-wizard/placement";
+import { guardPublicJsonPost } from "@/lib/security/public-api-guard";
+import { publicLeadPayloadSchema } from "@/lib/security/schemas/public-forms";
+import { envInt } from "@/lib/security/env";
 import type {
   LeadContactForm,
-  ManualDimensions,
-  PublicLeadRecord,
-  PublicProductId,
   PlacedPublicFixture,
+  PublicLeadRecord,
   PublicObstacle,
-  RoomFunctionId,
-  AtmosphereId,
-  CeilingTypeId,
-  WizardInputMethod,
+  PublicProductId,
 } from "@/types/public-wizard";
 
 export const runtime = "nodejs";
 
 const API_ERROR_MESSAGE = "Er ging iets mis bij het versturen van uw aanvraag.";
 const API_SUCCESS_MESSAGE = "Aanvraag ontvangen";
-
-interface SubmitBody {
-  contact: LeadContactForm;
-  roomFunction: RoomFunctionId;
-  ceilingHeightM: number;
-  targetLux: number;
-  atmosphere: AtmosphereId;
-  ceilingType?: CeilingTypeId | null;
-  preferredProductId: PublicProductId;
-  fixtures: PlacedPublicFixture[];
-  obstacles?: PublicObstacle[];
-  roomVertices: { x: number; y: number }[];
-  pixelsPerMeter: number;
-  inputMethod: WizardInputMethod;
-  manualDimensions: ManualDimensions | null;
-  requiredFixtureCount?: number | null;
-  floorPlanDataUrl: string | null;
-  lightPlanImageBase64?: string | null;
-  heatmapImageBase64?: string | null;
-}
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ success: false, message }, { status });
@@ -74,36 +51,46 @@ function getSmtpConfig() {
 }
 
 export async function POST(request: Request) {
+  const guarded = await guardPublicJsonPost(request, {
+    routeKey: "public_leads",
+    maxBytes: envInt("MAX_BODY_PUBLIC_LEADS_BYTES", 32_000_000),
+    rateLimit: {
+      max: envInt("RATE_LIMIT_PUBLIC_LEADS_MAX", 5),
+      windowSec: envInt("RATE_LIMIT_PUBLIC_LEADS_WINDOW_SEC", 3600),
+    },
+    schema: publicLeadPayloadSchema,
+    honeypotFilled: (d) => (d._hp_company_site?.length ?? 0) > 0,
+    getTurnstileToken: (d) => d.turnstileToken,
+  });
+
+  if (!guarded.ok) return guarded.response;
+
+  const body = guarded.data;
+
   try {
-    let body: SubmitBody;
-    try {
-      body = (await request.json()) as SubmitBody;
-    } catch {
-      return jsonError("Ongeldige aanvraag.", 400);
-    }
-
-    const contact = resolveLeadContactDelivery(body.contact);
-    const validationError = validateLeadForm(contact);
-    if (validationError) {
-      return jsonError(validationError, 400);
-    }
-
-    if (!body.roomFunction || !body.atmosphere || !body.fixtures || !body.roomVertices?.length || !body.inputMethod) {
-      return jsonError("Wizardgegevens ontbreken.", 400);
-    }
+    const normalizedContact: LeadContactForm = {
+      ...body.contact,
+      projectName: body.contact.projectName ?? "",
+      remarks: body.contact.remarks ?? "",
+      desiredDeliveryDate: body.contact.desiredDeliveryDate ?? "",
+    };
+    const contact = resolveLeadContactDelivery(normalizedContact);
 
     const site = await loadCmsSite();
     setActiveProductCatalog(site.wizard.products ?? null);
+
+    const fixtures = body.fixtures as PlacedPublicFixture[];
+    const preferredProductId = body.preferredProductId as PublicProductId;
 
     const areaM2 = createRoomPolygon(body.roomVertices, body.pixelsPerMeter).areaM2;
     const result = calculateIndicativeResult(
       areaM2,
       body.targetLux,
       body.ceilingHeightM,
-      body.fixtures,
+      fixtures,
       body.requiredFixtureCount ?? undefined,
     );
-    const price = calculateMaterialPrice(body.fixtures);
+    const price = calculateMaterialPrice(fixtures);
     const reference = generateReference();
 
     const record: PublicLeadRecord = {
@@ -118,9 +105,9 @@ export async function POST(request: Request) {
         targetLux: body.targetLux,
         atmosphere: body.atmosphere,
         ceilingType: body.ceilingType ?? null,
-        preferredProductId: body.preferredProductId,
-        fixtures: body.fixtures,
-        obstacles: body.obstacles ?? [],
+        preferredProductId,
+        fixtures,
+        obstacles: (body.obstacles ?? []) as PublicObstacle[],
         roomVertices: body.roomVertices,
         pixelsPerMeter: body.pixelsPerMeter,
         inputMethod: body.inputMethod,
@@ -142,7 +129,7 @@ export async function POST(request: Request) {
       console.error("Lead storage failed:", storageError);
     }
 
-    const productSummary = Object.entries(countProducts(body.fixtures))
+    const productSummary = Object.entries(countProducts(fixtures))
       .map(([name, qty]) => `${name}: ${qty}`)
       .join(", ");
 

@@ -1,6 +1,10 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { getLeadsDir as getLeadsDirFromStorage } from "@/lib/storage/data-dir";
+import {
+  getInternalBearerFromRequest,
+  isValidInternalToken,
+} from "@/lib/security/internal-auth";
 import type { LeadStatus, PublicLeadRecord } from "@/types/public-wizard";
 
 function getLeadsDir(): string {
@@ -79,9 +83,7 @@ export async function readLeadPdf(reference: string): Promise<Buffer | null> {
   }
 }
 
-export function verifyInternalToken(request: Request): boolean {
-  const token = process.env.INTERNAL_ADMIN_TOKEN;
-  if (!token) return false;
-  const auth = request.headers.get("authorization");
-  return auth === `Bearer ${token}`;
+export async function verifyInternalToken(request: Request): Promise<boolean> {
+  const bearer = await getInternalBearerFromRequest(request);
+  return isValidInternalToken(bearer);
 }

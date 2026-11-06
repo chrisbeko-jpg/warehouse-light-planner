@@ -8,6 +8,7 @@ import {
   validateAiCalculatorForm,
   type AiCalculatorFormData,
 } from "@/lib/ai-calculator/form";
+import { TurnstileField } from "@/components/security/TurnstileField";
 
 const EMPTY_FORM: AiCalculatorFormData = {
   companyName: "",
@@ -33,6 +34,9 @@ export function AiCalculatorForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [hpCompanySite, setHpCompanySite] = useState("");
+  const turnstileEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
   const update = (patch: Partial<AiCalculatorFormData>) => {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -46,6 +50,10 @@ export function AiCalculatorForm({
       setError(validationError);
       return;
     }
+    if (turnstileEnabled && !turnstileToken) {
+      setError("Beveiligingscontrole wordt geladen… Probeer het opnieuw over een moment.");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -53,7 +61,11 @@ export function AiCalculatorForm({
       const response = await fetch("/api/ai-calculator", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          _hp_company_site: hpCompanySite,
+          turnstileToken: turnstileToken ?? undefined,
+        }),
       });
       const bodyText = await response.text();
       const data = parseAiCalculatorApiResponse(response, bodyText);
@@ -63,6 +75,8 @@ export function AiCalculatorForm({
       }
       setSuccess(true);
       setForm(EMPTY_FORM);
+      setTurnstileToken(null);
+      setHpCompanySite("");
     } catch (err) {
       console.error("AI calculator submit failed:", err);
       setError(AI_CALCULATOR_SUBMIT_ERROR_MESSAGE);
@@ -92,6 +106,17 @@ export function AiCalculatorForm({
         <h2 className="lp-heading-2">{heading}</h2>
         <p className="lp-body mt-3">{intro}</p>
         <form className="lp-card mt-6 space-y-4 p-6" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            name="company_website"
+            value={hpCompanySite}
+            onChange={(e) => setHpCompanySite(e.target.value)}
+            className="absolute -left-[9999px] h-px w-px overflow-hidden"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+          />
+          <TurnstileField onVerify={(t) => setTurnstileToken(t)} onExpire={() => setTurnstileToken(null)} />
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
               Bedrijfsnaam *

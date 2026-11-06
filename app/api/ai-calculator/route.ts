@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { validateAiCalculatorForm, type AiCalculatorFormData } from "@/lib/ai-calculator/form";
+import type { AiCalculatorFormData } from "@/lib/ai-calculator/form";
 import { SITE_LINKS } from "@/lib/ledpaneel/site-config";
+import { guardPublicJsonPost } from "@/lib/security/public-api-guard";
+import { aiCalculatorPayloadSchema } from "@/lib/security/schemas/public-forms";
+import { envInt } from "@/lib/security/env";
 
 export const runtime = "nodejs";
 
@@ -23,19 +26,33 @@ function getSmtpConfig() {
 }
 
 export async function POST(request: Request) {
+  const guarded = await guardPublicJsonPost(request, {
+    routeKey: "ai_calculator",
+    maxBytes: envInt("MAX_BODY_AI_CALCULATOR_BYTES", 64_000),
+    rateLimit: {
+      max: envInt("RATE_LIMIT_AI_CALCULATOR_MAX", 8),
+      windowSec: envInt("RATE_LIMIT_AI_CALCULATOR_WINDOW_SEC", 3600),
+    },
+    schema: aiCalculatorPayloadSchema,
+    honeypotFilled: (d) => (d._hp_company_site?.length ?? 0) > 0,
+    getTurnstileToken: (d) => d.turnstileToken,
+  });
+
+  if (!guarded.ok) return guarded.response;
+
+  const body = guarded.data;
+  const form: AiCalculatorFormData = {
+    companyName: body.companyName,
+    contactPerson: body.contactPerson,
+    email: body.email,
+    telephone: body.telephone ?? "",
+    website: body.website ?? "",
+    description: body.description,
+    desiredTimeline: body.desiredTimeline ?? "",
+    remarks: body.remarks ?? "",
+  };
+
   try {
-    let body: AiCalculatorFormData;
-    try {
-      body = (await request.json()) as AiCalculatorFormData;
-    } catch {
-      return jsonError("Ongeldige aanvraag.", 400);
-    }
-
-    const validationError = validateAiCalculatorForm(body);
-    if (validationError) {
-      return jsonError(validationError, 400);
-    }
-
     const smtp = getSmtpConfig();
     if (!smtp) {
       console.error("ai-calculator: SMTP not configured");
@@ -50,28 +67,28 @@ export async function POST(request: Request) {
     });
 
     const mailFrom = process.env.SMTP_FROM ?? SITE_LINKS.contactEmail;
-    const subject = `Nieuwe aanvraag eigen AI lichtcalculator – ${body.companyName.trim()}`;
+    const subject = `Nieuwe aanvraag eigen AI lichtcalculator – ${form.companyName.trim()}`;
 
     const textBody = [
       subject,
       "",
-      `Bedrijf: ${body.companyName.trim()}`,
-      `Contact: ${body.contactPerson.trim()}`,
-      `E-mail: ${body.email.trim()}`,
-      body.telephone.trim() ? `Telefoon: ${body.telephone.trim()}` : "",
-      body.website.trim() ? `Website: ${body.website.trim()}` : "",
+      `Bedrijf: ${form.companyName.trim()}`,
+      `Contact: ${form.contactPerson.trim()}`,
+      `E-mail: ${form.email.trim()}`,
+      form.telephone.trim() ? `Telefoon: ${form.telephone.trim()}` : "",
+      form.website.trim() ? `Website: ${form.website.trim()}` : "",
       "",
       `Omschrijving wens:`,
-      body.description.trim(),
-      body.desiredTimeline.trim() ? `\nGewenste planning: ${body.desiredTimeline.trim()}` : "",
-      body.remarks.trim() ? `\nOpmerkingen: ${body.remarks.trim()}` : "",
+      form.description.trim(),
+      form.desiredTimeline.trim() ? `\nGewenste planning: ${form.desiredTimeline.trim()}` : "",
+      form.remarks.trim() ? `\nOpmerkingen: ${form.remarks.trim()}` : "",
     ]
       .filter(Boolean)
       .join("\n");
 
     await transporter.sendMail({
       from: mailFrom,
-      replyTo: body.email.trim(),
+      replyTo: form.email.trim(),
       to: SITE_LINKS.salesEmail,
       subject,
       text: textBody,

@@ -11,7 +11,7 @@ import type { LeadStatus } from "@/types/public-wizard";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  if (!verifyInternalToken(request)) {
+  if (!(await verifyInternalToken(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const leads = await listLeads();
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!verifyInternalToken(request)) {
+  if (!(await verifyInternalToken(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = (await request.json()) as { reference: string; status: LeadStatus };
@@ -31,7 +31,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!verifyInternalToken(request)) {
+  if (!(await verifyInternalToken(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = (await request.json()) as { reference: string; action: "download-pdf" };

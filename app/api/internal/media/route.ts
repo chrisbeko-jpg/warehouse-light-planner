@@ -14,7 +14,7 @@ function jsonError(message: string, status: number) {
 }
 
 export async function GET(request: Request) {
-  if (!verifyInternalToken(request)) {
+  if (!(await verifyInternalToken(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!verifyInternalToken(request)) {
+  if (!(await verifyInternalToken(request))) {
     return jsonError("Unauthorized", 401);
   }
 

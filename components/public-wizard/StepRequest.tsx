@@ -11,6 +11,7 @@ import {
 import { usePublicWizardStore } from "@/lib/public-wizard/store";
 import { WizardCard, WizardNav } from "@/components/public-wizard/WizardShell";
 import { WIZARD_COPY } from "@/lib/public-wizard/wizard-copy";
+import { TurnstileField } from "@/components/security/TurnstileField";
 import type { LeadContactForm } from "@/types/public-wizard";
 
 const EMPTY_FORM: LeadContactForm = {
@@ -35,6 +36,9 @@ export function StepRequest() {
   const [form, setForm] = useState<LeadContactForm>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [hpCompanySite, setHpCompanySite] = useState("");
+  const turnstileEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
   const roomFunction = usePublicWizardStore((s) => s.roomFunction);
   const ceilingHeightM = usePublicWizardStore((s) => s.ceilingHeightM);
@@ -94,6 +98,10 @@ export function StepRequest() {
       setError("Wizardgegevens ontbreken. Start opnieuw.");
       return;
     }
+    if (turnstileEnabled && !turnstileToken) {
+      setError("Beveiligingscontrole wordt geladen… Probeer het opnieuw over een moment.");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -114,6 +122,8 @@ export function StepRequest() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          _hp_company_site: hpCompanySite,
+          turnstileToken: turnstileToken ?? undefined,
           contact,
           roomFunction,
           ceilingHeightM,
@@ -138,8 +148,10 @@ export function StepRequest() {
       const data = parseLeadApiResponse(response, bodyText);
       if (!data.success || !data.reference) {
         setError(data.message || LEAD_SUBMIT_ERROR_MESSAGE);
-        return;
-      }
+      return;
+    }
+      setTurnstileToken(null);
+      setHpCompanySite("");
       setSubmitResult(data.reference, contact.email);
     } catch (err) {
       console.error("Lead submit failed:", err);
@@ -166,6 +178,19 @@ export function StepRequest() {
       <p className="lp-body mb-4">{WIZARD_COPY.request.intro}</p>
 
       <WizardCard className="grid gap-3 sm:grid-cols-2">
+        <input
+          type="text"
+          name="company_website"
+          value={hpCompanySite}
+          onChange={(e) => setHpCompanySite(e.target.value)}
+          className="absolute -left-[9999px] h-px w-px overflow-hidden"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+        />
+        <div className="sm:col-span-2">
+          <TurnstileField onVerify={(t) => setTurnstileToken(t)} onExpire={() => setTurnstileToken(null)} />
+        </div>
         <Field label="Bedrijfsnaam *" value={form.companyName} onChange={(v) => update({ companyName: v })} />
         <Field label="Contactpersoon *" value={form.contactPerson} onChange={(v) => update({ contactPerson: v })} />
         <Field label="Adres *" value={form.address} onChange={(v) => update({ address: v })} />

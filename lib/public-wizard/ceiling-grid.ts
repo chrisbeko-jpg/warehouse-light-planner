@@ -723,16 +723,14 @@ export function placePanelsOnCeilingGrid(
     );
   }
 
-  if (!isElongatedPanel(productId)) {
+  if (!isElongatedPanel(productId) && context.coverageAugmentMaxExtra != null) {
     const coverageAugment = augmentFixturesForCoverage(
       fixtures,
       vertices,
       pixelsPerMeter,
       productId,
       context,
-      context.coverageAugmentMaxExtra != null
-        ? { maxExtra: context.coverageAugmentMaxExtra }
-        : undefined,
+      { maxExtra: context.coverageAugmentMaxExtra },
     );
     fixtures = coverageAugment.fixtures;
   }

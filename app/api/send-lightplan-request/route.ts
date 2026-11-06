@@ -1,29 +1,11 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { formatEuroExVat } from "@/lib/format-currency";
+import { guardPublicJsonPost } from "@/lib/security/public-api-guard";
+import { sendLightplanPayloadSchema } from "@/lib/security/schemas/send-lightplan";
+import { envInt } from "@/lib/security/env";
 
 export const runtime = "nodejs";
-
-interface RequestBody {
-  email: string;
-  projectName?: string;
-  length: number;
-  width: number;
-  height: number;
-  lux: number;
-  lineFillMode: string;
-  mountingSystem: string;
-  totalExVat: number;
-  materialLines: Array<{
-    sku: string;
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    totalPrice: number;
-  }>;
-  pdfBase64?: string;
-  pdfFilename?: string;
-}
 
 function getSmtpConfig() {
   const host = process.env.SMTP_HOST;
@@ -45,7 +27,15 @@ function getSmtpConfig() {
   };
 }
 
-function buildMaterialText(lines: RequestBody["materialLines"]) {
+function buildMaterialText(
+  lines: {
+    sku: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+  }[],
+) {
   return lines
     .map(
       (line) =>
@@ -55,13 +45,23 @@ function buildMaterialText(lines: RequestBody["materialLines"]) {
 }
 
 export async function POST(request: Request) {
+  const guarded = await guardPublicJsonPost(request, {
+    routeKey: "send_lightplan",
+    maxBytes: envInt("MAX_BODY_SEND_LIGHTPLAN_BYTES", 18_000_000),
+    rateLimit: {
+      max: envInt("RATE_LIMIT_SEND_LIGHTPLAN_MAX", 8),
+      windowSec: envInt("RATE_LIMIT_SEND_LIGHTPLAN_WINDOW_SEC", 3600),
+    },
+    schema: sendLightplanPayloadSchema,
+    honeypotFilled: (d) => (d._hp_company_site?.length ?? 0) > 0,
+    getTurnstileToken: (d) => d.turnstileToken,
+  });
+
+  if (!guarded.ok) return guarded.response;
+
+  const body = guarded.data;
+
   try {
-    const body = (await request.json()) as RequestBody;
-
-    if (!body.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
-      return NextResponse.json({ ok: false, error: "Ongeldig e-mailadres" }, { status: 400 });
-    }
-
     const smtp = getSmtpConfig();
     const dateStr = new Date().toLocaleDateString("nl-NL");
 
@@ -122,12 +122,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ ok: true, emailSent: true });
-  } catch (error) {
-    console.error("send-lightplan-request error:", error);
+  } catch {
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "Mail versturen mislukt",
+        error: "Mail versturen mislukt",
       },
       { status: 500 },
     );
